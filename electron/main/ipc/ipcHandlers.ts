@@ -8,6 +8,7 @@ import { generatePassword } from '../services/password-gen.service'
 import { checkBreach } from '../services/breach-check.service'
 import { getDatabase } from '../db/connection'
 import { getCategories, createCategory, updateCategory, deleteCategory, reorderCategories } from '../db/queries/categories.queries'
+import { checkIntegrity } from '../integrity'
 
 type IPCChannel = keyof IPCChannels
 
@@ -78,6 +79,9 @@ const handlers: Record<string, (...args: any[]) => any> = {
     const db = await getDatabase()
     db.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, value])
   },
+
+  // Integrity check
+  'integrity:check': () => checkIntegrity(),
 
   // Import CSV
   'import:csv': async (_: unknown, filePath?: string) => {
