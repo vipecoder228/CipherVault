@@ -194,3 +194,74 @@ export async function getEntryTOTP(id: number): Promise<string | null> {
     return null
   }
 }
+
+// ─── Browser Extension Support ──────────────────────────
+
+function matchDomain(storedUrl: string, currentDomain: string): boolean {
+  if (!storedUrl) return false
+  try {
+    const stored = new URL(storedUrl)
+    return stored.hostname === currentDomain || stored.hostname.endsWith('.' + currentDomain)
+  } catch {
+    return storedUrl.toLowerCase().includes(currentDomain.toLowerCase())
+  }
+}
+
+export async function searchEntriesByDomain(
+  domain: string
+): Promise<Array<{ id: number; title: string; username: string }>> {
+  const encKey = getEncryptionKey()
+  if (!encKey) return []
+
+  const db = await getDatabase()
+  const vaultId = getActiveVaultId()
+  const rows = getEntries(db, {}, vaultId)
+
+  const matches: Array<{ id: number; title: string; username: string }> = []
+
+  for (const row of rows) {
+    try {
+      const decrypted = decryptJSON<{ url?: string; username?: string }>(
+        { iv: row.iv, ciphertext: row.encrypted_data, authTag: row.auth_tag },
+        encKey
+      )
+      if (matchDomain(decrypted.url || '', domain)) {
+        matches.push({
+          id: row.id,
+          title: row.display_title,
+          username: decrypted.username || '',
+        })
+      }
+    } catch {
+      // skip corrupted entries
+    }
+  }
+
+  return matches
+}
+
+export async function getEntryCredentials(
+  id: number
+): Promise<{ id: number; title: string; username: string; password: string } | null> {
+  const encKey = getEncryptionKey()
+  if (!encKey) return null
+
+  const db = await getDatabase()
+  const row = getEntryById(db, id)
+  if (!row) return null
+
+  try {
+    const decrypted = decryptJSON<{ username?: string; password?: string }>(
+      { iv: row.iv, ciphertext: row.encrypted_data, authTag: row.auth_tag },
+      encKey
+    )
+    return {
+      id: row.id,
+      title: row.display_title,
+      username: decrypted.username || '',
+      password: decrypted.password || '',
+    }
+  } catch {
+    return null
+  }
+}

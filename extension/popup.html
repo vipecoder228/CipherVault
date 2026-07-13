@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 280px;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0f14;
+      color: #e0e0e0;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .logo {
+      width: 28px;
+      height: 28px;
+      background: #6366f1;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .logo svg {
+      width: 16px;
+      height: 16px;
+      stroke: white;
+      fill: none;
+    }
+    .title {
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      background: #1a1a24;
+      border-radius: 8px;
+      margin-bottom: 12px;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .dot.connected { background: #22c55e; }
+    .dot.disconnected { background: #ef4444; }
+    .status-text {
+      font-size: 12px;
+      color: #999;
+    }
+    .status-text strong {
+      color: #e0e0e0;
+    }
+    .hint {
+      font-size: 11px;
+      color: #666;
+      line-height: 1.5;
+    }
+    .token-section {
+      margin-top: 12px;
+    }
+    .token-input {
+      width: 100%;
+      padding: 8px 10px;
+      background: #1a1a24;
+      border: 1px solid #333;
+      border-radius: 6px;
+      color: #e0e0e0;
+      font-size: 11px;
+      font-family: monospace;
+      outline: none;
+    }
+    .token-input:focus {
+      border-color: #6366f1;
+    }
+    .token-btn {
+      width: 100%;
+      margin-top: 6px;
+      padding: 6px;
+      background: #6366f1;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .token-btn:hover {
+      background: #5558e6;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+      </svg>
+    </div>
+    <span class="title">CipherVault</span>
+  </div>
+
+  <div class="status-row">
+    <div class="dot" id="statusDot"></div>
+    <span class="status-text" id="statusText">Checking...</span>
+  </div>
+
+  <p class="hint">
+    Make sure CipherVault desktop app is running and unlocked. The extension communicates directly with the app over a local connection — no data leaves your computer.
+  </p>
+
+  <div class="token-section">
+    <input type="text" class="token-input" id="tokenInput" placeholder="Paste auth token from CipherVault">
+    <button class="token-btn" id="saveToken">Connect</button>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
