@@ -1,6 +1,11 @@
 import { create } from 'zustand'
 import { invoke } from '../lib/ipc'
 
+interface VaultInfo {
+  id: number
+  displayName: string
+}
+
 interface VaultState {
   locked: boolean
   initialized: boolean
@@ -9,11 +14,14 @@ interface VaultState {
   requiresTotp: boolean
   pendingPassword: string | null
   alarmMode: boolean
+  activeVaultId: number
+  vaults: VaultInfo[]
 
   checkStatus: () => Promise<void>
-  setup: (masterPassword: string, alarmPassword?: string) => Promise<boolean>
-  unlock: (masterPassword: string, totpCode?: string) => Promise<boolean>
+  setup: (masterPassword: string, alarmPassword?: string, displayName?: string) => Promise<boolean>
+  unlock: (masterPassword: string, totpCode?: string, vaultId?: number) => Promise<boolean>
   lock: () => Promise<void>
+  switchVault: (vaultId: number) => void
   clearError: () => void
   resetTotpState: () => void
 }
@@ -26,22 +34,38 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   requiresTotp: false,
   pendingPassword: null,
   alarmMode: false,
+  activeVaultId: 1,
+  vaults: [],
 
   checkStatus: async () => {
     try {
       const status = await invoke('vault:status')
-      set({ locked: status.locked, initialized: status.initialized })
+      set({
+        locked: status.locked,
+        initialized: status.initialized,
+        activeVaultId: status.activeVaultId,
+        vaults: status.vaults,
+      })
     } catch (err) {
       console.error('Failed to check vault status:', err)
     }
   },
 
-  setup: async (masterPassword: string, alarmPassword?: string) => {
+  setup: async (masterPassword: string, alarmPassword?: string, displayName?: string) => {
     set({ loading: true, error: null })
     try {
-      const result = await invoke('vault:setup', masterPassword, alarmPassword)
+      const result = await invoke('vault:setup', masterPassword, alarmPassword, displayName)
       if (result.success) {
-        set({ locked: false, initialized: true, loading: false, alarmMode: false })
+        // Refresh vault list
+        const status = await invoke('vault:status')
+        set({
+          locked: false,
+          initialized: true,
+          loading: false,
+          alarmMode: false,
+          activeVaultId: status.activeVaultId,
+          vaults: status.vaults,
+        })
         return true
       } else {
         set({ error: result.error || 'Setup failed', loading: false })
@@ -53,10 +77,10 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     }
   },
 
-  unlock: async (masterPassword: string, totpCode?: string) => {
+  unlock: async (masterPassword: string, totpCode?: string, vaultId?: number) => {
     set({ loading: true, error: null })
     try {
-      const result = await invoke('vault:unlock', masterPassword, totpCode)
+      const result = await invoke('vault:unlock', masterPassword, totpCode, vaultId)
       if (result.success) {
         set({
           locked: false,
@@ -87,6 +111,10 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   lock: async () => {
     await invoke('vault:lock')
     set({ locked: true, requiresTotp: false, pendingPassword: null, alarmMode: false })
+  },
+
+  switchVault: (vaultId: number) => {
+    set({ activeVaultId: vaultId })
   },
 
   clearError: () => set({ error: null }),

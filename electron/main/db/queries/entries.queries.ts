@@ -19,10 +19,15 @@ function queryOne<T>(db: Database, sql: string, params: any[] = []): T | undefin
 
 export function getEntries(
   db: Database,
-  filters?: EntryFilters
+  filters?: EntryFilters,
+  vaultId?: number
 ): EncryptedEntry[] {
   let query = 'SELECT * FROM encrypted_entries WHERE 1=1'
   const params: any[] = []
+
+  // Always filter by vault_id (default to 1)
+  query += ' AND vault_id = ?'
+  params.push(vaultId ?? 1)
 
   if (filters) {
     if (filters.category_id !== undefined && filters.category_id !== null) {
@@ -59,12 +64,13 @@ export function createEntry(
   authTag: string,
   displayTitle: string,
   categoryId: number | null = null,
-  isFavorite: boolean = false
+  isFavorite: boolean = false,
+  vaultId: number = 1
 ): EncryptedEntry {
   db.run(
-    `INSERT INTO encrypted_entries (entry_type, encrypted_data, iv, auth_tag, display_title, category_id, is_favorite)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [entryType, encryptedData, iv, authTag, displayTitle, categoryId, isFavorite ? 1 : 0]
+    `INSERT INTO encrypted_entries (entry_type, encrypted_data, iv, auth_tag, display_title, category_id, is_favorite, vault_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [entryType, encryptedData, iv, authTag, displayTitle, categoryId, isFavorite ? 1 : 0, vaultId]
   )
 
   const lastId = db.exec('SELECT last_insert_rowid()')[0].values[0][0] as number
@@ -111,11 +117,12 @@ export function deleteEntry(
 
 export function searchEntries(
   db: Database,
-  query: string
+  query: string,
+  vaultId?: number
 ): EncryptedEntry[] {
   return queryAll<EncryptedEntry>(
     db,
-    `SELECT * FROM encrypted_entries WHERE display_title LIKE ? OR entry_type LIKE ? ORDER BY updated_at DESC`,
-    [`%${query}%`, `%${query}%`]
+    `SELECT * FROM encrypted_entries WHERE vault_id = ? AND (display_title LIKE ? OR entry_type LIKE ?) ORDER BY updated_at DESC`,
+    [vaultId ?? 1, `%${query}%`, `%${query}%`]
   )
 }

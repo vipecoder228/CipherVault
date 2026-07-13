@@ -10,13 +10,16 @@ import {
 } from '../db/queries/entries.queries'
 import { addHistoryEntry, getEntryHistory, getFullEntryHistory } from '../db/queries/history.queries'
 import { encryptJSON, decryptJSON } from '../crypto/encryption'
-import { getEncryptionKey } from './vault.service'
+import { getEncryptionKey, getActiveVaultId } from './vault.service'
 import { generateTOTPToken } from '../crypto/totp'
 import type { CreateEntryPayload, UpdateEntryPayload, DecryptedEntry, EncryptedEntry, EntryFilters, EntryHistoryItem } from '../../shared/types'
 
 export async function listEntries(filters?: EntryFilters): Promise<EncryptedEntry[]> {
+  const encKey = getEncryptionKey()
+  if (!encKey) return [] // Alarm mode — return empty
   const db = await getDatabase()
-  return getEntries(db, filters)
+  const vaultId = getActiveVaultId()
+  return getEntries(db, filters, vaultId)
 }
 
 export async function getEntry(id: number): Promise<DecryptedEntry | null> {
@@ -60,6 +63,7 @@ export async function createEntry(data: CreateEntryPayload): Promise<EncryptedEn
 
   const encrypted = encryptJSON(entryData, encKey)
 
+  const vaultId = getActiveVaultId()
   const entry = dbCreateEntry(
     db,
     data.entry_type,
@@ -68,7 +72,8 @@ export async function createEntry(data: CreateEntryPayload): Promise<EncryptedEn
     encrypted.authTag,
     data.title || data.entry_type,
     data.category_id ?? null,
-    data.is_favorite ?? false
+    data.is_favorite ?? false,
+    vaultId
   )
 
   addHistoryEntry(db, entry.id, encrypted.ciphertext, encrypted.iv, encrypted.authTag, 'create')
@@ -112,23 +117,32 @@ export async function updateEntry(id: number, data: UpdateEntryPayload): Promise
 }
 
 export async function deleteEntryById(id: number): Promise<void> {
+  const encKey = getEncryptionKey()
+  if (!encKey) return // Alarm mode — no-op
   const db = await getDatabase()
   dbDeleteEntry(db, id)
   saveDatabase()
 }
 
 export async function searchEntries(query: string): Promise<EncryptedEntry[]> {
+  const encKey = getEncryptionKey()
+  if (!encKey) return [] // Alarm mode — return empty
   const db = await getDatabase()
-  return dbSearchEntries(db, query)
+  const vaultId = getActiveVaultId()
+  return dbSearchEntries(db, query, vaultId)
 }
 
 export async function toggleFavoriteEntry(id: number): Promise<void> {
+  const encKey = getEncryptionKey()
+  if (!encKey) return // Alarm mode — no-op
   const db = await getDatabase()
   dbToggleFavorite(db, id)
   saveDatabase()
 }
 
 export async function getEntryHistoryList(id: number): Promise<EntryHistoryItem[]> {
+  const encKey = getEncryptionKey()
+  if (!encKey) return [] // Alarm mode — return empty
   const db = await getDatabase()
   return getEntryHistory(db, id)
 }

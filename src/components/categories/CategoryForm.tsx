@@ -116,7 +116,7 @@ export function CategoryForm({ open, onClose, onCreated, initialData }: Props) {
         <div className="flex justify-end gap-3 pt-2">
           <Button variant="secondary" onClick={handleClose}>Cancel</Button>
           <Button onClick={handleSubmit} disabled={loading}>
-            {loading ? 'Creating...' : 'Create'}
+            {loading ? (initialData ? 'Saving...' : 'Creating...') : (initialData ? 'Save Changes' : 'Create')}
           </Button>
         </div>
       </div>
@@ -129,7 +129,7 @@ function getIconEmoji(icon: string): string {
     folder: '📁', briefcase: '💼', heart: '❤️', star: '⭐',
     home: '🏠', globe: '🌐', 'credit-card': '💳', key: '🔑',
     user: '👤', lock: '🔒', shield: '🛡️', mail: '📧',
-    phone: '📱', car: '🚗', gamepad: '🎮', music: '🎵', camera: '📷',
+    phone: '📱', car: '🚗', 'gamepad-2': '🎮', music: '🎵', camera: '📷',
   }
   return map[icon] || '📁'
 }

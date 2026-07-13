@@ -1,5 +1,5 @@
 import { getDatabase, saveDatabase } from '../db/connection'
-import { getVault, createVault, updateMasterHash, updateTOTP, updateAlarm } from '../db/queries/vault.queries'
+import { getVault, getAllVaults, createVault, updateMasterHash, updateTOTP, updateAlarm } from '../db/queries/vault.queries'
 import { generateSalt, deriveKey, computeVerificationHash, splitDerivedKey } from '../crypto/keyderivation'
 import { encrypt, decrypt } from '../crypto/encryption'
 import { generateSecret, verifyTOTP, generateQRCodeUrl } from '../crypto/totp'
@@ -10,6 +10,7 @@ import type { Buffer } from 'buffer'
 let derivedKey: Buffer | null = null
 let autoLockTimer: ReturnType<typeof setTimeout> | null = null
 let alarmMode = false
+let activeVaultId: number = 1
 
 // Pending TOTP secret (set during enableTOTP, used during verifyAndSaveTOTP)
 let pendingTotpSecret: string | null = null
@@ -25,6 +26,10 @@ export function isAlarmMode(): boolean {
 export function getEncryptionKey(): Buffer | null {
   if (!derivedKey) return null
   return splitDerivedKey(derivedKey).encryptionKey
+}
+
+export function getActiveVaultId(): number {
+  return activeVaultId
 }
 
 // ─── Rate Limiting ──────────────────────────────────────
@@ -56,18 +61,33 @@ function getRequiredDelay(db: any): number {
 
 export async function getVaultStatus() {
   const db = await getDatabase()
-  const vault = getVault(db)
+  const vault = getVault(db, activeVaultId)
+  const allVaults = getAllVaults(db)
   return {
     locked: !isUnlocked(),
     initialized: !!vault,
+    activeVaultId,
+    vaults: allVaults.map(v => ({ id: v.id, displayName: v.display_name })),
   }
 }
 
-export async function setupVault(masterPassword: string, alarmPassword?: string): Promise<{ success: boolean; error?: string }> {
+export async function setupVault(masterPassword: string, alarmPassword?: string, displayName?: string): Promise<{ success: boolean; error?: string; vaultId?: number }> {
   const db = await getDatabase()
-  const existing = getVault(db)
-  if (existing) {
-    return { success: false, error: 'Vault already initialized' }
+
+  // Find next available vault id
+  const allVaults = getAllVaults(db)
+  const existingIds = allVaults.map(v => v.id)
+  let newVaultId = 1
+  while (existingIds.includes(newVaultId)) {
+    newVaultId++
+  }
+
+  // If this is the first vault, lock any other vaults first
+  if (newVaultId === 1) {
+    const firstVault = getVault(db, 1)
+    if (firstVault) {
+      return { success: false, error: 'Vault already initialized' }
+    }
   }
 
   const salt = generateSalt()
@@ -90,7 +110,12 @@ export async function setupVault(masterPassword: string, alarmPassword?: string)
 
   // Set alarm password if provided
   if (alarmHash && alarmSaltHex) {
-    updateAlarm(db, alarmHash, alarmSaltHex)
+    updateAlarm(db, alarmHash, alarmSaltHex, newVaultId)
+  }
+
+  // Update display name if provided
+  if (displayName) {
+    db.run('UPDATE vault SET display_name = ? WHERE id = ?', [displayName, newVaultId])
   }
 
   saveDatabase()
@@ -98,20 +123,23 @@ export async function setupVault(masterPassword: string, alarmPassword?: string)
   // Unlock immediately after setup
   derivedKey = key
   alarmMode = false
+  activeVaultId = newVaultId
   await startAutoLockTimer()
 
-  return { success: true }
+  return { success: true, vaultId: newVaultId }
 }
 
 export async function unlockVault(
   masterPassword: string,
-  totpCode?: string
+  totpCode?: string,
+  vaultId?: number
 ): Promise<{ success: boolean; error?: string; requiresTotp?: boolean; alarmMode?: boolean }> {
   if (isUnlocked()) {
     return { success: false, error: 'Vault is already unlocked' }
   }
 
   const db = await getDatabase()
+  const targetVaultId = vaultId ?? activeVaultId
 
   const attempts = getRecentFailedAttempts(db)
   if (attempts >= RATE_LIMIT.ATTEMPTS_BEFORE_LOCK) {
@@ -126,7 +154,7 @@ export async function unlockVault(
     await new Promise(resolve => setTimeout(resolve, delay))
   }
 
-  const vault = getVault(db)
+  const vault = getVault(db, targetVaultId)
   if (!vault) {
     return { success: false, error: 'Vault not initialized' }
   }
@@ -184,6 +212,7 @@ export async function unlockVault(
 
   derivedKey = isAlarm ? null : key // In alarm mode, don't store real key
   alarmMode = isAlarm
+  activeVaultId = targetVaultId
   recordAttempt(db, true)
   saveDatabase()
   await startAutoLockTimer()
@@ -192,13 +221,32 @@ export async function unlockVault(
 }
 
 export function lockVault(): void {
+  // Zero the key buffer before releasing it
+  if (derivedKey) {
+    derivedKey.fill(0)
+  }
   derivedKey = null
   alarmMode = false
   pendingTotpSecret = null
+  // Don't reset activeVaultId — keep it for re-unlock
   if (autoLockTimer) {
     clearTimeout(autoLockTimer)
     autoLockTimer = null
   }
+}
+
+export async function switchVault(vaultId: number): Promise<{ success: boolean; error?: string }> {
+  if (isUnlocked()) {
+    return { success: false, error: 'Lock the vault before switching' }
+  }
+  // Validate vault exists
+  const db = await getDatabase()
+  const vault = getVault(db, vaultId)
+  if (!vault) {
+    return { success: false, error: 'Vault not found' }
+  }
+  activeVaultId = vaultId
+  return { success: true }
 }
 
 export async function changeMasterPassword(
@@ -207,7 +255,7 @@ export async function changeMasterPassword(
   totpCode?: string
 ): Promise<{ success: boolean; error?: string }> {
   const db = await getDatabase()
-  const vault = getVault(db)
+  const vault = getVault(db, activeVaultId)
   if (!vault) {
     return { success: false, error: 'Vault not initialized' }
   }
@@ -247,7 +295,7 @@ export async function changeMasterPassword(
   const newHash = computeVerificationHash(newEncKey)
 
   // Update vault
-  updateMasterHash(db, newHash, newSalt.toString('hex'))
+  updateMasterHash(db, newHash, newSalt.toString('hex'), 'pbkdf2', activeVaultId)
 
   // Re-encrypt TOTP secret if enabled
   if (vault.totp_enabled && vault.totp_secret) {
@@ -258,7 +306,7 @@ export async function changeMasterPassword(
     )
     const reEncrypted = encrypt(decryptedSecret, newEncKey)
     const reEncryptedStr = `${reEncrypted.iv}:${reEncrypted.ciphertext}:${reEncrypted.authTag}`
-    updateTOTP(db, reEncryptedStr, true)
+    updateTOTP(db, reEncryptedStr, true, activeVaultId)
   }
 
   saveDatabase()
@@ -293,7 +341,7 @@ export async function verifyAndSaveTOTP(code: string): Promise<boolean> {
   const encryptedStr = `${encrypted.iv}:${encrypted.ciphertext}:${encrypted.authTag}`
 
   const db = await getDatabase()
-  updateTOTP(db, encryptedStr, true)
+  updateTOTP(db, encryptedStr, true, activeVaultId)
   saveDatabase()
 
   pendingTotpSecret = null
@@ -305,7 +353,7 @@ export async function disableTOTP(totpCode: string): Promise<boolean> {
   if (!encKey) return false
 
   const db = await getDatabase()
-  const vault = getVault(db)
+  const vault = getVault(db, activeVaultId)
   if (!vault || !vault.totp_secret) return false
 
   const parts = vault.totp_secret.split(':')
@@ -316,7 +364,7 @@ export async function disableTOTP(totpCode: string): Promise<boolean> {
 
   if (!verifyTOTP(decryptedSecret, totpCode)) return false
 
-  updateTOTP(db, null, false)
+  updateTOTP(db, null, false, activeVaultId)
   saveDatabase()
   return true
 }
@@ -359,7 +407,7 @@ export async function setupAlarmPassword(alarmPassword: string): Promise<{ succe
   if (!encKey) return { success: false, error: 'Vault is locked' }
 
   const db = await getDatabase()
-  const vault = getVault(db)
+  const vault = getVault(db, activeVaultId)
   if (!vault) return { success: false, error: 'Vault not initialized' }
 
   const salt = generateSalt()
@@ -367,7 +415,7 @@ export async function setupAlarmPassword(alarmPassword: string): Promise<{ succe
   const { encryptionKey } = splitDerivedKey(key)
   const alarmHash = computeVerificationHash(encryptionKey)
 
-  updateAlarm(db, alarmHash, salt.toString('hex'))
+  updateAlarm(db, alarmHash, salt.toString('hex'), activeVaultId)
   saveDatabase()
 
   return { success: true }
@@ -375,7 +423,7 @@ export async function setupAlarmPassword(alarmPassword: string): Promise<{ succe
 
 export async function changeAlarmPassword(oldAlarmPassword: string, newAlarmPassword: string): Promise<{ success: boolean; error?: string }> {
   const db = await getDatabase()
-  const vault = getVault(db)
+  const vault = getVault(db, activeVaultId)
   if (!vault) return { success: false, error: 'Vault not initialized' }
 
   if (!vault.alarm_hash || !vault.alarm_salt) {
@@ -398,7 +446,7 @@ export async function changeAlarmPassword(oldAlarmPassword: string, newAlarmPass
   const { encryptionKey: newEncKey } = splitDerivedKey(newKey)
   const newHash = computeVerificationHash(newEncKey)
 
-  updateAlarm(db, newHash, newSalt.toString('hex'))
+  updateAlarm(db, newHash, newSalt.toString('hex'), activeVaultId)
   saveDatabase()
 
   return { success: true }
@@ -406,7 +454,7 @@ export async function changeAlarmPassword(oldAlarmPassword: string, newAlarmPass
 
 export async function removeAlarmPassword(): Promise<{ success: boolean; error?: string }> {
   const db = await getDatabase()
-  updateAlarm(db, null, null)
+  updateAlarm(db, null, null, activeVaultId)
   saveDatabase()
   return { success: true }
 }

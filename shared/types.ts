@@ -97,11 +97,14 @@ export interface CreateCategoryPayload {
 export interface VaultStatus {
   locked: boolean
   initialized: boolean
+  activeVaultId: number
+  vaults: Array<{ id: number; displayName: string }>
 }
 
 export interface VaultSetupResult {
   success: boolean
   error?: string
+  vaultId?: number
 }
 
 export interface VaultUnlockResult {
@@ -150,9 +153,10 @@ export interface EntryHistoryItem {
 export interface IPCChannels {
   // Vault
   'vault:status': () => VaultStatus
-  'vault:setup': (masterPassword: string, alarmPassword?: string) => Promise<VaultSetupResult>
-  'vault:unlock': (masterPassword: string, totpCode?: string) => Promise<VaultUnlockResult>
+  'vault:setup': (masterPassword: string, alarmPassword?: string, displayName?: string) => Promise<VaultSetupResult>
+  'vault:unlock': (masterPassword: string, totpCode?: string, vaultId?: number) => Promise<VaultUnlockResult>
   'vault:lock': () => void
+  'vault:switch': (vaultId: number) => Promise<{ success: boolean; error?: string }>
   'vault:change-master-password': (oldPassword: string, newPassword: string, totpCode?: string) => Promise<VaultSetupResult>
   'vault:enable-totp': () => Promise<{ secret: string; qrCodeUrl: string }>
   'vault:verify-totp': (code: string) => Promise<boolean>
@@ -191,6 +195,14 @@ export interface IPCChannels {
   // Settings
   'settings:get': (key: string) => Promise<string | null>
   'settings:set': (key: string, value: string) => Promise<void>
+
+  // Disposable Emails
+  'disposable:create': () => Promise<{ id: number; address: string }>
+  'disposable:list': () => Promise<Array<{ id: number; address: string; createdAt: string }>>
+  'disposable:messages': (emailId: number) => Promise<Array<{ id: string; from: string; subject: string; intro: string; createdAt: string; size: number }>>
+  'disposable:message': (emailId: number, messageId: string) => Promise<{ id: string; from: string; subject: string; text: string; html: string; createdAt: string }>
+  'disposable:delete-message': (emailId: number, messageId: string) => Promise<void>
+  'disposable:delete-account': (emailId: number) => Promise<void>
 
   // Import/Export
   'import:csv': (filePath: string) => Promise<ImportResult>

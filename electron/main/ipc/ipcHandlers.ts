@@ -4,6 +4,7 @@ import type { IPCChannels } from '../../shared/types'
 import * as vaultService from '../services/vault.service'
 import * as entriesService from '../services/entries.service'
 import * as clipboardService from '../services/clipboard.service'
+import * as disposableEmailService from '../services/disposable-email.service'
 import { generatePassword } from '../services/password-gen.service'
 import { checkBreach } from '../services/breach-check.service'
 import { getDatabase } from '../db/connection'
@@ -15,9 +16,10 @@ type IPCChannel = keyof IPCChannels
 const handlers: Record<string, (...args: any[]) => any> = {
   // Vault
   'vault:status': () => vaultService.getVaultStatus(),
-  'vault:setup': (_: unknown, masterPassword: string, alarmPassword?: string) => vaultService.setupVault(masterPassword, alarmPassword),
-  'vault:unlock': (_: unknown, masterPassword: string, totpCode?: string) => vaultService.unlockVault(masterPassword, totpCode),
+  'vault:setup': (_: unknown, masterPassword: string, alarmPassword?: string, displayName?: string) => vaultService.setupVault(masterPassword, alarmPassword, displayName),
+  'vault:unlock': (_: unknown, masterPassword: string, totpCode?: string, vaultId?: number) => vaultService.unlockVault(masterPassword, totpCode, vaultId),
   'vault:lock': () => vaultService.lockVault(),
+  'vault:switch': (_: unknown, vaultId: number) => vaultService.switchVault(vaultId),
   'vault:change-master-password': (_: unknown, oldPwd: string, newPwd: string, totpCode?: string) => vaultService.changeMasterPassword(oldPwd, newPwd, totpCode),
   'vault:enable-totp': () => vaultService.enableTOTP(),
   'vault:verify-totp': (_: unknown, code: string) => vaultService.verifyAndSaveTOTP(code),
@@ -79,6 +81,14 @@ const handlers: Record<string, (...args: any[]) => any> = {
     const db = await getDatabase()
     db.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, value])
   },
+
+  // Disposable Emails
+  'disposable:create': () => disposableEmailService.createDisposableEmailAddress(),
+  'disposable:list': () => disposableEmailService.listDisposableEmails(),
+  'disposable:messages': (_: unknown, emailId: number) => disposableEmailService.getDisposableEmailMessages(emailId),
+  'disposable:message': (_: unknown, emailId: number, messageId: string) => disposableEmailService.getDisposableEmailMessage(emailId, messageId),
+  'disposable:delete-message': (_: unknown, emailId: number, messageId: string) => disposableEmailService.deleteDisposableEmailMessage(emailId, messageId),
+  'disposable:delete-account': (_: unknown, emailId: number) => disposableEmailService.deleteDisposableEmailAccount(emailId),
 
   // Integrity check
   'integrity:check': () => checkIntegrity(),

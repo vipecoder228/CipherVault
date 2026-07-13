@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useVaultStore } from '../../store/vaultStore'
 import { VerificationScreen } from './VerificationScreen'
-import { Shield, Eye, EyeOff, AlertTriangle } from 'lucide-react'
+import { Shield, Eye, EyeOff, AlertTriangle, Plus, ChevronDown } from 'lucide-react'
 
 export function UnlockScreen() {
   const [password, setPassword] = useState('')
@@ -9,7 +9,10 @@ export function UnlockScreen() {
   const [alarmPassword, setAlarmPassword] = useState('')
   const [showAlarmPassword, setShowAlarmPassword] = useState(false)
   const [showAlarmField, setShowAlarmField] = useState(false)
-  const { unlock, setup, initialized, loading, error, clearError, requiresTotp, pendingPassword, resetTotpState } = useVaultStore()
+  const [vaultName, setVaultName] = useState('')
+  const [showVaultName, setShowVaultName] = useState(false)
+  const [showVaultSelector, setShowVaultSelector] = useState(false)
+  const { unlock, setup, initialized, loading, error, clearError, requiresTotp, pendingPassword, resetTotpState, activeVaultId, vaults, switchVault } = useVaultStore()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -17,9 +20,9 @@ export function UnlockScreen() {
 
     let success: boolean
     if (initialized) {
-      success = await unlock(password)
+      success = await unlock(password, undefined, activeVaultId)
     } else {
-      success = await setup(password, alarmPassword || undefined)
+      success = await setup(password, alarmPassword || undefined, vaultName || undefined)
     }
 
     if (!success && !useVaultStore.getState().requiresTotp) {
@@ -29,13 +32,20 @@ export function UnlockScreen() {
 
   const handleTotpVerify = async (code: string): Promise<boolean> => {
     if (!pendingPassword) return false
-    const success = await unlock(pendingPassword, code)
+    const success = await unlock(pendingPassword, code, activeVaultId)
     return success
   }
 
   const handleTotpCancel = () => {
     resetTotpState()
     setPassword('')
+  }
+
+  const handleVaultSwitch = (vaultId: number) => {
+    switchVault(vaultId)
+    setShowVaultSelector(false)
+    setPassword('')
+    clearError()
   }
 
   // Show TOTP verification screen
@@ -68,6 +78,39 @@ export function UnlockScreen() {
           </p>
         </div>
 
+        {/* Vault Selector (only when multiple vaults exist and initialized) */}
+        {initialized && vaults.length > 0 && (
+          <div className="mb-4">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowVaultSelector(!showVaultSelector)}
+                className="w-full h-10 px-4 flex items-center justify-between rounded-xl bg-vault-surface border border-vault-border text-vault-text text-sm hover:border-vault-accent/50 transition-colors"
+              >
+                <span className="font-medium">{vaults.find(v => v.id === activeVaultId)?.displayName || `Vault ${activeVaultId}`}</span>
+                <ChevronDown size={16} className={`text-vault-text-secondary transition-transform ${showVaultSelector ? 'rotate-180' : ''}`} />
+              </button>
+              {showVaultSelector && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-vault-surface border border-vault-border rounded-xl shadow-lg z-50 overflow-hidden">
+                  {vaults.map((vault) => (
+                    <button
+                      key={vault.id}
+                      onClick={() => handleVaultSwitch(vault.id)}
+                      className={`w-full px-4 py-2.5 text-left text-sm transition-colors ${
+                        activeVaultId === vault.id
+                          ? 'bg-vault-accent/10 text-vault-accent'
+                          : 'text-vault-text hover:bg-vault-surface-hover'
+                      }`}
+                    >
+                      {vault.displayName}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="relative">
@@ -87,6 +130,32 @@ export function UnlockScreen() {
               {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
           </div>
+
+          {/* Vault name field (setup only) */}
+          {!initialized && vaults.length > 0 && (
+            <div className="space-y-2">
+              {!showVaultName ? (
+                <button
+                  type="button"
+                  onClick={() => setShowVaultName(true)}
+                  className="w-full text-xs text-vault-text-secondary hover:text-vault-accent transition-colors flex items-center justify-center gap-1"
+                >
+                  <Plus size={12} />
+                  Name this vault (optional)
+                </button>
+              ) : (
+                <div className="animate-slide-up">
+                  <input
+                    type="text"
+                    placeholder="Vault name (e.g. Work, Personal)"
+                    value={vaultName}
+                    onChange={(e) => setVaultName(e.target.value)}
+                    className="w-full h-10 px-4 rounded-lg bg-vault-surface border border-vault-border text-vault-text placeholder:text-vault-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-vault-accent/50 focus:border-vault-accent transition-colors text-sm"
+                  />
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Alarm password field (setup only) */}
           {!initialized && (
@@ -143,7 +212,7 @@ export function UnlockScreen() {
                 {initialized ? 'Unlocking...' : 'Setting up...'}
               </div>
             ) : (
-              initialized ? 'Continue' : 'Create Vault'
+              initialized ? 'Continue' : vaults.length > 0 ? 'Create Vault' : 'Create Master Vault'
             )}
           </button>
         </form>
@@ -151,7 +220,10 @@ export function UnlockScreen() {
         {/* First time hint */}
         {!initialized && (
           <p className="mt-4 text-center text-xs text-vault-text-secondary">
-            This will be your master password. Choose something strong and memorable.
+            {vaults.length > 0
+              ? 'Each vault has its own master password and stores separate passwords.'
+              : 'This will be your master password. Choose something strong and memorable.'
+            }
             <br />
             It cannot be recovered if lost.
           </p>

@@ -70,6 +70,23 @@ const MIGRATIONS = [
   // v9: Add alarm/duress code support
   `ALTER TABLE vault ADD COLUMN alarm_hash TEXT;`,
   `ALTER TABLE vault ADD COLUMN alarm_salt TEXT;`,
+
+  // v10: Multi-vault support — add vault_id to entries
+  `ALTER TABLE encrypted_entries ADD COLUMN vault_id INTEGER NOT NULL DEFAULT 1;`,
+  `CREATE INDEX IF NOT EXISTS idx_entries_vault ON encrypted_entries(vault_id);`,
+
+  // v11: Vault display name
+  `ALTER TABLE vault ADD COLUMN display_name TEXT NOT NULL DEFAULT 'Main Vault';`,
+
+  // v12: Disposable emails
+  `CREATE TABLE IF NOT EXISTS disposable_emails (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    address     TEXT    NOT NULL UNIQUE,
+    password    TEXT    NOT NULL,
+    token       TEXT,
+    account_id  TEXT,
+    created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+  );`,
 ]
 
 export function runMigrations(db: Database): void {

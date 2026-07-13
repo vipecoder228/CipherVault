@@ -5,7 +5,7 @@ import { Button } from '../ui/Button'
 import { useEntriesStore } from '../../store/entriesStore'
 import { useToastStore } from '../ui/Toast'
 import { invoke } from '../../lib/ipc'
-import { RefreshCw, Copy, Key } from 'lucide-react'
+import { RefreshCw, Copy, Key, Shield } from 'lucide-react'
 import { calculateStrength } from '../../lib/passwordStrength'
 import type { UpdateEntryPayload, DecryptedEntry, PasswordOptions } from '@shared/types'
 
@@ -21,6 +21,7 @@ export function EditEntryModal({ open, onClose, entry }: Props) {
   const [password, setPassword] = useState('')
   const [url, setUrl] = useState('')
   const [notes, setNotes] = useState('')
+  const [totpSecret, setTotpSecret] = useState('')
   const [cardNumber, setCardNumber] = useState('')
   const [cardHolder, setCardHolder] = useState('')
   const [cardExpiry, setCardExpiry] = useState('')
@@ -40,6 +41,7 @@ export function EditEntryModal({ open, onClose, entry }: Props) {
       setPassword(entry.password || '')
       setUrl(entry.url || '')
       setNotes(entry.notes || '')
+      setTotpSecret(entry.totp_secret || '')
       setCardNumber(entry.card_number || '')
       setCardHolder(entry.card_holder || '')
       setCardExpiry(entry.card_expiry || '')
@@ -70,6 +72,7 @@ export function EditEntryModal({ open, onClose, entry }: Props) {
         password: entry.entry_type === 'login' ? password : undefined,
         url: entry.entry_type === 'login' ? url.trim() : undefined,
         notes: notes.trim(),
+        totp_secret: totpSecret.trim() || undefined,
         card_number: entry.entry_type === 'card' ? cardNumber.trim() : undefined,
         card_holder: entry.entry_type === 'card' ? cardHolder.trim() : undefined,
         card_expiry: entry.entry_type === 'card' ? cardExpiry.trim() : undefined,
@@ -156,6 +159,26 @@ export function EditEntryModal({ open, onClose, entry }: Props) {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
             />
+
+            {/* 2FA Secret */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-vault-text-secondary flex items-center gap-1">
+                  <Shield size={12} />
+                  2FA Secret (TOTP)
+                </label>
+              </div>
+              <input
+                type="text"
+                placeholder="Enter TOTP secret key (from authenticator setup)"
+                value={totpSecret}
+                onChange={(e) => setTotpSecret(e.target.value)}
+                className="w-full h-10 px-3 rounded-lg bg-vault-surface border border-vault-border text-sm text-vault-text font-mono placeholder:text-vault-text-secondary/50 placeholder:font-sans focus:outline-none focus:ring-2 focus:ring-vault-accent/50 focus:border-vault-accent transition-colors"
+              />
+              <p className="text-[10px] text-vault-text-secondary">
+                Paste the secret key from your 2FA setup page. Codes will be generated automatically.
+              </p>
+            </div>
           </>
         )}
 

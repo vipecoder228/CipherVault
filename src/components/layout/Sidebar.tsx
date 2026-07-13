@@ -7,7 +7,7 @@ import { CategoryForm } from '../categories/CategoryForm'
 import { SettingsPanel } from '../settings/SettingsPanel'
 import type { Category } from '@shared/types'
 import {
-  Shield, Star, LayoutGrid, Settings, Lock,
+  Shield, Star, LayoutGrid, Settings, Lock, Mail,
   Plus, ChevronLeft, ChevronRight, Folder, Pencil, Trash2
 } from 'lucide-react'
 
@@ -15,9 +15,11 @@ export function Sidebar() {
   const [categories, setCategories] = useState<Category[]>([])
   const [showCategoryForm, setShowCategoryForm] = useState(false)
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
-  const { activeCategoryId, setActiveCategory, sidebarCollapsed, toggleSidebar, showSettings, setShowSettings } = useUIStore()
+  const { activeCategoryId, setActiveCategory, sidebarCollapsed, toggleSidebar, showSettings, setShowSettings, showDisposableEmail, setShowDisposableEmail } = useUIStore()
   const { setFilters } = useEntriesStore()
-  const lock = useVaultStore((s) => s.lock)
+  const { lock, activeVaultId, vaults } = useVaultStore()
+
+  const currentVault = vaults.find(v => v.id === activeVaultId)
 
   useEffect(() => {
     loadCategories()
@@ -55,7 +57,14 @@ export function Sidebar() {
           {!sidebarCollapsed && (
             <div className="flex items-center gap-2">
               <Shield size={20} className="text-vault-accent" />
-              <span className="font-semibold text-vault-text">CipherVault</span>
+              <div className="flex flex-col">
+                <span className="font-semibold text-vault-text">CipherVault</span>
+                {currentVault && (
+                  <span className="text-[10px] text-vault-text-secondary truncate max-w-[120px]">
+                    {currentVault.displayName}
+                  </span>
+                )}
+              </div>
             </div>
           )}
           <button
@@ -82,6 +91,13 @@ export function Sidebar() {
               active={false}
               collapsed={sidebarCollapsed}
               onClick={() => setFilters({ is_favorite: true })}
+            />
+            <NavItem
+              icon={<Mail size={18} />}
+              label="Temp Email"
+              active={showDisposableEmail}
+              collapsed={sidebarCollapsed}
+              onClick={() => { setShowDisposableEmail(!showDisposableEmail); setShowSettings(false) }}
             />
           </div>
 

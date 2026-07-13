@@ -6,6 +6,7 @@ interface UIState {
   activeCategoryId: number | null
   showPasswordGenerator: boolean
   showSettings: boolean
+  showDisposableEmail: boolean
 
   toggleTheme: () => void
   setTheme: (theme: 'dark' | 'light') => void
@@ -13,6 +14,7 @@ interface UIState {
   setActiveCategory: (id: number | null) => void
   setShowPasswordGenerator: (show: boolean) => void
   setShowSettings: (show: boolean) => void
+  setShowDisposableEmail: (show: boolean) => void
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -21,6 +23,7 @@ export const useUIStore = create<UIState>((set) => ({
   activeCategoryId: null,
   showPasswordGenerator: false,
   showSettings: false,
+  showDisposableEmail: false,
 
   toggleTheme: () => set((state) => {
     const newTheme = state.theme === 'dark' ? 'light' : 'dark'
@@ -37,4 +40,5 @@ export const useUIStore = create<UIState>((set) => ({
   setActiveCategory: (id) => set({ activeCategoryId: id }),
   setShowPasswordGenerator: (show) => set({ showPasswordGenerator: show }),
   setShowSettings: (show) => set({ showSettings: show }),
+  setShowDisposableEmail: (show) => set({ showDisposableEmail: show }),
 }))
