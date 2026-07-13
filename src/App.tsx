@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useVaultStore } from './store/vaultStore'
 import { useUIStore } from './store/uiStore'
 import { SplashScreen } from './components/vault/SplashScreen'
@@ -12,22 +12,20 @@ export function App() {
   const { theme } = useUIStore()
   const [booting, setBooting] = useState(true)
   const [integrityOk, setIntegrityOk] = useState<boolean | null>(null)
+  const checkStatusRef = useRef(checkStatus)
+  checkStatusRef.current = checkStatus
 
-  // Splash screen completion
   const handleBootComplete = useCallback(async () => {
-    // Check integrity
     try {
       const result = await invoke('integrity:check' as any)
       setIntegrityOk(result?.ok !== false)
     } catch {
-      // If integrity check channel doesn't exist, skip it
       setIntegrityOk(true)
     }
     setBooting(false)
-    checkStatus()
-  }, [checkStatus])
+    checkStatusRef.current()
+  }, [])
 
-  // Apply theme class to html element
   useEffect(() => {
     const root = document.documentElement
     if (theme === 'dark') {
@@ -39,7 +37,6 @@ export function App() {
     }
   }, [theme])
 
-  // Show splash screen during boot
   if (booting) {
     return (
       <div className={`${theme}`}>
@@ -48,7 +45,6 @@ export function App() {
     )
   }
 
-  // Integrity check failed
   if (integrityOk === false) {
     return (
       <div className={`${theme}`}>
