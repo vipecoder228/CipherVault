@@ -1,0 +1,199 @@
+import { useEffect, useState } from 'react'
+import { invoke } from '../../lib/ipc'
+import { useEntriesStore } from '../../store/entriesStore'
+import { useUIStore } from '../../store/uiStore'
+import { useVaultStore } from '../../store/vaultStore'
+import { CategoryForm } from '../categories/CategoryForm'
+import { SettingsPanel } from '../settings/SettingsPanel'
+import type { Category } from '@shared/types'
+import {
+  Shield, Star, LayoutGrid, Settings, Lock,
+  Plus, ChevronLeft, ChevronRight, Folder, Pencil, Trash2
+} from 'lucide-react'
+
+export function Sidebar() {
+  const [categories, setCategories] = useState<Category[]>([])
+  const [showCategoryForm, setShowCategoryForm] = useState(false)
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null)
+  const { activeCategoryId, setActiveCategory, sidebarCollapsed, toggleSidebar, showSettings, setShowSettings } = useUIStore()
+  const { setFilters } = useEntriesStore()
+  const lock = useVaultStore((s) => s.lock)
+
+  useEffect(() => {
+    loadCategories()
+  }, [])
+
+  const loadCategories = async () => {
+    try {
+      const cats = await invoke('categories:list')
+      setCategories(cats)
+    } catch {}
+  }
+
+  const handleCategoryClick = (categoryId: number | null) => {
+    setActiveCategory(categoryId)
+    setFilters({ category_id: categoryId })
+  }
+
+  const handleDeleteCategory = async (id: number) => {
+    if (!confirm('Delete this category? Entries in this category will not be deleted.')) return
+    try {
+      await invoke('categories:delete', id)
+      await loadCategories()
+      if (activeCategoryId === id) {
+        setActiveCategory(null)
+        setFilters({ category_id: null })
+      }
+    } catch {}
+  }
+
+  return (
+    <>
+      <div className="h-full bg-vault-surface border-r border-vault-border flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-vault-border">
+          {!sidebarCollapsed && (
+            <div className="flex items-center gap-2">
+              <Shield size={20} className="text-vault-accent" />
+              <span className="font-semibold text-vault-text">CipherVault</span>
+            </div>
+          )}
+          <button
+            onClick={toggleSidebar}
+            className="p-1.5 rounded-lg text-vault-text-secondary hover:text-vault-text hover:bg-vault-surface-hover transition-colors"
+          >
+            {sidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+          </button>
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex-1 overflow-y-auto p-2">
+          <div className="space-y-1">
+            <NavItem
+              icon={<LayoutGrid size={18} />}
+              label="All Entries"
+              active={activeCategoryId === null}
+              collapsed={sidebarCollapsed}
+              onClick={() => handleCategoryClick(null)}
+            />
+            <NavItem
+              icon={<Star size={18} />}
+              label="Favorites"
+              active={false}
+              collapsed={sidebarCollapsed}
+              onClick={() => setFilters({ is_favorite: true })}
+            />
+          </div>
+
+          {/* Categories */}
+          {!sidebarCollapsed && (
+            <div className="mt-6">
+              <div className="flex items-center justify-between px-3 mb-2">
+                <span className="text-xs font-medium text-vault-text-secondary uppercase tracking-wider">
+                  Categories
+                </span>
+                <button
+                  onClick={() => setShowCategoryForm(true)}
+                  className="p-1 rounded text-vault-text-secondary hover:text-vault-text hover:bg-vault-surface-hover transition-colors"
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
+              <div className="space-y-1">
+                {categories.map((cat) => (
+                  <div key={cat.id} className="group relative">
+                    <NavItem
+                      icon={<Folder size={18} style={{ color: cat.color }} />}
+                      label={cat.name}
+                      active={activeCategoryId === cat.id}
+                      collapsed={sidebarCollapsed}
+                      onClick={() => handleCategoryClick(cat.id)}
+                    />
+                    {/* Edit/Delete buttons on hover */}
+                    {!sidebarCollapsed && (
+                      <div className="absolute right-1 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-0.5">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setEditingCategory(cat) }}
+                          className="p-1 rounded text-vault-text-secondary hover:text-vault-accent transition-colors"
+                        >
+                          <Pencil size={12} />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDeleteCategory(cat.id) }}
+                          className="p-1 rounded text-vault-text-secondary hover:text-vault-danger transition-colors"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </nav>
+
+        {/* Footer */}
+        <div className="p-2 border-t border-vault-border space-y-1">
+          <NavItem
+            icon={<Settings size={18} />}
+            label="Settings"
+            collapsed={sidebarCollapsed}
+            onClick={() => setShowSettings(true)}
+          />
+          <NavItem
+            icon={<Lock size={18} />}
+            label="Lock"
+            collapsed={sidebarCollapsed}
+            onClick={lock}
+          />
+        </div>
+      </div>
+
+      <CategoryForm
+        open={showCategoryForm}
+        onClose={() => setShowCategoryForm(false)}
+        onCreated={loadCategories}
+      />
+      <CategoryForm
+        open={!!editingCategory}
+        onClose={() => setEditingCategory(null)}
+        onCreated={loadCategories}
+        initialData={editingCategory}
+      />
+      <SettingsPanel
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+      />
+    </>
+  )
+}
+
+function NavItem({
+  icon,
+  label,
+  active,
+  collapsed,
+  onClick,
+}: {
+  icon: React.ReactNode
+  label: string
+  active?: boolean
+  collapsed: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-150 ${
+        active
+          ? 'bg-vault-accent/10 text-vault-accent'
+          : 'text-vault-text-secondary hover:text-vault-text hover:bg-vault-surface-hover'
+      } ${collapsed ? 'justify-center' : ''}`}
+      title={collapsed ? label : undefined}
+    >
+      {icon}
+      {!collapsed && <span className="text-sm">{label}</span>}
+    </button>
+  )
+}

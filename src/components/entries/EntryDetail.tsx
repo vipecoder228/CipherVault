@@ -1,0 +1,331 @@
+import { useState, useEffect, useCallback } from 'react'
+import { useEntriesStore } from '../../store/entriesStore'
+import { invoke } from '../../lib/ipc'
+import { useToastStore } from '../ui/Toast'
+import { HistoryViewer } from './HistoryViewer'
+import { EditEntryModal } from './EditEntryModal'
+import {
+  X, Copy, ExternalLink, Star, Trash2, Clock, Shield, Pencil,
+  Eye, EyeOff
+} from 'lucide-react'
+
+export function EntryDetail() {
+  const { selectedEntry: entry, selectEntry, deleteEntry, toggleFavorite } = useEntriesStore()
+  const addToast = useToastStore((s) => s.addToast)
+  const [showPassword, setShowPassword] = useState(false)
+  const [copiedField, setCopiedField] = useState<string | null>(null)
+  const [showHistory, setShowHistory] = useState(false)
+  const [showEdit, setShowEdit] = useState(false)
+
+  if (!entry) return null
+
+  const handleCopy = async (text: string, field: string) => {
+    try {
+      await invoke('clipboard:copy', text, 30000)
+      setCopiedField(field)
+      addToast('Copied to clipboard (clears in 30s)', 'success')
+      setTimeout(() => setCopiedField(null), 2000)
+    } catch {
+      addToast('Failed to copy', 'error')
+    }
+  }
+
+  const handleDelete = async () => {
+    if (confirm('Are you sure you want to delete this entry?')) {
+      await deleteEntry(entry.id)
+      addToast('Entry deleted', 'success')
+    }
+  }
+
+  return (
+    <>
+      <div className="h-full flex flex-col bg-vault-bg">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-vault-border">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-vault-surface border border-vault-border flex items-center justify-center text-lg">
+              {getEntryEmoji(entry.entry_type)}
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-vault-text">{entry.title || entry.entry_type}</h3>
+              <p className="text-xs text-vault-text-secondary">{entry.entry_type}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setShowEdit(true)}
+              className="p-1.5 rounded-lg text-vault-text-secondary hover:text-vault-accent transition-colors"
+              title="Edit"
+            >
+              <Pencil size={16} />
+            </button>
+            <button
+              onClick={() => setShowHistory(true)}
+              className="p-1.5 rounded-lg text-vault-text-secondary hover:text-vault-text transition-colors"
+              title="History"
+            >
+              <Clock size={16} />
+            </button>
+            <button
+              onClick={() => toggleFavorite(entry.id)}
+              className={`p-1.5 rounded-lg transition-colors ${
+                entry.is_favorite ? 'text-vault-warning' : 'text-vault-text-secondary hover:text-vault-warning'
+              }`}
+            >
+              <Star size={16} fill={entry.is_favorite ? 'currentColor' : 'none'} />
+            </button>
+            <button
+              onClick={handleDelete}
+              className="p-1.5 rounded-lg text-vault-text-secondary hover:text-vault-danger transition-colors"
+            >
+              <Trash2 size={16} />
+            </button>
+            <button
+              onClick={() => selectEntry(null)}
+              className="p-1.5 rounded-lg text-vault-text-secondary hover:text-vault-text transition-colors"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+
+        {/* Fields */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {/* Title */}
+          {entry.title && (
+            <FieldRow label="Title" value={entry.title} />
+          )}
+
+          {/* Username */}
+          {entry.username && (
+            <FieldRow
+              label="Username"
+              value={entry.username}
+              copied={copiedField === 'username'}
+              onCopy={() => handleCopy(entry.username, 'username')}
+            />
+          )}
+
+          {/* Password */}
+          {entry.password && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-vault-text-secondary">Password</label>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 flex items-center h-10 px-3 rounded-lg bg-vault-surface border border-vault-border">
+                  <span className="flex-1 text-sm text-vault-text font-mono truncate">
+                    {showPassword ? entry.password : '•'.repeat(Math.min(entry.password.length, 20))}
+                  </span>
+                  <button
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="p-1 text-vault-text-secondary hover:text-vault-text transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+                <button
+                  onClick={() => handleCopy(entry.password, 'password')}
+                  className={`h-10 px-3 rounded-lg border transition-colors ${
+                    copiedField === 'password'
+                      ? 'bg-vault-success/10 border-vault-success/30 text-vault-success'
+                      : 'bg-vault-surface border-vault-border text-vault-text-secondary hover:text-vault-text'
+                  }`}
+                >
+                  <Copy size={14} />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* URL */}
+          {entry.url && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-vault-text-secondary">URL</label>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-10 px-3 rounded-lg bg-vault-surface border border-vault-border flex items-center">
+                  <span className="flex-1 text-sm text-vault-text truncate">{entry.url}</span>
+                </div>
+                <a
+                  href={entry.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="h-10 px-3 rounded-lg bg-vault-surface border border-vault-border text-vault-text-secondary hover:text-vault-text transition-colors flex items-center"
+                >
+                  <ExternalLink size={14} />
+                </a>
+              </div>
+            </div>
+          )}
+
+          {/* TOTP */}
+          {entry.totp_secret && (
+            <TOTPField entryId={entry.id} />
+          )}
+
+          {/* Card fields */}
+          {entry.entry_type === 'card' && (
+            <>
+              {entry.card_number && (
+                <FieldRow
+                  label="Card Number"
+                  value={entry.card_number}
+                  copied={copiedField === 'card_number'}
+                  onCopy={() => handleCopy(entry.card_number, 'card_number')}
+                />
+              )}
+              {entry.card_holder && (
+                <FieldRow label="Cardholder" value={entry.card_holder} />
+              )}
+              {entry.card_expiry && (
+                <FieldRow label="Expiry" value={entry.card_expiry} />
+              )}
+            </>
+          )}
+
+          {/* Notes */}
+          {entry.notes && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-vault-text-secondary">Notes</label>
+              <div className="p-3 rounded-lg bg-vault-surface border border-vault-border">
+                <p className="text-sm text-vault-text whitespace-pre-wrap">{entry.notes}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Metadata */}
+          <div className="pt-4 border-t border-vault-border space-y-2">
+            <div className="flex items-center gap-2 text-xs text-vault-text-secondary">
+              <Clock size={12} />
+              <span>Created: {new Date(entry.created_at).toLocaleDateString()}</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-vault-text-secondary">
+              <Clock size={12} />
+              <span>Modified: {new Date(entry.updated_at).toLocaleDateString()}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <HistoryViewer
+        open={showHistory}
+        onClose={() => setShowHistory(false)}
+        entryId={entry.id}
+      />
+      <EditEntryModal
+        open={showEdit}
+        onClose={() => setShowEdit(false)}
+        entry={entry}
+      />
+    </>
+  )
+}
+
+function FieldRow({
+  label,
+  value,
+  copied,
+  onCopy,
+}: {
+  label: string
+  value: string
+  copied?: boolean
+  onCopy?: () => void
+}) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-xs font-medium text-vault-text-secondary">{label}</label>
+      <div className="flex items-center gap-2">
+        <div className="flex-1 h-10 px-3 rounded-lg bg-vault-surface border border-vault-border flex items-center">
+          <span className="flex-1 text-sm text-vault-text truncate">{value}</span>
+        </div>
+        {onCopy && (
+          <button
+            onClick={onCopy}
+            className={`h-10 px-3 rounded-lg border transition-colors ${
+              copied
+                ? 'bg-vault-success/10 border-vault-success/30 text-vault-success'
+                : 'bg-vault-surface border-vault-border text-vault-text-secondary hover:text-vault-text'
+            }`}
+          >
+            <Copy size={14} />
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function TOTPField({ entryId }: { entryId: number }) {
+  const [code, setCode] = useState('------')
+  const [timeLeft, setTimeLeft] = useState(30)
+
+  const fetchCode = useCallback(async () => {
+    try {
+      const totpCode = await invoke('entries:get-totp', entryId)
+      setCode(totpCode || '------')
+    } catch {
+      setCode('------')
+    }
+  }, [entryId])
+
+  useEffect(() => {
+    fetchCode()
+    const interval = setInterval(() => {
+      fetchCode()
+      setTimeLeft(30)
+    }, 30000)
+
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => (prev <= 1 ? 30 : prev - 1))
+    }, 1000)
+
+    return () => {
+      clearInterval(interval)
+      clearInterval(timer)
+    }
+  }, [fetchCode])
+
+  const circumference = 2 * Math.PI * 18
+
+  return (
+    <div className="space-y-1.5">
+      <label className="text-xs font-medium text-vault-text-secondary flex items-center gap-1">
+        <Shield size={12} />
+        Two-Factor Code
+      </label>
+      <div className="flex items-center gap-2">
+        <div className="flex-1 h-12 px-3 rounded-lg bg-vault-surface border border-vault-border flex items-center justify-center">
+          <span className="text-lg font-mono tracking-[0.3em] text-vault-accent font-bold">
+            {code}
+          </span>
+        </div>
+        <div className="relative w-10 h-10">
+          <svg className="w-10 h-10 -rotate-90" viewBox="0 0 40 40">
+            <circle cx="20" cy="20" r="18" fill="none" stroke="var(--vault-border)" strokeWidth="2" />
+            <circle
+              cx="20" cy="20" r="18" fill="none"
+              stroke="var(--vault-accent)"
+              strokeWidth="2"
+              strokeDasharray={circumference}
+              strokeDashoffset={circumference - (timeLeft / 30) * circumference}
+              strokeLinecap="round"
+              className="transition-all duration-1000 ease-linear"
+            />
+          </svg>
+          <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-vault-text">
+            {timeLeft}
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function getEntryEmoji(type: string): string {
+  switch (type) {
+    case 'login': return '🔑'
+    case 'card': return '💳'
+    case 'secure_note': return '📝'
+    case 'identity': return '👤'
+    default: return '🔐'
+  }
+}

@@ -1,0 +1,100 @@
+import { create } from 'zustand'
+import { invoke } from '../lib/ipc'
+import type { EncryptedEntry, DecryptedEntry, CreateEntryPayload, UpdateEntryPayload, EntryFilters } from '@shared/types'
+
+interface EntriesState {
+  entries: EncryptedEntry[]
+  selectedEntry: DecryptedEntry | null
+  viewMode: 'grid' | 'list'
+  filters: EntryFilters
+  loading: boolean
+
+  loadEntries: (filters?: EntryFilters) => Promise<void>
+  selectEntry: (id: number | null) => Promise<void>
+  createEntry: (data: CreateEntryPayload) => Promise<void>
+  updateEntry: (id: number, data: UpdateEntryPayload) => Promise<void>
+  deleteEntry: (id: number) => Promise<void>
+  toggleFavorite: (id: number) => Promise<void>
+  search: (query: string) => Promise<void>
+  setViewMode: (mode: 'grid' | 'list') => void
+  setFilters: (filters: EntryFilters) => void
+}
+
+export const useEntriesStore = create<EntriesState>((set, get) => ({
+  entries: [],
+  selectedEntry: null,
+  viewMode: 'list',
+  filters: {},
+  loading: false,
+
+  loadEntries: async (filters?: EntryFilters) => {
+    set({ loading: true })
+    try {
+      const f = filters ?? get().filters
+      const entries = await invoke('entries:list', f)
+      set({ entries, loading: false })
+    } catch {
+      set({ loading: false })
+    }
+  },
+
+  selectEntry: async (id: number | null) => {
+    if (id === null) {
+      set({ selectedEntry: null })
+      return
+    }
+    try {
+      const entry = await invoke('entries:get', id)
+      set({ selectedEntry: entry })
+    } catch {
+      set({ selectedEntry: null })
+    }
+  },
+
+  createEntry: async (data: CreateEntryPayload) => {
+    await invoke('entries:create', data)
+    await get().loadEntries()
+  },
+
+  updateEntry: async (id: number, data: UpdateEntryPayload) => {
+    await invoke('entries:update', id, data)
+    await get().loadEntries()
+    const selected = get().selectedEntry
+    if (selected?.id === id) {
+      await get().selectEntry(id)
+    }
+  },
+
+  deleteEntry: async (id: number) => {
+    await invoke('entries:delete', id)
+    const selected = get().selectedEntry
+    if (selected?.id === id) {
+      set({ selectedEntry: null })
+    }
+    await get().loadEntries()
+  },
+
+  toggleFavorite: async (id: number) => {
+    await invoke('entries:toggle-favorite', id)
+    await get().loadEntries()
+  },
+
+  search: async (query: string) => {
+    if (!query.trim()) {
+      return get().loadEntries()
+    }
+    set({ loading: true })
+    try {
+      const entries = await invoke('entries:search', query)
+      set({ entries, loading: false })
+    } catch {
+      set({ loading: false })
+    }
+  },
+
+  setViewMode: (mode) => set({ viewMode: mode }),
+  setFilters: (filters) => {
+    set({ filters })
+    get().loadEntries(filters)
+  },
+}))
