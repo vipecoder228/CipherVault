@@ -7,8 +7,11 @@ files:
   - '!**/.vscode/*'
   - '!src/*'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
-  - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
+  - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - '!scripts/*'
+  - '!*.nsh'
+  - '!*.nsl'
 asarUnpack:
   - resources/**
 win:
@@ -24,11 +27,15 @@ nsis:
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
   oneClick: false
+  perMachine: false
   allowToChangeInstallationDirectory: true
   installerIcon: resources/icon.ico
   uninstallerIcon: resources/icon.ico
   installerHeaderIcon: resources/icon.ico
   include: customInstall.nsh
+  language: 1033
+  runAfterFinish: false
+  unicode: true
 mac:
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:

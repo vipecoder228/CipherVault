@@ -1,3 +1,4 @@
 !macro customInit
-  ; Initial placeholder - overwritten by build script with actual hash
+  ; Custom init - set title bar text
+  System::Call 'user32::SetWindowText(i $hwndParent, t "CipherVault Installer")'
 !macroend
