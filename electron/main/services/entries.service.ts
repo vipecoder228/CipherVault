@@ -27,7 +27,10 @@ export async function getEntry(id: number): Promise<DecryptedEntry | null> {
   const row = getEntryById(db, id)
   if (!row) return null
 
-  const decrypted = decryptJSON<DecryptedEntry>(row, encKey)
+  const decrypted = decryptJSON<DecryptedEntry>(
+    { iv: row.iv, ciphertext: row.encrypted_data, authTag: row.auth_tag },
+    encKey
+  )
   decrypted.id = row.id
   decrypted.display_title = row.display_title
   decrypted.created_at = row.created_at
@@ -82,7 +85,10 @@ export async function updateEntry(id: number, data: UpdateEntryPayload): Promise
   const existing = getEntryById(db, id)
   if (!existing) throw new Error('Entry not found')
 
-  const existingData = decryptJSON<Record<string, string>>(existing, encKey)
+  const existingData = decryptJSON<Record<string, string>>(
+    { iv: existing.iv, ciphertext: existing.encrypted_data, authTag: existing.auth_tag },
+    encKey
+  )
 
   const updatedData = {
     title: data.title ?? existingData.title,
@@ -162,7 +168,10 @@ export async function getEntryTOTP(id: number): Promise<string | null> {
   const entry = getEntryById(db, id)
   if (!entry) return null
 
-  const decrypted = decryptJSON<Record<string, string>>(entry, encKey)
+  const decrypted = decryptJSON<Record<string, string>>(
+    { iv: entry.iv, ciphertext: entry.encrypted_data, authTag: entry.auth_tag },
+    encKey
+  )
   if (!decrypted.totp_secret) return null
 
   try {
