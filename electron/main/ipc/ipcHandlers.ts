@@ -8,6 +8,8 @@ import * as disposableEmailService from '../services/disposable-email.service'
 import { generatePassword } from '../services/password-gen.service'
 import { checkBreach } from '../services/breach-check.service'
 import * as backupService from '../services/backup.service'
+import { analyzePasswordHealth } from '../services/health.service'
+import { generateUsername, generatePassphrase } from '../services/password-gen.service'
 import { getDatabase } from '../db/connection'
 import { getCategories, createCategory, updateCategory, deleteCategory, reorderCategories } from '../db/queries/categories.queries'
 import { checkIntegrity } from '../integrity'
@@ -95,6 +97,13 @@ const handlers: Record<string, (...args: any[]) => any> = {
   // Backup
   'backup:export': (_: unknown, backupPassword: string) => backupService.exportEncryptedBackup(backupPassword),
   'backup:import': (_: unknown, backupPassword: string, filePath?: string) => backupService.importEncryptedBackup(backupPassword, filePath),
+
+  // Health
+  'health:analyze': () => analyzePasswordHealth(),
+
+  // Generators
+  'password:generate-username': () => generateUsername(),
+  'password:generate-passphrase': (_: unknown, wordCount?: number) => generatePassphrase(wordCount),
 
   // Integrity check
   'integrity:check': () => checkIntegrity(),

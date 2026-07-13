@@ -8,6 +8,7 @@ import { invoke } from '../../lib/ipc'
 import { useUIStore } from '../../store/uiStore'
 import { useToastStore } from '../ui/Toast'
 import { BackupDialog } from '../import-export/BackupDialog'
+import { SecurityHealth } from '../health/SecurityHealth'
 import { Shield, Palette, Info } from 'lucide-react'
 
 interface Props {
@@ -60,6 +61,7 @@ function SecurityTab() {
   const [showAlarmSetup, setShowAlarmSetup] = useState(false)
   const [showBackupExport, setShowBackupExport] = useState(false)
   const [showBackupImport, setShowBackupImport] = useState(false)
+  const [showSecurityHealth, setShowSecurityHealth] = useState(false)
   const [totpEnabled, setTotpEnabled] = useState(false)
   const [alarmEnabled, setAlarmEnabled] = useState(false)
   const [autoLockMs, setAutoLockMs] = useState('300000')
@@ -111,6 +113,17 @@ function SecurityTab() {
 
   return (
     <div className="space-y-6">
+      {/* Security Health */}
+      <div>
+        <label className="text-sm font-medium text-vault-text block mb-2">Security Health</label>
+        <p className="text-xs text-vault-text-secondary mb-2">
+          Check for weak, reused, or old passwords across your vault.
+        </p>
+        <Button variant="secondary" onClick={() => setShowSecurityHealth(true)} className="w-full">
+          Analyze Passwords
+        </Button>
+      </div>
+
       {/* Auto-lock */}
       <div>
         <label className="text-sm font-medium text-vault-text block mb-2">Auto-lock timeout</label>
@@ -210,6 +223,9 @@ function SecurityTab() {
       )}
       {showBackupImport && (
         <BackupDialog mode="import" open={showBackupImport} onClose={() => setShowBackupImport(false)} />
+      )}
+      {showSecurityHealth && (
+        <SecurityHealth open={showSecurityHealth} onClose={() => setShowSecurityHealth(false)} />
       )}
     </div>
   )

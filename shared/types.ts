@@ -208,6 +208,13 @@ export interface IPCChannels {
   'backup:export': (backupPassword: string) => Promise<{ success: boolean; path?: string; error?: string }>
   'backup:import': (backupPassword: string, filePath?: string) => Promise<{ success: boolean; error?: string }>
 
+  // Password Health
+  'health:analyze': () => Promise<PasswordHealth>
+
+  // Generators
+  'password:generate-username': () => string
+  'password:generate-passphrase': (wordCount?: number) => string
+
   // Import/Export
   'import:csv': (filePath?: string) => Promise<ImportResult>
   'import:json': (filePath?: string) => Promise<ImportResult>
@@ -226,3 +233,21 @@ export type SettingsKey =
   | 'default_view'
   | 'font_size'
   | 'show_icons'
+
+// ─── Password Health ─────────────────────────────────────
+
+export interface PasswordHealth {
+  total: number
+  weak: number
+  reused: number
+  old: number
+  exposed: number
+  score: number
+  details: PasswordHealthItem[]
+}
+
+export interface PasswordHealthItem {
+  entryId: number
+  title: string
+  issues: string[]
+}

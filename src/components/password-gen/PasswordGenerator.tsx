@@ -5,7 +5,10 @@ import { Copy, RefreshCw } from 'lucide-react'
 import { calculateStrength } from '../../lib/passwordStrength'
 import type { PasswordOptions } from '@shared/types'
 
+type GeneratorMode = 'password' | 'passphrase' | 'username'
+
 export function PasswordGenerator({ onUsePassword }: { onUsePassword?: (pwd: string) => void }) {
+  const [mode, setMode] = useState<GeneratorMode>('password')
   const [options, setOptions] = useState<PasswordOptions>({
     length: 16,
     uppercase: true,
@@ -13,17 +16,25 @@ export function PasswordGenerator({ onUsePassword }: { onUsePassword?: (pwd: str
     numbers: true,
     symbols: true,
   })
+  const [passphraseWords, setPassphraseWords] = useState(4)
   const [password, setPassword] = useState('')
   const addToast = useToastStore((s) => s.addToast)
 
   const generate = async () => {
-    const pwd = await invoke('password:generate', options)
+    let pwd: string
+    if (mode === 'passphrase') {
+      pwd = await invoke('password:generate-passphrase', passphraseWords)
+    } else if (mode === 'username') {
+      pwd = await invoke('password:generate-username')
+    } else {
+      pwd = await invoke('password:generate', options)
+    }
     setPassword(pwd)
   }
 
   useEffect(() => {
     generate()
-  }, [options])
+  }, [mode, options, passphraseWords])
 
   const strength = calculateStrength(password)
 
@@ -34,6 +45,27 @@ export function PasswordGenerator({ onUsePassword }: { onUsePassword?: (pwd: str
 
   return (
     <div className="space-y-5">
+      {/* Mode selector */}
+      <div className="flex gap-1 p-1 bg-vault-bg rounded-lg">
+        {([
+          { key: 'password' as GeneratorMode, label: 'Password' },
+          { key: 'passphrase' as GeneratorMode, label: 'Passphrase' },
+          { key: 'username' as GeneratorMode, label: 'Username' },
+        ]).map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setMode(key)}
+            className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
+              mode === key
+                ? 'bg-vault-surface text-vault-text shadow-sm'
+                : 'text-vault-text-secondary hover:text-vault-text'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       {/* Generated password display */}
       <div className="relative">
         <div className="flex items-center h-12 px-4 rounded-xl bg-vault-bg border border-vault-border">
@@ -76,53 +108,56 @@ export function PasswordGenerator({ onUsePassword }: { onUsePassword?: (pwd: str
         </div>
       </div>
 
-      {/* Length slider */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-vault-text-secondary">Length</span>
-          <span className="text-xs font-medium text-vault-text">{options.length}</span>
-        </div>
-        <input
-          type="range"
-          min="8"
-          max="64"
-          value={options.length}
-          onChange={(e) => setOptions({ ...options, length: parseInt(e.target.value) })}
-          className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-vault-accent"
-          style={{
-            background: `linear-gradient(to right, var(--vault-accent) ${((options.length - 8) / 56) * 100}%, var(--vault-border) ${((options.length - 8) / 56) * 100}%)`,
-          }}
-        />
-        <div className="flex justify-between text-[10px] text-vault-text-secondary">
-          <span>8</span>
-          <span>64</span>
-        </div>
-      </div>
+      {/* Password options (only in password mode) */}
+      {mode === 'password' && (
+        <>
+          {/* Length slider */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-vault-text-secondary">Length</span>
+              <span className="text-xs font-medium text-vault-text">{options.length}</span>
+            </div>
+            <input
+              type="range"
+              min="8"
+              max="64"
+              value={options.length}
+              onChange={(e) => setOptions({ ...options, length: parseInt(e.target.value) })}
+              className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-vault-accent"
+              style={{
+                background: `linear-gradient(to right, var(--vault-accent) ${((options.length - 8) / 56) * 100}%, var(--vault-border) ${((options.length - 8) / 56) * 100}%)`,
+              }}
+            />
+            <div className="flex justify-between text-[10px] text-vault-text-secondary">
+              <span>8</span>
+              <span>64</span>
+            </div>
+          </div>
 
-      {/* Character options */}
-      <div className="space-y-2">
-        <span className="text-xs text-vault-text-secondary">Character Types</span>
-        <div className="grid grid-cols-2 gap-2">
-          {[
-            { key: 'uppercase' as const, label: 'A-Z', desc: 'Uppercase' },
-            { key: 'lowercase' as const, label: 'a-z', desc: 'Lowercase' },
-            { key: 'numbers' as const, label: '0-9', desc: 'Numbers' },
-            { key: 'symbols' as const, label: '!@#', desc: 'Symbols' },
-          ].map(({ key, label, desc }) => (
-            <label
-              key={key}
-              className={`flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition-all ${
-                options[key]
-                  ? 'bg-vault-accent/10 border-vault-accent/30'
-                  : 'bg-vault-surface border-vault-border hover:border-vault-accent/20'
-              }`}
-            >
-              <input
-                type="checkbox"
-                checked={options[key]}
-                onChange={(e) => setOptions({ ...options, [key]: e.target.checked })}
-                className="sr-only"
-              />
+          {/* Character options */}
+          <div className="space-y-2">
+            <span className="text-xs text-vault-text-secondary">Character Types</span>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { key: 'uppercase' as const, label: 'A-Z', desc: 'Uppercase' },
+                { key: 'lowercase' as const, label: 'a-z', desc: 'Lowercase' },
+                { key: 'numbers' as const, label: '0-9', desc: 'Numbers' },
+                { key: 'symbols' as const, label: '!@#', desc: 'Symbols' },
+              ].map(({ key, label, desc }) => (
+                <label
+                  key={key}
+                  className={`flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition-all ${
+                    options[key]
+                      ? 'bg-vault-accent/10 border-vault-accent/30'
+                      : 'bg-vault-surface border-vault-border hover:border-vault-accent/20'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={options[key]}
+                    onChange={(e) => setOptions({ ...options, [key]: e.target.checked })}
+                    className="sr-only"
+                  />
               <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
                 options[key] ? 'bg-vault-accent border-vault-accent' : 'border-vault-border'
               }`}>
@@ -140,6 +175,33 @@ export function PasswordGenerator({ onUsePassword }: { onUsePassword?: (pwd: str
           ))}
         </div>
       </div>
+        </>
+      )}
+
+      {/* Passphrase options (only in passphrase mode) */}
+      {mode === 'passphrase' && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-vault-text-secondary">Number of words</span>
+            <span className="text-xs font-medium text-vault-text">{passphraseWords}</span>
+          </div>
+          <input
+            type="range"
+            min="3"
+            max="8"
+            value={passphraseWords}
+            onChange={(e) => setPassphraseWords(parseInt(e.target.value))}
+            className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-vault-accent"
+            style={{
+              background: `linear-gradient(to right, var(--vault-accent) ${((passphraseWords - 3) / 5) * 100}%, var(--vault-border) ${((passphraseWords - 3) / 5) * 100}%)`,
+            }}
+          />
+          <div className="flex justify-between text-[10px] text-vault-text-secondary">
+            <span>3</span>
+            <span>8</span>
+          </div>
+        </div>
+      )}
 
       {/* Use password button */}
       {onUsePassword && (
