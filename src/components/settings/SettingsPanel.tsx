@@ -495,7 +495,7 @@ function AboutTab() {
       <div>
         <h3 className="text-lg font-bold text-vault-text">CipherVault</h3>
         <p className="text-sm text-vault-text-secondary">Password Manager</p>
-        <p className="text-xs text-vault-text-secondary mt-1">Version 1.0.0</p>
+        <p className="text-xs text-vault-text-secondary mt-1">Version 7.0.0</p>
       </div>
       <div className="p-4 rounded-xl bg-vault-bg border border-vault-border text-left">
         <p className="text-xs text-vault-text-secondary leading-relaxed">
