@@ -1,6 +1,7 @@
-import { app, BrowserWindow, shell, Tray, Menu, nativeImage, globalShortcut, screen } from 'electron'
+import { app, BrowserWindow, shell, Tray, Menu, nativeImage, globalShortcut, screen, ipcMain } from 'electron'
 import { join } from 'path'
 import { readFileSync } from 'fs'
+import AutoLaunch from 'auto-launch'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { registerIPC, unregisterIPC } from './ipc/ipcHandlers'
 import { closeDatabase } from './db/connection'
@@ -8,8 +9,12 @@ import { lockVault } from './services/vault.service'
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
+let isQuitting = false
 
-let stealthMode = true
+const autoLauncher = new AutoLaunch({
+  name: 'CipherVault',
+  path: app.getPath('exe'),
+})
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -17,8 +22,7 @@ function createWindow(): void {
     height: 700,
     show: false,
     autoHideMenuBar: true,
-    skipTaskbar: stealthMode,
-    alwaysOnTop: stealthMode,
+    skipTaskbar: true,
     webPreferences: {
       preload: join(__dirname, '../preload/preload.js'),
       sandbox: false,
@@ -28,11 +32,9 @@ function createWindow(): void {
     backgroundColor: '#0f0f14',
   })
 
+  // Never show window on ready — stay in tray
   mainWindow.on('ready-to-show', () => {
-    if (!stealthMode) {
-      mainWindow?.show()
-      mainWindow?.focus()
-    }
+    // Hidden by default
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -40,9 +42,9 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
-  // Stealth: hide window on blur
+  // Hide to tray on blur
   mainWindow.on('blur', () => {
-    if (stealthMode && mainWindow?.isVisible()) {
+    if (mainWindow?.isVisible()) {
       mainWindow.hide()
       mainWindow.setSkipTaskbar(true)
     }
@@ -54,8 +56,15 @@ function createWindow(): void {
     mainWindow?.webContents.send('vault:locked')
   })
 
-  // Lock vault when window is closed
-  mainWindow.on('close', () => {
+  // Minimize to tray instead of quitting
+  mainWindow.on('close', (e) => {
+    if (!isQuitting) {
+      e.preventDefault()
+      mainWindow?.hide()
+      mainWindow?.setSkipTaskbar(true)
+      lockVault()
+      return
+    }
     lockVault()
   })
 
@@ -66,8 +75,7 @@ function createWindow(): void {
   }
 }
 
-function createTray(): void {
-  // Create tray icon from SVG
+async function createTray(): Promise<void> {
   const iconPath = join(__dirname, '../../resources/tray-icon.svg')
   let icon: Electron.NativeImage
 
@@ -75,12 +83,13 @@ function createTray(): void {
     const svgBuffer = readFileSync(iconPath)
     icon = nativeImage.createFromBuffer(svgBuffer)
   } catch {
-    // Fallback to empty icon
     icon = nativeImage.createEmpty()
   }
 
   tray = new Tray(icon)
   tray.setToolTip('CipherVault')
+
+  const isAutoStart = await autoLauncher.isEnabled()
 
   const contextMenu = Menu.buildFromTemplate([
     {
@@ -96,8 +105,24 @@ function createTray(): void {
     },
     { type: 'separator' },
     {
+      label: 'Launch on startup',
+      type: 'checkbox',
+      checked: isAutoStart,
+      click: async (menuItem) => {
+        if (menuItem.checked) {
+          await autoLauncher.enable()
+        } else {
+          await autoLauncher.disable()
+        }
+      },
+    },
+    { type: 'separator' },
+    {
       label: 'Quit',
-      click: () => app.quit(),
+      click: () => {
+        isQuitting = true
+        app.quit()
+      },
     },
   ])
 
@@ -113,7 +138,7 @@ function toggleWindow(): void {
 
   if (mainWindow.isVisible()) {
     mainWindow.hide()
-    if (stealthMode) mainWindow.setSkipTaskbar(true)
+    mainWindow.setSkipTaskbar(true)
   } else {
     mainWindow.show()
     mainWindow.setSkipTaskbar(false)
@@ -122,7 +147,6 @@ function toggleWindow(): void {
 }
 
 function registerGlobalShortcuts(): void {
-  // Register Ctrl+Shift+Space to toggle window
   const registered = globalShortcut.register('CommandOrControl+Shift+Space', () => {
     toggleWindow()
   })
@@ -157,6 +181,7 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => {
+  isQuitting = true
   globalShortcut.unregisterAll()
   lockVault()
   unregisterIPC()
