@@ -7,6 +7,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { invoke } from '../../lib/ipc'
 import { useUIStore } from '../../store/uiStore'
 import { useToastStore } from '../ui/Toast'
+import { BackupDialog } from '../import-export/BackupDialog'
 import { Shield, Palette, Info } from 'lucide-react'
 
 interface Props {
@@ -57,6 +58,8 @@ function SecurityTab() {
   const [showSetupTOTP, setShowSetupTOTP] = useState(false)
   const [showDisableTOTP, setShowDisableTOTP] = useState(false)
   const [showAlarmSetup, setShowAlarmSetup] = useState(false)
+  const [showBackupExport, setShowBackupExport] = useState(false)
+  const [showBackupImport, setShowBackupImport] = useState(false)
   const [totpEnabled, setTotpEnabled] = useState(false)
   const [alarmEnabled, setAlarmEnabled] = useState(false)
   const [autoLockMs, setAutoLockMs] = useState('300000')
@@ -174,6 +177,22 @@ function SecurityTab() {
         </Button>
       </div>
 
+      {/* Encrypted Backup */}
+      <div>
+        <label className="text-sm font-medium text-vault-text block mb-2">Encrypted Backup</label>
+        <p className="text-xs text-vault-text-secondary mb-2">
+          Export your vault as an encrypted .ciphervault file. Store it safely as a backup — you'll need a password to restore it.
+        </p>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setShowBackupExport(true)} className="flex-1">
+            Export Backup
+          </Button>
+          <Button variant="secondary" onClick={() => setShowBackupImport(true)} className="flex-1">
+            Import Backup
+          </Button>
+        </div>
+      </div>
+
       {showChangePassword && (
         <ChangePasswordModal onClose={() => setShowChangePassword(false)} />
       )}
@@ -185,6 +204,12 @@ function SecurityTab() {
       )}
       {showDisableTOTP && (
         <DisableTOTPModal onClose={() => setShowDisableTOTP(false)} onStatusChange={setTotpEnabled} />
+      )}
+      {showBackupExport && (
+        <BackupDialog mode="export" open={showBackupExport} onClose={() => setShowBackupExport(false)} />
+      )}
+      {showBackupImport && (
+        <BackupDialog mode="import" open={showBackupImport} onClose={() => setShowBackupImport(false)} />
       )}
     </div>
   )

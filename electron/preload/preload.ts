@@ -44,6 +44,8 @@ const channels: (keyof IPCChannels)[] = [
   'disposable:message',
   'disposable:delete-message',
   'disposable:delete-account',
+  'backup:export',
+  'backup:import',
   'import:csv',
   'import:json',
   'export:csv',

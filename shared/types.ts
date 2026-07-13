@@ -204,6 +204,10 @@ export interface IPCChannels {
   'disposable:delete-message': (emailId: number, messageId: string) => Promise<void>
   'disposable:delete-account': (emailId: number) => Promise<void>
 
+  // Backup
+  'backup:export': (backupPassword: string) => Promise<{ success: boolean; path?: string; error?: string }>
+  'backup:import': (backupPassword: string, filePath?: string) => Promise<{ success: boolean; error?: string }>
+
   // Import/Export
   'import:csv': (filePath?: string) => Promise<ImportResult>
   'import:json': (filePath?: string) => Promise<ImportResult>

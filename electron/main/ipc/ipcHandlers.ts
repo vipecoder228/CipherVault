@@ -7,6 +7,7 @@ import * as clipboardService from '../services/clipboard.service'
 import * as disposableEmailService from '../services/disposable-email.service'
 import { generatePassword } from '../services/password-gen.service'
 import { checkBreach } from '../services/breach-check.service'
+import * as backupService from '../services/backup.service'
 import { getDatabase } from '../db/connection'
 import { getCategories, createCategory, updateCategory, deleteCategory, reorderCategories } from '../db/queries/categories.queries'
 import { checkIntegrity } from '../integrity'
@@ -90,6 +91,10 @@ const handlers: Record<string, (...args: any[]) => any> = {
   'disposable:message': (_: unknown, emailId: number, messageId: string) => disposableEmailService.getDisposableEmailMessage(emailId, messageId),
   'disposable:delete-message': (_: unknown, emailId: number, messageId: string) => disposableEmailService.deleteDisposableEmailMessage(emailId, messageId),
   'disposable:delete-account': (_: unknown, emailId: number) => disposableEmailService.deleteDisposableEmailAccount(emailId),
+
+  // Backup
+  'backup:export': (_: unknown, backupPassword: string) => backupService.exportEncryptedBackup(backupPassword),
+  'backup:import': (_: unknown, backupPassword: string, filePath?: string) => backupService.importEncryptedBackup(backupPassword, filePath),
 
   // Integrity check
   'integrity:check': () => checkIntegrity(),
