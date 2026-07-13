@@ -10,6 +10,7 @@ import { checkBreach } from '../services/breach-check.service'
 import { getDatabase } from '../db/connection'
 import { getCategories, createCategory, updateCategory, deleteCategory, reorderCategories } from '../db/queries/categories.queries'
 import { checkIntegrity } from '../integrity'
+import { getActiveVaultId } from '../services/vault.service'
 
 type IPCChannel = keyof IPCChannels
 
@@ -34,7 +35,7 @@ const handlers: Record<string, (...args: any[]) => any> = {
   'entries:create': (_: unknown, data: any) => entriesService.createEntry(data),
   'entries:update': (_: unknown, id: number, data: any) => entriesService.updateEntry(id, data),
   'entries:delete': (_: unknown, id: number) => entriesService.deleteEntryById(id),
-  'entries:search': (_: unknown, query: string) => entriesService.searchEntries(query),
+  'entries:search': (_: unknown, query: string, filters?: any) => entriesService.searchEntries(query, filters),
   'entries:toggle-favorite': (_: unknown, id: number) => entriesService.toggleFavoriteEntry(id),
   'entries:get-history': (_: unknown, id: number) => entriesService.getEntryHistoryList(id),
   'entries:get-decrypted-history': (_: unknown, id: number) => entriesService.getDecryptedHistory(id),
@@ -109,12 +110,17 @@ const handlers: Record<string, (...args: any[]) => any> = {
     }
 
     try {
-      const content = readFileSync(filePath, 'utf-8')
+      // Strip BOM if present
+      let content = readFileSync(filePath, 'utf-8')
+      if (content.charCodeAt(0) === 0xFEFF) {
+        content = content.slice(1)
+      }
       const lines = content.split('\n').filter(l => l.trim())
       const header = lines[0].toLowerCase()
       let imported = 0
       let skipped = 0
       const errors: string[] = []
+      const vaultId = getActiveVaultId()
 
       // Parse CSV header
       const cols = header.split(',').map(c => c.trim().replace(/"/g, ''))
@@ -122,6 +128,12 @@ const handlers: Record<string, (...args: any[]) => any> = {
       const urlIdx = cols.findIndex(c => c === 'url')
       const userIdx = cols.findIndex(c => c === 'username' || c === 'login' || c === 'email')
       const passIdx = cols.findIndex(c => c === 'password')
+      const typeIdx = cols.findIndex(c => c === 'type')
+      const cardNumIdx = cols.findIndex(c => c === 'card_number')
+      const cardHolderIdx = cols.findIndex(c => c === 'card_holder')
+      const cardExpiryIdx = cols.findIndex(c => c === 'card_expiry')
+      const cardCvvIdx = cols.findIndex(c => c === 'card_cvv')
+      const notesIdx = cols.findIndex(c => c === 'notes')
 
       for (let i = 1; i < lines.length; i++) {
         try {
@@ -129,18 +141,27 @@ const handlers: Record<string, (...args: any[]) => any> = {
           const title = nameIdx >= 0 ? values[nameIdx] : `Import ${i}`
           if (!title) { skipped++; continue }
 
+          // Strip surrounding quotes from values
+          const cleanTitle = title.replace(/^"(.*)"$/, '$1')
+          const entryType = typeIdx >= 0 ? (values[typeIdx] || 'login') : 'login'
+
           // Skip duplicates
-          if (await isDuplicateEntry(title, userIdx >= 0 ? values[userIdx] : '')) {
+          if (await isDuplicateEntry(cleanTitle, userIdx >= 0 ? values[userIdx] : '', vaultId)) {
             skipped++
             continue
           }
 
           await entriesService.createEntry({
-            entry_type: 'login',
-            title,
-            username: userIdx >= 0 ? values[userIdx] : '',
-            password: passIdx >= 0 ? values[passIdx] : '',
-            url: urlIdx >= 0 ? values[urlIdx] : '',
+            entry_type: entryType as any,
+            title: cleanTitle,
+            username: userIdx >= 0 ? (values[userIdx] || '').replace(/^"(.*)"$/, '$1') : '',
+            password: passIdx >= 0 ? (values[passIdx] || '').replace(/^"(.*)"$/, '$1') : '',
+            url: urlIdx >= 0 ? (values[urlIdx] || '').replace(/^"(.*)"$/, '$1') : '',
+            notes: notesIdx >= 0 ? (values[notesIdx] || '').replace(/^"(.*)"$/, '$1') : '',
+            card_number: cardNumIdx >= 0 ? (values[cardNumIdx] || '').replace(/^"(.*)"$/, '$1') : undefined,
+            card_holder: cardHolderIdx >= 0 ? (values[cardHolderIdx] || '').replace(/^"(.*)"$/, '$1') : undefined,
+            card_expiry: cardExpiryIdx >= 0 ? (values[cardExpiryIdx] || '').replace(/^"(.*)"$/, '$1') : undefined,
+            card_cvv: cardCvvIdx >= 0 ? (values[cardCvvIdx] || '').replace(/^"(.*)"$/, '$1') : undefined,
           })
           imported++
         } catch (e: any) {
@@ -221,7 +242,7 @@ const handlers: Record<string, (...args: any[]) => any> = {
         defaultPath: 'vault-export.csv',
         filters: [{ name: 'CSV Files', extensions: ['csv'] }],
       })
-      if (result.canceled || !result.filePath) return
+      if (result.canceled || !result.filePath) return { success: false }
       filePath = result.filePath
     }
 
@@ -229,7 +250,7 @@ const handlers: Record<string, (...args: any[]) => any> = {
       ? await Promise.all(entryIds.map(id => entriesService.getEntry(id)))
       : (await entriesService.listEntries()).map(e => ({ ...e } as any))
 
-    const csvLines = ['name,url,username,password,notes']
+    const csvLines = ['name,url,username,password,notes,type,card_number,card_holder,card_expiry,card_cvv']
     for (const entry of entries) {
       if (!entry) continue
       const e = entry as any
@@ -238,10 +259,16 @@ const handlers: Record<string, (...args: any[]) => any> = {
       const password = e.password || ''
       const url = e.url || ''
       const notes = (e.notes || '').replace(/\n/g, ' ')
-      csvLines.push(`"${title}","${url}","${username}","${password}","${notes}"`)
+      const type = e.entry_type || 'login'
+      const cardNumber = e.card_number || ''
+      const cardHolder = e.card_holder || ''
+      const cardExpiry = e.card_expiry || ''
+      const cardCvv = e.card_cvv || ''
+      csvLines.push(`"${escapeCSV(title)}","${escapeCSV(url)}","${escapeCSV(username)}","${escapeCSV(password)}","${escapeCSV(notes)}","${type}","${escapeCSV(cardNumber)}","${escapeCSV(cardHolder)}","${escapeCSV(cardExpiry)}","${escapeCSV(cardCvv)}"`)
     }
 
     writeFileSync(filePath, csvLines.join('\n'), 'utf-8')
+    return { success: true }
   },
 
   // Export JSON
@@ -253,7 +280,7 @@ const handlers: Record<string, (...args: any[]) => any> = {
         defaultPath: 'vault-export.json',
         filters: [{ name: 'JSON Files', extensions: ['json'] }],
       })
-      if (result.canceled || !result.filePath) return
+      if (result.canceled || !result.filePath) return { success: false }
       filePath = result.filePath
     }
 
@@ -268,10 +295,19 @@ const handlers: Record<string, (...args: any[]) => any> = {
       url: entry.url || '',
       notes: entry.notes || '',
       type: entry.entry_type || 'login',
+      card_number: entry.card_number || '',
+      card_holder: entry.card_holder || '',
+      card_expiry: entry.card_expiry || '',
+      card_cvv: entry.card_cvv || '',
     }))
 
     writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8')
+    return { success: true }
   },
+}
+
+function escapeCSV(value: string): string {
+  return value.replace(/"/g, '""')
 }
 
 function parseCSVLine(line: string): string[] {
@@ -282,7 +318,13 @@ function parseCSVLine(line: string): string[] {
   for (let i = 0; i < line.length; i++) {
     const char = line[i]
     if (char === '"') {
-      inQuotes = !inQuotes
+      if (inQuotes && i + 1 < line.length && line[i + 1] === '"') {
+        // Escaped quote (RFC 4180): "" inside quoted field
+        current += '"'
+        i++ // skip next quote
+      } else {
+        inQuotes = !inQuotes
+      }
     } else if (char === ',' && !inQuotes) {
       result.push(current.trim())
       current = ''
@@ -294,14 +336,13 @@ function parseCSVLine(line: string): string[] {
   return result
 }
 
-async function isDuplicateEntry(title: string, username: string): Promise<boolean> {
+async function isDuplicateEntry(title: string, username: string, vaultId?: number): Promise<boolean> {
   try {
     const db = await getDatabase()
-    // We need to check display_title and also decrypt to check username
-    // For simplicity, just check display_title match
+    const vid = vaultId ?? 1
     const result = db.exec(
-      "SELECT COUNT(*) as count FROM encrypted_entries WHERE display_title = ?",
-      [title]
+      "SELECT COUNT(*) as count FROM encrypted_entries WHERE display_title = ? AND vault_id = ?",
+      [title, vid]
     )
     if (result.length > 0 && result[0].values.length > 0) {
       return (result[0].values[0][0] as number) > 0

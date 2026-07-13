@@ -85,7 +85,8 @@ export const useEntriesStore = create<EntriesState>((set, get) => ({
     }
     set({ loading: true })
     try {
-      const entries = await invoke('entries:search', query)
+      const f = get().filters
+      const entries = await invoke('entries:search', query, f)
       set({ entries, loading: false })
     } catch {
       set({ loading: false })

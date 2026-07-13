@@ -173,10 +173,14 @@ export function DisposableEmailPanel() {
           {selectedMessage.text ? (
             <pre className="text-sm text-vault-text whitespace-pre-wrap font-sans">{selectedMessage.text}</pre>
           ) : selectedMessage.html ? (
-            <div
-              className="text-sm text-vault-text prose prose-sm max-w-none"
-              dangerouslySetInnerHTML={{ __html: selectedMessage.html }}
-            />
+            <div className="text-sm text-vault-text prose prose-sm max-w-none">
+              <iframe
+                srcDoc={selectedMessage.html}
+                sandbox="allow-same-origin"
+                className="w-full border-0 min-h-[200px]"
+                title="Email content"
+              />
+            </div>
           ) : (
             <p className="text-sm text-vault-text-secondary italic">No content</p>
           )}

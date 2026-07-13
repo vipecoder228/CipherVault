@@ -99,6 +99,11 @@ export function Sidebar() {
               collapsed={sidebarCollapsed}
               onClick={() => { setShowDisposableEmail(!showDisposableEmail); setShowSettings(false) }}
             />
+            {!sidebarCollapsed && showDisposableEmail && (
+              <p className="px-3 text-[10px] text-vault-text-secondary leading-tight">
+                Disposable email via mail.tm
+              </p>
+            )}
           </div>
 
           {/* Categories */}

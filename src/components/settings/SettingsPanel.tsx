@@ -67,8 +67,17 @@ function SecurityTab() {
   }, [])
 
   const loadSettings = async () => {
-    const lockMs = await invoke('settings:get', 'auto_lock_ms')
-    if (lockMs) setAutoLockMs(lockMs)
+    try {
+      const lockMs = await invoke('settings:get', 'auto_lock_ms')
+      if (lockMs) setAutoLockMs(lockMs)
+
+      // Load TOTP and alarm status from settings
+      const totpData = await invoke('settings:get', 'totp_enabled')
+      if (totpData === 'true' || totpData === '1') setTotpEnabled(true)
+
+      const alarmData = await invoke('settings:get', 'alarm_enabled')
+      if (alarmData === 'true' || alarmData === '1') setAlarmEnabled(true)
+    } catch {}
   }
 
   const handleAutoLockChange = async (ms: string) => {

@@ -171,7 +171,7 @@ export interface IPCChannels {
   'entries:create': (data: CreateEntryPayload) => Promise<EncryptedEntry>
   'entries:update': (id: number, data: UpdateEntryPayload) => Promise<void>
   'entries:delete': (id: number) => Promise<void>
-  'entries:search': (query: string) => Promise<EncryptedEntry[]>
+  'entries:search': (query: string, filters?: EntryFilters) => Promise<EncryptedEntry[]>
   'entries:toggle-favorite': (id: number) => Promise<void>
   'entries:get-history': (id: number) => Promise<EntryHistoryItem[]>
   'entries:get-decrypted-history': (id: number) => Promise<Array<EntryHistoryItem & { decrypted: Record<string, string> | null }>>
@@ -205,10 +205,10 @@ export interface IPCChannels {
   'disposable:delete-account': (emailId: number) => Promise<void>
 
   // Import/Export
-  'import:csv': (filePath: string) => Promise<ImportResult>
-  'import:json': (filePath: string) => Promise<ImportResult>
-  'export:csv': (filePath: string, entryIds?: number[]) => Promise<void>
-  'export:json': (filePath: string, entryIds?: number[]) => Promise<void>
+  'import:csv': (filePath?: string) => Promise<ImportResult>
+  'import:json': (filePath?: string) => Promise<ImportResult>
+  'export:csv': (filePath?: string, entryIds?: number[]) => Promise<{ success: boolean } | void>
+  'export:json': (filePath?: string, entryIds?: number[]) => Promise<{ success: boolean } | void>
 }
 
 export type IPCChannel = keyof IPCChannels

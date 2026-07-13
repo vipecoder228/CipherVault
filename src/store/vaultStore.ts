@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { invoke } from '../lib/ipc'
+import { useEntriesStore } from './entriesStore'
 
 interface VaultInfo {
   id: number
@@ -111,6 +112,8 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   lock: async () => {
     await invoke('vault:lock')
     set({ locked: true, requiresTotp: false, pendingPassword: null, alarmMode: false })
+    // Clear entries so they don't leak into alarm mode
+    useEntriesStore.setState({ entries: [], selectedEntry: null })
   },
 
   switchVault: (vaultId: number) => {
@@ -130,5 +133,6 @@ if (typeof window !== 'undefined' && window.electronAPI?.on) {
       pendingPassword: null,
       alarmMode: false,
     })
+    useEntriesStore.setState({ entries: [], selectedEntry: null })
   })
 }

@@ -3,6 +3,7 @@ import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { invoke } from '../../lib/ipc'
 import { useToastStore } from '../ui/Toast'
+import { useEntriesStore } from '../../store/entriesStore'
 import type { ImportResult } from '@shared/types'
 
 interface Props {
@@ -15,6 +16,7 @@ export function ImportDialog({ open, onClose }: Props) {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<ImportResult | null>(null)
   const addToast = useToastStore((s) => s.addToast)
+  const loadEntries = useEntriesStore((s) => s.loadEntries)
 
   const handleImport = async () => {
     setLoading(true)
@@ -26,6 +28,7 @@ export function ImportDialog({ open, onClose }: Props) {
       setResult(importResult)
       if (importResult.imported > 0) {
         addToast(`Imported ${importResult.imported} entries`, 'success')
+        await loadEntries()
       }
       if (importResult.errors.length > 0) {
         addToast(`${importResult.errors.length} errors occurred`, 'warning')

@@ -1,15 +1,24 @@
+import { useEffect } from 'react'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 import { EntryDetail } from '../entries/EntryDetail'
 import { DisposableEmailPanel } from '../disposable-email/DisposableEmailPanel'
 import { useEntriesStore } from '../../store/entriesStore'
 import { useUIStore } from '../../store/uiStore'
+import { useVaultStore } from '../../store/vaultStore'
+import { AlertTriangle } from 'lucide-react'
 import type { EntryType } from '@shared/types'
 
 export function AppShell() {
   const selectedEntry = useEntriesStore((s) => s.selectedEntry)
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed)
   const showDisposableEmail = useUIStore((s) => s.showDisposableEmail)
+  const alarmMode = useVaultStore((s) => s.alarmMode)
+  const loadEntries = useEntriesStore((s) => s.loadEntries)
+
+  useEffect(() => {
+    loadEntries()
+  }, [loadEntries])
 
   return (
     <div className="flex h-screen overflow-hidden bg-vault-bg">
@@ -20,6 +29,12 @@ export function AppShell() {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
+        {alarmMode && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-vault-warning/10 border-b border-vault-warning/30 text-vault-warning text-xs font-medium">
+            <AlertTriangle size={14} />
+            <span>Duress mode — viewing decoy vault. Real data is hidden.</span>
+          </div>
+        )}
         <Header />
         <div className="flex-1 flex overflow-hidden">
           {/* Entry list / grid */}
@@ -56,6 +71,7 @@ const TYPE_LABELS: Record<EntryType, string> = {
 function EntryGrid() {
   const { entries, viewMode, loading, selectEntry, selectedEntry, toggleFavorite, filters, setFilters } = useEntriesStore()
   const setShowPasswordGenerator = useUIStore((s) => s.setShowPasswordGenerator)
+  const alarmMode = useVaultStore((s) => s.alarmMode)
 
   const activeType = filters.entry_type || null
 
@@ -92,22 +108,34 @@ function EntryGrid() {
 
       {entries.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-64 text-vault-text-secondary">
-          <div className="w-16 h-16 rounded-2xl bg-vault-surface border border-vault-border flex items-center justify-center mb-4">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3" />
-              <line x1="8" y1="12" x2="16" y2="12" />
-            </svg>
-          </div>
-          <p className="text-lg font-medium mb-2">No entries yet</p>
-          <p className="text-sm mb-4">Add your first password or import from another manager</p>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowPasswordGenerator(true)}
-              className="px-4 py-2 bg-vault-accent text-white rounded-lg hover:bg-vault-accent-hover transition-colors text-sm"
-            >
-              Generate Password
-            </button>
-          </div>
+          {alarmMode ? (
+            <>
+              <div className="w-16 h-16 rounded-2xl bg-vault-surface border border-vault-border flex items-center justify-center mb-4">
+                <AlertTriangle size={32} className="text-vault-warning" />
+              </div>
+              <p className="text-lg font-medium mb-2">Decoy vault is empty</p>
+              <p className="text-sm mb-4">You are in duress mode. Real data is hidden.</p>
+            </>
+          ) : (
+            <>
+              <div className="w-16 h-16 rounded-2xl bg-vault-surface border border-vault-border flex items-center justify-center mb-4">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3" />
+                  <line x1="8" y1="12" x2="16" y2="12" />
+                </svg>
+              </div>
+              <p className="text-lg font-medium mb-2">No entries yet</p>
+              <p className="text-sm mb-4">Add your first password or import from another manager</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowPasswordGenerator(true)}
+                  className="px-4 py-2 bg-vault-accent text-white rounded-lg hover:bg-vault-accent-hover transition-colors text-sm"
+                >
+                  Generate Password
+                </button>
+              </div>
+            </>
+          )}
         </div>
       ) : viewMode === 'list' ? (
         <div className="space-y-1">

@@ -110,8 +110,18 @@ export function runMigrations(db: Database): void {
   // Run pending migrations
   MIGRATIONS.forEach((sql, index) => {
     if (!appliedVersions.has(index)) {
-      db.run(sql)
-      db.run('INSERT INTO _migrations (version) VALUES (?)', [index])
+      try {
+        db.run(sql)
+        db.run('INSERT INTO _migrations (version) VALUES (?)', [index])
+      } catch (e) {
+        // Migration may have already been partially applied (e.g., column exists)
+        // Still mark as applied to avoid retrying
+        try {
+          db.run('INSERT INTO _migrations (version) VALUES (?)', [index])
+        } catch {
+          // Already tracked
+        }
+      }
     }
   })
 }

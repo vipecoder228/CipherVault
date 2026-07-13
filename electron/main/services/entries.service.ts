@@ -124,12 +124,12 @@ export async function deleteEntryById(id: number): Promise<void> {
   saveDatabase()
 }
 
-export async function searchEntries(query: string): Promise<EncryptedEntry[]> {
+export async function searchEntries(query: string, filters?: EntryFilters): Promise<EncryptedEntry[]> {
   const encKey = getEncryptionKey()
   if (!encKey) return [] // Alarm mode — return empty
   const db = await getDatabase()
   const vaultId = getActiveVaultId()
-  return dbSearchEntries(db, query, vaultId)
+  return dbSearchEntries(db, query, vaultId, filters)
 }
 
 export async function toggleFavoriteEntry(id: number): Promise<void> {

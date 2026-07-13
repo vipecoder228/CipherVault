@@ -2,6 +2,8 @@ import { cn } from '../../lib/utils'
 import { useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
 
+let openModalCount = 0
+
 interface ModalProps {
   open: boolean
   onClose: () => void
@@ -27,11 +29,19 @@ export function Modal({ open, onClose, title, children, className, maxWidth = 'm
 
   useEffect(() => {
     if (open) {
-      document.body.style.overflow = 'hidden'
-    } else {
-      document.body.style.overflow = ''
+      openModalCount++
+      if (openModalCount === 1) {
+        document.body.style.overflow = 'hidden'
+      }
     }
-    return () => { document.body.style.overflow = '' }
+    return () => {
+      if (open) {
+        openModalCount--
+        if (openModalCount === 0) {
+          document.body.style.overflow = ''
+        }
+      }
+    }
   }, [open])
 
   if (!open) return null

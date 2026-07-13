@@ -1,7 +1,7 @@
 import { getDatabase, saveDatabase } from '../db/connection'
 import { getVault, getAllVaults, createVault, updateMasterHash, updateTOTP, updateAlarm } from '../db/queries/vault.queries'
 import { generateSalt, deriveKey, computeVerificationHash, splitDerivedKey } from '../crypto/keyderivation'
-import { encrypt, decrypt } from '../crypto/encryption'
+import { encrypt, decrypt, encryptJSON, decryptJSON } from '../crypto/encryption'
 import { generateSecret, verifyTOTP, generateQRCodeUrl } from '../crypto/totp'
 import { RATE_LIMIT } from '../crypto/constants'
 import type { Buffer } from 'buffer'
@@ -309,6 +309,63 @@ export async function changeMasterPassword(
     updateTOTP(db, reEncryptedStr, true, activeVaultId)
   }
 
+  // Re-encrypt all entries with the new key
+  const entries = db.exec(
+    'SELECT id, encrypted_data, iv, auth_tag FROM encrypted_entries WHERE vault_id = ?',
+    [activeVaultId]
+  )
+  if (entries.length > 0) {
+    for (const row of entries[0].values) {
+      const entryId = row[0] as number
+      const encryptedData = row[1] as string
+      const ivHex = row[2] as string
+      const authTagHex = row[3] as string
+
+      const decrypted = decryptJSON<Record<string, string>>(
+        { iv: ivHex, ciphertext: encryptedData, authTag: authTagHex },
+        oldEncKey
+      )
+
+      const reEncrypted = encryptJSON(decrypted, newEncKey)
+
+      db.run(
+        `UPDATE encrypted_entries SET encrypted_data = ?, iv = ?, auth_tag = ?, updated_at = datetime('now') WHERE id = ?`,
+        [reEncrypted.ciphertext, reEncrypted.iv, reEncrypted.authTag, entryId]
+      )
+    }
+
+    // Re-encrypt history snapshots too
+    const historyRows = db.exec(
+      `SELECT h.id, h.encrypted_snapshot, h.iv, h.auth_tag
+       FROM entry_history h
+       JOIN encrypted_entries e ON h.entry_id = e.id
+       WHERE e.vault_id = ?`,
+      [activeVaultId]
+    )
+    if (historyRows.length > 0) {
+      for (const row of historyRows[0].values) {
+        const historyId = row[0] as number
+        const snapshot = row[1] as string
+        const ivHex = row[2] as string
+        const authTagHex = row[3] as string
+
+        try {
+          const decrypted = decryptJSON<Record<string, string>>(
+            { iv: ivHex, ciphertext: snapshot, authTag: authTagHex },
+            oldEncKey
+          )
+          const reEncrypted = encryptJSON(decrypted, newEncKey)
+          db.run(
+            `UPDATE entry_history SET encrypted_snapshot = ?, iv = ?, auth_tag = ? WHERE id = ?`,
+            [reEncrypted.ciphertext, reEncrypted.iv, reEncrypted.authTag, historyId]
+          )
+        } catch {
+          // History snapshot may be corrupted — skip
+        }
+      }
+    }
+  }
+
   saveDatabase()
   derivedKey = newKey
   await startAutoLockTimer()
@@ -342,6 +399,9 @@ export async function verifyAndSaveTOTP(code: string): Promise<boolean> {
 
   const db = await getDatabase()
   updateTOTP(db, encryptedStr, true, activeVaultId)
+
+  // Save TOTP status to settings
+  db.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('totp_enabled', 'true')")
   saveDatabase()
 
   pendingTotpSecret = null
@@ -365,6 +425,9 @@ export async function disableTOTP(totpCode: string): Promise<boolean> {
   if (!verifyTOTP(decryptedSecret, totpCode)) return false
 
   updateTOTP(db, null, false, activeVaultId)
+
+  // Save TOTP status to settings
+  db.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('totp_enabled', 'false')")
   saveDatabase()
   return true
 }
@@ -416,6 +479,9 @@ export async function setupAlarmPassword(alarmPassword: string): Promise<{ succe
   const alarmHash = computeVerificationHash(encryptionKey)
 
   updateAlarm(db, alarmHash, salt.toString('hex'), activeVaultId)
+
+  // Save alarm status to settings
+  db.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('alarm_enabled', 'true')")
   saveDatabase()
 
   return { success: true }
@@ -455,6 +521,10 @@ export async function changeAlarmPassword(oldAlarmPassword: string, newAlarmPass
 export async function removeAlarmPassword(): Promise<{ success: boolean; error?: string }> {
   const db = await getDatabase()
   updateAlarm(db, null, null, activeVaultId)
+
+  // Save alarm status to settings
+  db.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('alarm_enabled', 'false')")
   saveDatabase()
+
   return { success: true }
 }

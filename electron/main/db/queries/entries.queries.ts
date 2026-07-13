@@ -118,11 +118,28 @@ export function deleteEntry(
 export function searchEntries(
   db: Database,
   query: string,
-  vaultId?: number
+  vaultId?: number,
+  filters?: EntryFilters
 ): EncryptedEntry[] {
-  return queryAll<EncryptedEntry>(
-    db,
-    `SELECT * FROM encrypted_entries WHERE vault_id = ? AND (display_title LIKE ? OR entry_type LIKE ?) ORDER BY updated_at DESC`,
-    [vaultId ?? 1, `%${query}%`, `%${query}%`]
-  )
+  let sql = `SELECT * FROM encrypted_entries WHERE vault_id = ? AND (display_title LIKE ? OR entry_type LIKE ?)`
+  const params: any[] = [vaultId ?? 1, `%${query}%`, `%${query}%`]
+
+  if (filters) {
+    if (filters.category_id !== undefined && filters.category_id !== null) {
+      sql += ' AND category_id = ?'
+      params.push(filters.category_id)
+    }
+    if (filters.is_favorite !== undefined) {
+      sql += ' AND is_favorite = ?'
+      params.push(filters.is_favorite ? 1 : 0)
+    }
+    if (filters.entry_type) {
+      sql += ' AND entry_type = ?'
+      params.push(filters.entry_type)
+    }
+  }
+
+  sql += ' ORDER BY updated_at DESC'
+
+  return queryAll<EncryptedEntry>(db, sql, params)
 }

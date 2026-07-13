@@ -17,11 +17,13 @@ export function ExportDialog({ open, onClose }: Props) {
   const handleExport = async () => {
     setLoading(true)
     try {
+      let result
       if (format === 'csv') {
-        await invoke('export:csv')
+        result = await invoke('export:csv')
       } else {
-        await invoke('export:json')
+        result = await invoke('export:json')
       }
+      if (result?.success === false) return
       addToast('Export completed', 'success')
       onClose()
     } catch {

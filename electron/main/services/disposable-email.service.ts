@@ -158,7 +158,7 @@ export async function getDisposableEmailMessages(emailId: number): Promise<Array
   const email = getDisposableEmailById(db, emailId)
   if (!email) throw new Error('Email not found')
 
-  // Refresh token if needed
+  // Refresh token if needed or if API call fails with 401
   let token = email.token
   if (!token) {
     token = await getToken(email.address, email.password)
@@ -166,7 +166,16 @@ export async function getDisposableEmailMessages(emailId: number): Promise<Array
     saveDatabase()
   }
 
-  const messages = await getMessages(token)
+  let messages
+  try {
+    messages = await getMessages(token)
+  } catch {
+    // Token may be expired — refresh and retry
+    token = await getToken(email.address, email.password)
+    updateDisposableEmailToken(db, emailId, token, email.account_id)
+    saveDatabase()
+    messages = await getMessages(token)
+  }
   return messages.map(m => ({
     id: m.id,
     from: m.from.address,
@@ -196,7 +205,16 @@ export async function getDisposableEmailMessage(emailId: number, messageId: stri
     saveDatabase()
   }
 
-  const msg = await getMessage(token, messageId)
+  let msg
+  try {
+    msg = await getMessage(token, messageId)
+  } catch {
+    // Token may be expired — refresh and retry
+    token = await getToken(email.address, email.password)
+    updateDisposableEmailToken(db, emailId, token, email.account_id)
+    saveDatabase()
+    msg = await getMessage(token, messageId)
+  }
   return {
     id: msg.id,
     from: msg.from.address,
