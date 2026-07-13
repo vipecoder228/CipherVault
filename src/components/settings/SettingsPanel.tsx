@@ -9,6 +9,7 @@ import { useUIStore } from '../../store/uiStore'
 import { useToastStore } from '../ui/Toast'
 import { BackupDialog } from '../import-export/BackupDialog'
 import { SecurityHealth } from '../health/SecurityHealth'
+import { SyncSettings } from './SyncSettings'
 import { Shield, Palette, Info } from 'lucide-react'
 
 interface Props {
@@ -204,6 +205,15 @@ function SecurityTab() {
             Import Backup
           </Button>
         </div>
+      </div>
+
+      {/* Cloud Sync */}
+      <div>
+        <label className="text-sm font-medium text-vault-text block mb-2">Cloud Sync</label>
+        <p className="text-xs text-vault-text-secondary mb-3">
+          Sync your vault between devices via cloud storage (Google Drive, Dropbox, OneDrive, etc.). The file is encrypted — your cloud provider cannot read it.
+        </p>
+        <SyncSettings />
       </div>
 
       {showChangePassword && (

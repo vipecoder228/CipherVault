@@ -7,6 +7,7 @@ import { registerIPC, unregisterIPC } from './ipc/ipcHandlers'
 import { closeDatabase } from './db/connection'
 import { lockVault } from './services/vault.service'
 import { startWebSocketServer, stopWebSocketServer } from './services/websocket.service'
+import { loadSyncSettings, stopSync } from './services/sync.service'
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -169,6 +170,7 @@ app.whenReady().then(() => {
   createTray()
   registerGlobalShortcuts()
   startWebSocketServer()
+  loadSyncSettings()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -186,6 +188,7 @@ app.on('before-quit', () => {
   isQuitting = true
   globalShortcut.unregisterAll()
   stopWebSocketServer()
+  stopSync()
   lockVault()
   unregisterIPC()
   closeDatabase()

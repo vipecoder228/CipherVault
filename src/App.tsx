@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useVaultStore } from './store/vaultStore'
 import { useUIStore } from './store/uiStore'
+import { useEntriesStore } from './store/entriesStore'
 import { SplashScreen } from './components/vault/SplashScreen'
 import { UnlockScreen } from './components/vault/UnlockScreen'
 import { AppShell } from './components/layout/AppShell'
@@ -36,6 +37,16 @@ export function App() {
       root.classList.add('light')
     }
   }, [theme])
+
+  // Listen for sync:imported events (from cloud sync)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.electronAPI?.on) {
+      const cleanup = window.electronAPI.on('sync:imported', () => {
+        useEntriesStore.getState().loadEntries()
+      })
+      return cleanup
+    }
+  }, [])
 
   if (booting) {
     return (

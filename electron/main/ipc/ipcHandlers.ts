@@ -10,6 +10,7 @@ import { checkBreach } from '../services/breach-check.service'
 import * as backupService from '../services/backup.service'
 import { analyzePasswordHealth } from '../services/health.service'
 import { generateUsername, generatePassphrase } from '../services/password-gen.service'
+import * as syncService from '../services/sync.service'
 import { getDatabase } from '../db/connection'
 import { getCategories, createCategory, updateCategory, deleteCategory, reorderCategories } from '../db/queries/categories.queries'
 import { checkIntegrity } from '../integrity'
@@ -104,6 +105,14 @@ const handlers: Record<string, (...args: any[]) => any> = {
   // Generators
   'password:generate-username': () => generateUsername(),
   'password:generate-passphrase': (_: unknown, wordCount?: number) => generatePassphrase(wordCount),
+
+  // Sync
+  'sync:get-status': () => syncService.getSyncStatus(),
+  'sync:select-folder': () => syncService.selectSyncFolder(),
+  'sync:set-password': (_: unknown, password: string) => syncService.setSyncPassword(password),
+  'sync:now': () => syncService.syncNow(),
+  'sync:disable': () => syncService.disableSync(),
+  'sync:load-settings': () => syncService.loadSyncSettings(),
 
   // Integrity check
   'integrity:check': () => checkIntegrity(),

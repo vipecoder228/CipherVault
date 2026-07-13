@@ -215,6 +215,14 @@ export interface IPCChannels {
   'password:generate-username': () => string
   'password:generate-passphrase': (wordCount?: number) => string
 
+  // Sync
+  'sync:get-status': () => Promise<{ enabled: boolean; folder: string | null; lastSyncTime: number; isSyncing: boolean }>
+  'sync:select-folder': () => Promise<{ success: boolean; folder?: string; error?: string }>
+  'sync:set-password': (password: string) => Promise<void>
+  'sync:now': () => Promise<{ success: boolean; error?: string }>
+  'sync:disable': () => Promise<void>
+  'sync:load-settings': () => Promise<{ enabled: boolean; folder: string | null }>
+
   // Import/Export
   'import:csv': (filePath?: string) => Promise<ImportResult>
   'import:json': (filePath?: string) => Promise<ImportResult>
