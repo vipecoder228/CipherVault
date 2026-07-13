@@ -28,6 +28,13 @@ export function CreateEntryModal({ open, onClose, initialPassword }: Props) {
   const [cardNumber, setCardNumber] = useState('')
   const [cardHolder, setCardHolder] = useState('')
   const [cardExpiry, setCardExpiry] = useState('')
+  const [identityFirstName, setIdentityFirstName] = useState('')
+  const [identityLastName, setIdentityLastName] = useState('')
+  const [identityPhone, setIdentityPhone] = useState('')
+  const [identityEmail, setIdentityEmail] = useState('')
+  const [identityAddress, setIdentityAddress] = useState('')
+  const [identityPassport, setIdentityPassport] = useState('')
+  const [identityBirthdate, setIdentityBirthdate] = useState('')
   const [loading, setLoading] = useState(false)
   const [showGen, setShowGen] = useState(false)
   const [genPassword, setGenPassword] = useState('')
@@ -88,6 +95,14 @@ export function CreateEntryModal({ open, onClose, initialPassword }: Props) {
         data.card_number = cardNumber.trim() || undefined
         data.card_holder = cardHolder.trim() || undefined
         data.card_expiry = cardExpiry.trim() || undefined
+      } else if (entryType === 'identity') {
+        data.identity_first_name = identityFirstName.trim() || undefined
+        data.identity_last_name = identityLastName.trim() || undefined
+        data.identity_phone = identityPhone.trim() || undefined
+        data.identity_email = identityEmail.trim() || undefined
+        data.identity_address = identityAddress.trim() || undefined
+        data.identity_passport = identityPassport.trim() || undefined
+        data.identity_birthdate = identityBirthdate.trim() || undefined
       }
 
       await createEntry(data)
@@ -105,6 +120,8 @@ export function CreateEntryModal({ open, onClose, initialPassword }: Props) {
     setTitle(''); setUsername(''); setPassword(''); setUrl(''); setNotes('')
     setTotpSecret('')
     setCardNumber(''); setCardHolder(''); setCardExpiry('')
+    setIdentityFirstName(''); setIdentityLastName(''); setIdentityPhone('')
+    setIdentityEmail(''); setIdentityAddress(''); setIdentityPassport(''); setIdentityBirthdate('')
     setShowGen(false); setGenPassword('')
     onClose()
   }
@@ -268,6 +285,58 @@ export function CreateEntryModal({ open, onClose, initialPassword }: Props) {
               value={cardExpiry}
               onChange={(e) => setCardExpiry(e.target.value)}
             />
+          </>
+        )}
+
+        {/* Identity fields */}
+        {entryType === 'identity' && (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="First Name"
+                placeholder="John"
+                value={identityFirstName}
+                onChange={(e) => setIdentityFirstName(e.target.value)}
+              />
+              <Input
+                label="Last Name"
+                placeholder="Doe"
+                value={identityLastName}
+                onChange={(e) => setIdentityLastName(e.target.value)}
+              />
+            </div>
+            <Input
+              label="Phone"
+              placeholder="+1 (555) 123-4567"
+              value={identityPhone}
+              onChange={(e) => setIdentityPhone(e.target.value)}
+            />
+            <Input
+              label="Email"
+              placeholder="john@example.com"
+              value={identityEmail}
+              onChange={(e) => setIdentityEmail(e.target.value)}
+            />
+            <Input
+              label="Address"
+              placeholder="123 Main St, City, Country"
+              value={identityAddress}
+              onChange={(e) => setIdentityAddress(e.target.value)}
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="Passport / ID"
+                placeholder="AB1234567"
+                value={identityPassport}
+                onChange={(e) => setIdentityPassport(e.target.value)}
+              />
+              <Input
+                label="Birthdate"
+                placeholder="DD.MM.YYYY"
+                value={identityBirthdate}
+                onChange={(e) => setIdentityBirthdate(e.target.value)}
+              />
+            </div>
           </>
         )}
 

@@ -10,6 +10,7 @@ import { useToastStore } from '../ui/Toast'
 import { BackupDialog } from '../import-export/BackupDialog'
 import { SecurityHealth } from '../health/SecurityHealth'
 import { SyncSettings } from './SyncSettings'
+import { EmergencyAccess } from '../health/EmergencyAccess'
 import { Shield, Palette, Info } from 'lucide-react'
 
 interface Props {
@@ -63,6 +64,7 @@ function SecurityTab() {
   const [showBackupExport, setShowBackupExport] = useState(false)
   const [showBackupImport, setShowBackupImport] = useState(false)
   const [showSecurityHealth, setShowSecurityHealth] = useState(false)
+  const [showEmergencyAccess, setShowEmergencyAccess] = useState(false)
   const [totpEnabled, setTotpEnabled] = useState(false)
   const [alarmEnabled, setAlarmEnabled] = useState(false)
   const [autoLockMs, setAutoLockMs] = useState('300000')
@@ -216,6 +218,17 @@ function SecurityTab() {
         <SyncSettings />
       </div>
 
+      {/* Emergency Access */}
+      <div>
+        <label className="text-sm font-medium text-vault-text block mb-2">Emergency Access</label>
+        <p className="text-xs text-vault-text-secondary mb-2">
+          Create an encrypted backup for your trusted contact. They can restore your vault in case of emergency.
+        </p>
+        <Button variant="secondary" onClick={() => setShowEmergencyAccess(true)} className="w-full">
+          Set Up Emergency Access
+        </Button>
+      </div>
+
       {showChangePassword && (
         <ChangePasswordModal onClose={() => setShowChangePassword(false)} />
       )}
@@ -236,6 +249,9 @@ function SecurityTab() {
       )}
       {showSecurityHealth && (
         <SecurityHealth open={showSecurityHealth} onClose={() => setShowSecurityHealth(false)} />
+      )}
+      {showEmergencyAccess && (
+        <EmergencyAccess open={showEmergencyAccess} onClose={() => setShowEmergencyAccess(false)} />
       )}
     </div>
   )

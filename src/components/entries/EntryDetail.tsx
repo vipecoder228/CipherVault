@@ -181,6 +181,48 @@ export function EntryDetail() {
             </>
           )}
 
+          {/* Identity fields */}
+          {entry.entry_type === 'identity' && (
+            <>
+              {(entry.identity_first_name || entry.identity_last_name) && (
+                <FieldRow
+                  label="Name"
+                  value={`${entry.identity_first_name || ''} ${entry.identity_last_name || ''}`.trim()}
+                />
+              )}
+              {entry.identity_phone && (
+                <FieldRow
+                  label="Phone"
+                  value={entry.identity_phone}
+                  copied={copiedField === 'identity_phone'}
+                  onCopy={() => handleCopy(entry.identity_phone, 'identity_phone')}
+                />
+              )}
+              {entry.identity_email && (
+                <FieldRow
+                  label="Email"
+                  value={entry.identity_email}
+                  copied={copiedField === 'identity_email'}
+                  onCopy={() => handleCopy(entry.identity_email, 'identity_email')}
+                />
+              )}
+              {entry.identity_address && (
+                <FieldRow label="Address" value={entry.identity_address} />
+              )}
+              {entry.identity_passport && (
+                <FieldRow
+                  label="Passport / ID"
+                  value={entry.identity_passport}
+                  copied={copiedField === 'identity_passport'}
+                  onCopy={() => handleCopy(entry.identity_passport, 'identity_passport')}
+                />
+              )}
+              {entry.identity_birthdate && (
+                <FieldRow label="Birthdate" value={entry.identity_birthdate} />
+              )}
+            </>
+          )}
+
           {/* Notes */}
           {entry.notes && (
             <div className="space-y-1.5">

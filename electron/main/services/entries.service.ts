@@ -59,6 +59,14 @@ export async function createEntry(data: CreateEntryPayload): Promise<EncryptedEn
     card_holder: data.card_holder || '',
     card_expiry: data.card_expiry || '',
     card_cvv: data.card_cvv || '',
+    identity_first_name: data.identity_first_name || '',
+    identity_last_name: data.identity_last_name || '',
+    identity_phone: data.identity_phone || '',
+    identity_email: data.identity_email || '',
+    identity_address: data.identity_address || '',
+    identity_ssn: data.identity_ssn || '',
+    identity_passport: data.identity_passport || '',
+    identity_birthdate: data.identity_birthdate || '',
   }
 
   const encrypted = encryptJSON(entryData, encKey)
@@ -106,6 +114,14 @@ export async function updateEntry(id: number, data: UpdateEntryPayload): Promise
     card_holder: data.card_holder ?? existingData.card_holder,
     card_expiry: data.card_expiry ?? existingData.card_expiry,
     card_cvv: data.card_cvv ?? existingData.card_cvv,
+    identity_first_name: data.identity_first_name ?? existingData.identity_first_name,
+    identity_last_name: data.identity_last_name ?? existingData.identity_last_name,
+    identity_phone: data.identity_phone ?? existingData.identity_phone,
+    identity_email: data.identity_email ?? existingData.identity_email,
+    identity_address: data.identity_address ?? existingData.identity_address,
+    identity_ssn: data.identity_ssn ?? existingData.identity_ssn,
+    identity_passport: data.identity_passport ?? existingData.identity_passport,
+    identity_birthdate: data.identity_birthdate ?? existingData.identity_birthdate,
   }
 
   addHistoryEntry(db, id, existing.encrypted_data, existing.iv, existing.auth_tag, 'update')

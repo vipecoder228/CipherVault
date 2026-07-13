@@ -17,6 +17,15 @@ export interface CreateEntryPayload {
   card_holder?: string
   card_expiry?: string
   card_cvv?: string
+  // Identity fields
+  identity_first_name?: string
+  identity_last_name?: string
+  identity_phone?: string
+  identity_email?: string
+  identity_address?: string
+  identity_ssn?: string
+  identity_passport?: string
+  identity_birthdate?: string
 }
 
 export interface UpdateEntryPayload {
@@ -32,6 +41,14 @@ export interface UpdateEntryPayload {
   card_holder?: string
   card_expiry?: string
   card_cvv?: string
+  identity_first_name?: string
+  identity_last_name?: string
+  identity_phone?: string
+  identity_email?: string
+  identity_address?: string
+  identity_ssn?: string
+  identity_passport?: string
+  identity_birthdate?: string
 }
 
 export interface DecryptedEntry {
