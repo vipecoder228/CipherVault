@@ -81,8 +81,9 @@ export function CreateEntryModal({ open, onClose, initialPassword }: Props) {
       await createEntry(data)
       addToast('Entry created successfully', 'success')
       handleClose()
-    } catch {
-      addToast('Failed to create entry', 'error')
+    } catch (e: any) {
+      console.error('Create entry failed:', e)
+      addToast(e?.message || 'Failed to create entry', 'error')
     } finally {
       setLoading(false)
     }

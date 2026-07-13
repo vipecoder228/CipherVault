@@ -92,3 +92,15 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   clearError: () => set({ error: null }),
   resetTotpState: () => set({ requiresTotp: false, pendingPassword: null }),
 }))
+
+// Listen for vault:locked event from main process
+if (typeof window !== 'undefined' && window.electronAPI?.on) {
+  window.electronAPI.on('vault:locked', () => {
+    useVaultStore.setState({
+      locked: true,
+      requiresTotp: false,
+      pendingPassword: null,
+      alarmMode: false,
+    })
+  })
+}

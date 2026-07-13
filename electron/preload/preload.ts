@@ -47,4 +47,13 @@ for (const channel of channels) {
   api[channel] = (...args: any[]) => ipcRenderer.invoke(channel, ...args)
 }
 
+// Expose event listener for main process -> renderer events
+api.on = (channel: string, callback: (...args: any[]) => void) => {
+  const subscription = (_event: Electron.IpcRendererEvent, ...args: any[]) => callback(...args)
+  ipcRenderer.on(channel, subscription)
+  return () => {
+    ipcRenderer.removeListener(channel, subscription)
+  }
+}
+
 contextBridge.exposeInMainWorld('electronAPI', api)
