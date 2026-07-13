@@ -11,6 +11,9 @@ let derivedKey: Buffer | null = null
 let autoLockTimer: ReturnType<typeof setTimeout> | null = null
 let alarmMode = false
 
+// Pending TOTP secret (set during enableTOTP, used during verifyAndSaveTOTP)
+let pendingTotpSecret: string | null = null
+
 export function isUnlocked(): boolean {
   return derivedKey !== null
 }
@@ -103,7 +106,7 @@ export async function setupVault(masterPassword: string, alarmPassword?: string)
 export async function unlockVault(
   masterPassword: string,
   totpCode?: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; requiresTotp?: boolean; alarmMode?: boolean }> {
   if (isUnlocked()) {
     return { success: false, error: 'Vault is already unlocked' }
   }
@@ -191,6 +194,7 @@ export async function unlockVault(
 export function lockVault(): void {
   derivedKey = null
   alarmMode = false
+  pendingTotpSecret = null
   if (autoLockTimer) {
     clearTimeout(autoLockTimer)
     autoLockTimer = null
@@ -268,20 +272,31 @@ export async function changeMasterPassword(
 
 export function enableTOTP(): { secret: string; qrCodeUrl: string } {
   const secret = generateSecret()
-  const qrCodeUrl = generateQRCodeUrl(secret)
+  const qrCodeUrl = generateQRCodeUrl(secret, 'CipherVault')
+  // Store secret temporarily — will be saved after user verifies
+  pendingTotpSecret = secret
   return { secret, qrCodeUrl }
 }
 
-export async function verifyAndSaveTOTP(secret: string): Promise<boolean> {
+export async function verifyAndSaveTOTP(code: string): Promise<boolean> {
   const encKey = getEncryptionKey()
   if (!encKey) return false
 
-  const encrypted = encrypt(secret, encKey)
+  // Must have a pending secret from enableTOTP
+  if (!pendingTotpSecret) return false
+
+  // Verify the code against the pending secret
+  if (!verifyTOTP(pendingTotpSecret, code)) return false
+
+  // Code is valid — encrypt and save the secret
+  const encrypted = encrypt(pendingTotpSecret, encKey)
   const encryptedStr = `${encrypted.iv}:${encrypted.ciphertext}:${encrypted.authTag}`
 
   const db = await getDatabase()
   updateTOTP(db, encryptedStr, true)
   saveDatabase()
+
+  pendingTotpSecret = null
   return true
 }
 
