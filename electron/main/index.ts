@@ -205,7 +205,7 @@ async function setGlobalShortcut(shortcut: string): Promise<{ success: boolean; 
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   electronApp.setAppUserModelId('com.ciphervault.app')
 
   app.on('browser-window-created', (_, window) => {

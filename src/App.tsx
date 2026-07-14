@@ -5,16 +5,35 @@ import { useEntriesStore } from './store/entriesStore'
 import { SplashScreen } from './components/vault/SplashScreen'
 import { UnlockScreen } from './components/vault/UnlockScreen'
 import { AppShell } from './components/layout/AppShell'
+import { MobileAppShell } from './components/mobile/MobileAppShell'
 import { ToastContainer } from './components/ui/Toast'
 import { invoke } from './lib/ipc'
+
+// Detect if we're on a mobile device
+function isMobileDevice(): boolean {
+  if (typeof window === 'undefined') return false
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+    (window.innerWidth <= 768)
+}
 
 export function App() {
   const { locked, initialized, checkStatus } = useVaultStore()
   const { theme } = useUIStore()
   const [booting, setBooting] = useState(true)
   const [integrityOk, setIntegrityOk] = useState<boolean | null>(null)
+  const [isMobile, setIsMobile] = useState(false)
   const checkStatusRef = useRef(checkStatus)
   checkStatusRef.current = checkStatus
+
+  // Check if we're on mobile
+  useEffect(() => {
+    setIsMobile(isMobileDevice())
+    const handleResize = () => {
+      setIsMobile(isMobileDevice())
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   const handleBootComplete = useCallback(async () => {
     try {
@@ -77,7 +96,7 @@ export function App() {
 
   return (
     <div className={`${theme}`}>
-      {locked ? <UnlockScreen /> : <AppShell />}
+      {locked ? <UnlockScreen /> : (isMobile ? <MobileAppShell /> : <AppShell />)}
       <ToastContainer />
     </div>
   )
