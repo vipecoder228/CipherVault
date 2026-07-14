@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { OtpInput } from '../ui/OtpInput'
 import { Shield } from 'lucide-react'
+import { useI18n } from '../../i18n'
 
 interface VerificationScreenProps {
   title?: string
@@ -11,12 +12,13 @@ interface VerificationScreenProps {
 }
 
 export function VerificationScreen({
-  title = 'Verification',
-  subtitle = 'Enter your 6-digit code',
+  title,
+  subtitle,
   onVerify,
   onCancel,
   loading = false,
 }: VerificationScreenProps) {
+  const { t } = useI18n()
   const [error, setError] = useState(false)
   const [timeLeft, setTimeLeft] = useState(30)
   const [verifyLoading, setVerifyLoading] = useState(false)
@@ -68,8 +70,8 @@ export function VerificationScreen({
         </div>
 
         {/* Title */}
-        <h1 className="text-2xl font-bold text-vault-text mb-2">{title}</h1>
-        <p className="text-sm text-vault-text-secondary mb-8">{subtitle}</p>
+        <h1 className="text-2xl font-bold text-vault-text mb-2">{title || t('verification_title')}</h1>
+        <p className="text-sm text-vault-text-secondary mb-8">{subtitle || t('verification_subtitle')}</p>
 
         {/* OTP Input */}
         <div className="mb-8">
@@ -84,7 +86,7 @@ export function VerificationScreen({
         {/* Error message */}
         {error && (
           <p className="text-sm text-vault-danger mb-4 animate-fade-in">
-            Invalid code. Please try again.
+            {t('invalid_code')}
           </p>
         )}
 
@@ -119,7 +121,7 @@ export function VerificationScreen({
         {(verifyLoading || loading) && (
           <div className="flex items-center gap-2 text-sm text-vault-text-secondary mb-4">
             <div className="w-4 h-4 border-2 border-vault-accent border-t-transparent rounded-full animate-spin" />
-            Verifying...
+            {t('verifying')}
           </div>
         )}
 
@@ -130,7 +132,7 @@ export function VerificationScreen({
             disabled={verifyLoading || loading}
             className="text-sm text-vault-text-secondary hover:text-vault-text transition-colors"
           >
-            Use a different method
+            {t('use_different_method')}
           </button>
         )}
       </div>

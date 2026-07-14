@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { useVaultStore } from '../../store/vaultStore'
 import { VerificationScreen } from './VerificationScreen'
 import { Shield, Eye, EyeOff, AlertTriangle } from 'lucide-react'
+import { useI18n } from '../../i18n'
 
 export function UnlockScreen() {
+  const { t } = useI18n()
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [alarmPassword, setAlarmPassword] = useState('')
@@ -42,8 +44,8 @@ export function UnlockScreen() {
   if (requiresTotp) {
     return (
       <VerificationScreen
-        title="Two-Factor Authentication"
-        subtitle="Enter the 6-digit code from your authenticator app"
+        title={t('totp_title')}
+        subtitle={t('totp_subtitle')}
         onVerify={handleTotpVerify}
         onCancel={handleTotpCancel}
       />
@@ -64,7 +66,7 @@ export function UnlockScreen() {
           </div>
           <h1 className="text-2xl font-bold text-vault-text mb-1">CipherVault</h1>
           <p className="text-sm text-vault-text-secondary">
-            {initialized ? 'Enter your master password to unlock' : 'Create a master password to get started'}
+            {initialized ? t('unlock_subtitle') : t('setup_subtitle')}
           </p>
         </div>
 
@@ -73,7 +75,7 @@ export function UnlockScreen() {
           <div className="relative">
             <input
               type={showPassword ? 'text' : 'password'}
-              placeholder="Master Password"
+              placeholder={t('master_password_placeholder')}
               value={password}
               onChange={(e) => { setPassword(e.target.value); clearError() }}
               autoFocus
@@ -98,14 +100,14 @@ export function UnlockScreen() {
                   className="w-full text-xs text-vault-text-secondary hover:text-vault-accent transition-colors flex items-center justify-center gap-1"
                 >
                   <AlertTriangle size={12} />
-                  Add duress code (optional)
+                  {t('add_duress_code')}
                 </button>
               ) : (
                 <div className="space-y-2 animate-slide-up">
                   <div className="relative">
                     <input
                       type={showAlarmPassword ? 'text' : 'password'}
-                      placeholder="Duress / Alarm Password"
+                      placeholder={t('duress_password_placeholder')}
                       value={alarmPassword}
                       onChange={(e) => setAlarmPassword(e.target.value)}
                       className="w-full h-10 px-4 pr-10 rounded-lg bg-vault-surface border border-vault-warning/30 text-vault-text placeholder:text-vault-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-vault-warning/50 focus:border-vault-warning transition-colors text-sm"
@@ -119,7 +121,7 @@ export function UnlockScreen() {
                     </button>
                   </div>
                   <p className="text-[10px] text-vault-warning leading-relaxed">
-                    This password opens an empty vault. Use it in emergencies to protect your real data.
+                    {t('duress_description')}
                   </p>
                 </div>
               )}
@@ -140,10 +142,10 @@ export function UnlockScreen() {
             {loading ? (
               <div className="flex items-center justify-center gap-2">
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                {initialized ? 'Unlocking...' : 'Setting up...'}
+                {initialized ? t('unlocking') : t('setting_up')}
               </div>
             ) : (
-              initialized ? 'Continue' : 'Create Vault'
+              initialized ? t('continue_btn') : t('create_vault')
             )}
           </button>
         </form>
@@ -151,9 +153,9 @@ export function UnlockScreen() {
         {/* First time hint */}
         {!initialized && (
           <p className="mt-4 text-center text-xs text-vault-text-secondary">
-            This will be your master password. Choose something strong and memorable.
+            {t('setup_hint')}
             <br />
-            It cannot be recovered if lost.
+            {t('setup_hint_warning')}
           </p>
         )}
       </div>

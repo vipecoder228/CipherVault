@@ -3,6 +3,7 @@ import { Modal } from '../ui/Modal'
 import { Input } from '../ui/Input'
 import { Button } from '../ui/Button'
 import { useToastStore } from '../ui/Toast'
+import { useI18n } from '../../i18n'
 import { invoke } from '../../lib/ipc'
 import { Download, Upload, AlertTriangle } from 'lucide-react'
 
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export function BackupDialog({ open, onClose, mode }: Props) {
+  const { t } = useI18n()
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -20,17 +22,17 @@ export function BackupDialog({ open, onClose, mode }: Props) {
 
   const handleSubmit = async () => {
     if (!password) {
-      addToast('Password is required', 'warning')
+      addToast(t('password_required'), 'warning')
       return
     }
 
     if (mode === 'export' && password !== confirmPassword) {
-      addToast('Passwords do not match', 'warning')
+      addToast(t('passwords_dont_match'), 'warning')
       return
     }
 
-    if (password.length < 4) {
-      addToast('Password must be at least 4 characters', 'warning')
+    if (password.length < 8) {
+      addToast(t('password_min_length'), 'warning')
       return
     }
 
@@ -39,27 +41,27 @@ export function BackupDialog({ open, onClose, mode }: Props) {
       if (mode === 'export') {
         const result = await invoke('backup:export', password)
         if (result.success) {
-          addToast(`Backup saved to ${result.path}`, 'success')
+          addToast(t('backup_saved', { path: result.path || '' }), 'success')
           handleClose()
         } else if (result.error) {
           addToast(result.error, 'error')
         }
       } else {
         // Import — confirm first
-        if (!confirm('This will REPLACE your current vault. Are you sure?')) {
+        if (!confirm(t('confirm_vault_replace'))) {
           setLoading(false)
           return
         }
         const result = await invoke('backup:import', password)
         if (result.success) {
-          addToast('Backup imported successfully. App will reload.', 'success')
+          addToast(t('backup_imported'), 'success')
           setTimeout(() => window.location.reload(), 1500)
         } else if (result.error) {
           addToast(result.error, 'error')
         }
       }
     } catch (e: any) {
-      addToast(e?.message || 'Backup failed', 'error')
+      addToast(e?.message || t('backup_failed'), 'error')
     } finally {
       setLoading(false)
     }
@@ -75,30 +77,30 @@ export function BackupDialog({ open, onClose, mode }: Props) {
     <Modal
       open={open}
       onClose={handleClose}
-      title={mode === 'export' ? 'Export Encrypted Backup' : 'Import Encrypted Backup'}
+      title={mode === 'export' ? t('export_backup') : t('import_backup')}
     >
       <div className="space-y-4">
         {mode === 'import' && (
           <div className="flex items-start gap-2 p-3 rounded-lg bg-vault-warning/10 border border-vault-warning/30">
             <AlertTriangle size={16} className="text-vault-warning flex-shrink-0 mt-0.5" />
             <p className="text-xs text-vault-warning">
-              This will replace your current vault with the backup data. Make sure you have a backup of your current vault first.
+              {t('import_warning')}
             </p>
           </div>
         )}
 
         {mode === 'export' ? (
           <p className="text-sm text-vault-text-secondary">
-            Your vault will be encrypted with a separate backup password. Store this file safely — you'll need the password to restore it.
+            {t('export_description')}
           </p>
         ) : (
           <p className="text-sm text-vault-text-secondary">
-            Select a .ciphervault backup file and enter its password to restore.
+            {t('import_description')}
           </p>
         )}
 
         <Input
-          label="Backup Password"
+          label={t('backup_password')}
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
@@ -108,7 +110,7 @@ export function BackupDialog({ open, onClose, mode }: Props) {
 
         {mode === 'export' && (
           <Input
-            label="Confirm Password"
+            label={t('confirm_password')}
             type="password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
@@ -117,17 +119,17 @@ export function BackupDialog({ open, onClose, mode }: Props) {
         )}
 
         <div className="flex justify-end gap-3 pt-2">
-          <Button variant="secondary" onClick={handleClose}>Cancel</Button>
+          <Button variant="secondary" onClick={handleClose}>{t('cancel')}</Button>
           <Button onClick={handleSubmit} disabled={loading}>
             {loading ? (
               <span className="flex items-center gap-2">
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                {mode === 'export' ? 'Encrypting...' : 'Importing...'}
+                {mode === 'export' ? t('encrypting') : t('importing')}
               </span>
             ) : (
               <span className="flex items-center gap-2">
                 {mode === 'export' ? <Download size={16} /> : <Upload size={16} />}
-                {mode === 'export' ? 'Export Backup' : 'Import Backup'}
+                {mode === 'export' ? t('export_backup') : t('import_backup')}
               </span>
             )}
           </Button>

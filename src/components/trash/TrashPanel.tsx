@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '../../lib/ipc'
 import { useEntriesStore } from '../../store/entriesStore'
+import { useI18n } from '../../i18n'
 import { Trash2, RotateCcw, X } from 'lucide-react'
 import type { EncryptedEntry } from '@shared/types'
 
 export function TrashPanel() {
+  const { t } = useI18n()
   const [entries, setEntries] = useState<EncryptedEntry[]>([])
   const [loading, setLoading] = useState(true)
   const loadEntries = useEntriesStore((s) => s.loadEntries)
@@ -35,7 +37,7 @@ export function TrashPanel() {
   }
 
   async function handlePermanentDelete(id: number) {
-    if (!confirm('This entry will be permanently deleted. This action cannot be undone.')) {
+    if (!confirm(t('confirm_permanent_delete'))) {
       return
     }
     try {
@@ -62,16 +64,16 @@ export function TrashPanel() {
     const diffMs = now.getTime() - date.getTime()
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
 
-    if (diffDays === 0) return 'Today'
-    if (diffDays === 1) return 'Yesterday'
-    if (diffDays < 7) return `${diffDays} days ago`
+    if (diffDays === 0) return t('today')
+    if (diffDays === 1) return t('yesterday')
+    if (diffDays < 7) return t('days_ago', { n: diffDays })
     return date.toLocaleDateString()
   }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-vault-text-secondary">Loading...</div>
+        <div className="text-vault-text-secondary">{t('loading')}</div>
       </div>
     )
   }
@@ -81,10 +83,10 @@ export function TrashPanel() {
       <div className="p-4 border-b border-vault-border">
         <div className="flex items-center gap-2">
           <Trash2 className="w-5 h-5 text-vault-text-secondary" />
-          <h2 className="text-lg font-semibold text-vault-text">Trash</h2>
+          <h2 className="text-lg font-semibold text-vault-text">{t('trash_title')}</h2>
         </div>
         <p className="text-sm text-vault-text-secondary mt-1">
-          Deleted entries are kept for 30 days
+          {t('trash_description')}
         </p>
       </div>
 
@@ -92,7 +94,7 @@ export function TrashPanel() {
         {entries.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-vault-text-secondary">
             <Trash2 className="w-12 h-12 mb-4 opacity-50" />
-            <p>Trash is empty</p>
+            <p>{t('trash_empty')}</p>
           </div>
         ) : (
           <div className="divide-y divide-vault-border">
@@ -107,21 +109,21 @@ export function TrashPanel() {
                     {entry.display_title}
                   </div>
                   <div className="text-xs text-vault-text-secondary">
-                    Deleted {formatDate(entry.deleted_at)}
+                    {t('deleted_date', { date: formatDate(entry.deleted_at || '') })}
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => handleRestore(entry.id)}
                     className="p-2 rounded-lg hover:bg-vault-surface text-vault-text-secondary hover:text-vault-text transition-colors"
-                    title="Restore"
+                    title={t('restore')}
                   >
                     <RotateCcw className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handlePermanentDelete(entry.id)}
                     className="p-2 rounded-lg hover:bg-vault-danger/10 text-vault-text-secondary hover:text-vault-danger transition-colors"
-                    title="Delete permanently"
+                    title={t('delete_permanently')}
                   >
                     <X className="w-4 h-4" />
                   </button>

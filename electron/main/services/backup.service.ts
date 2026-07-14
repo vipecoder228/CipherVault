@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto'
 import { readFileSync, writeFileSync } from 'fs'
 import { dialog } from 'electron'
-import { getDatabasePath, saveDatabase } from '../db/connection'
+import { getDatabasePath, saveDatabase, resetDatabase } from '../db/connection'
 import { deriveKey, splitDerivedKey } from '../crypto/keyderivation'
 import { CRYPTO } from '../crypto/constants'
 import { getWindow } from '../utils/window'
@@ -30,7 +30,8 @@ export async function exportEncryptedBackup(
   const encrypted = Buffer.concat([cipher.update(dbBuffer), cipher.final()])
   const authTag = cipher.getAuthTag()
 
-  const win = getWindow()!
+  const win = getWindow()
+  if (!win) return { success: false, error: 'No window available' }
   const result = await dialog.showSaveDialog(win, {
     title: 'Export Encrypted Backup',
     defaultPath: 'cipher-vault-backup.ciphervault',
@@ -58,7 +59,8 @@ export async function importEncryptedBackup(
   filePath?: string
 ): Promise<{ success: boolean; error?: string }> {
   if (!filePath) {
-    const win = getWindow()!
+    const win = getWindow()
+    if (!win) return { success: false, error: 'No window available' }
     const result = await dialog.showOpenDialog(win, {
       title: 'Import Encrypted Backup',
       filters: [{ name: 'CipherVault Backup', extensions: ['ciphervault'] }],
@@ -106,6 +108,7 @@ export async function importEncryptedBackup(
 
     const dbPath = getDatabasePath()
     writeFileSync(dbPath, decrypted)
+    resetDatabase()
 
     return { success: true }
   } catch {

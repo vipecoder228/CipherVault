@@ -11,9 +11,20 @@ let derivedKey: Buffer | null = null
 let autoLockTimer: ReturnType<typeof setTimeout> | null = null
 let alarmMode = false
 let activeVaultId: number = 1
+let operationCount = 0
+
+export function acquireOperation(): void { operationCount++ }
+export function releaseOperation(): void { operationCount-- }
 
 // Pending TOTP secret (set during enableTOTP, used during verifyAndSaveTOTP)
 let pendingTotpSecret: string | null = null
+
+// Safely parse an encrypted TOTP secret string into its parts
+function parseTotpSecret(encrypted: string): { iv: string; ciphertext: string; authTag: string } | null {
+  const parts = encrypted.split(':')
+  if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) return null
+  return { iv: parts[0], ciphertext: parts[1], authTag: parts[2] }
+}
 
 // Constant-time string comparison to prevent timing attacks
 function safeEqual(a: string, b: string): boolean {
@@ -86,65 +97,70 @@ export async function getVaultStatus() {
 }
 
 export async function setupVault(masterPassword: string, alarmPassword?: string, displayName?: string): Promise<{ success: boolean; error?: string; vaultId?: number }> {
-  const db = await getDatabase()
+  acquireOperation()
+  try {
+    const db = await getDatabase()
 
-  // Find next available vault id
-  const allVaults = getAllVaults(db)
-  const existingIds = allVaults.map(v => v.id)
-  let newVaultId = 1
-  while (existingIds.includes(newVaultId)) {
-    newVaultId++
-  }
-
-  // If this is the first vault, lock any other vaults first
-  if (newVaultId === 1) {
-    const firstVault = getVault(db, 1)
-    if (firstVault) {
-      return { success: false, error: 'Vault already initialized' }
+    // Find next available vault id
+    const allVaults = getAllVaults(db)
+    const existingIds = allVaults.map(v => v.id)
+    let newVaultId = 1
+    while (existingIds.includes(newVaultId)) {
+      newVaultId++
     }
+
+    // If this is the first vault, lock any other vaults first
+    if (newVaultId === 1) {
+      const firstVault = getVault(db, 1)
+      if (firstVault) {
+        return { success: false, error: 'Vault already initialized' }
+      }
+    }
+
+    const salt = generateSalt()
+    const key = deriveKey(masterPassword, salt)
+    const { encryptionKey } = splitDerivedKey(key)
+    const masterHash = computeVerificationHash(encryptionKey)
+
+    // Setup alarm password if provided
+    let alarmHash: string | null = null
+    let alarmSaltHex: string | null = null
+    if (alarmPassword && alarmPassword.length > 0) {
+      const aSalt = generateSalt()
+      const aKey = deriveKey(alarmPassword, aSalt)
+      const { encryptionKey: aEncKey } = splitDerivedKey(aKey)
+      alarmHash = computeVerificationHash(aEncKey)
+      alarmSaltHex = aSalt.toString('hex')
+    }
+
+    createVault(db, masterHash, salt.toString('hex'))
+
+    // Get the actual vault ID from SQLite
+    const lastIdResult = db.exec('SELECT last_insert_rowid()')
+    const actualVaultId = lastIdResult[0].values[0][0] as number
+
+    // Set alarm password if provided
+    if (alarmHash && alarmSaltHex) {
+      updateAlarm(db, alarmHash, alarmSaltHex, actualVaultId)
+    }
+
+    // Update display name if provided
+    if (displayName) {
+      db.run('UPDATE vault SET display_name = ? WHERE id = ?', [displayName, actualVaultId])
+    }
+
+    saveDatabase()
+
+    // Unlock immediately after setup
+    derivedKey = key
+    alarmMode = false
+    activeVaultId = actualVaultId
+    await startAutoLockTimer()
+
+    return { success: true, vaultId: actualVaultId }
+  } finally {
+    releaseOperation()
   }
-
-  const salt = generateSalt()
-  const key = deriveKey(masterPassword, salt)
-  const { encryptionKey } = splitDerivedKey(key)
-  const masterHash = computeVerificationHash(encryptionKey)
-
-  // Setup alarm password if provided
-  let alarmHash: string | null = null
-  let alarmSaltHex: string | null = null
-  if (alarmPassword && alarmPassword.length > 0) {
-    const aSalt = generateSalt()
-    const aKey = deriveKey(alarmPassword, aSalt)
-    const { encryptionKey: aEncKey } = splitDerivedKey(aKey)
-    alarmHash = computeVerificationHash(aEncKey)
-    alarmSaltHex = aSalt.toString('hex')
-  }
-
-  createVault(db, masterHash, salt.toString('hex'))
-
-  // Get the actual vault ID from SQLite
-  const lastIdResult = db.exec('SELECT last_insert_rowid()')
-  const actualVaultId = lastIdResult[0].values[0][0] as number
-
-  // Set alarm password if provided
-  if (alarmHash && alarmSaltHex) {
-    updateAlarm(db, alarmHash, alarmSaltHex, actualVaultId)
-  }
-
-  // Update display name if provided
-  if (displayName) {
-    db.run('UPDATE vault SET display_name = ? WHERE id = ?', [displayName, actualVaultId])
-  }
-
-  saveDatabase()
-
-  // Unlock immediately after setup
-  derivedKey = key
-  alarmMode = false
-  activeVaultId = actualVaultId
-  await startAutoLockTimer()
-
-  return { success: true, vaultId: actualVaultId }
 }
 
 export async function unlockVault(
@@ -152,93 +168,108 @@ export async function unlockVault(
   totpCode?: string,
   vaultId?: number
 ): Promise<{ success: boolean; error?: string; requiresTotp?: boolean; alarmMode?: boolean }> {
-  if (isUnlocked()) {
-    return { success: false, error: 'Vault is already unlocked' }
-  }
+  acquireOperation()
+  try {
+    if (isUnlocked()) {
+      return { success: false, error: 'Vault is already unlocked' }
+    }
 
-  const db = await getDatabase()
-  const targetVaultId = vaultId ?? activeVaultId
+    const db = await getDatabase()
+    const targetVaultId = vaultId ?? activeVaultId
 
-  const attempts = getRecentFailedAttempts(db)
-  if (attempts >= RATE_LIMIT.ATTEMPTS_BEFORE_LOCK) {
-    return { success: false, error: 'Too many failed attempts. Please restart the application.' }
-  }
-  if (attempts >= RATE_LIMIT.ATTEMPTS_BEFORE_DELAY_1) {
-    const delay = attempts >= RATE_LIMIT.ATTEMPTS_BEFORE_DELAY_3
-      ? RATE_LIMIT.DELAY_3_MS
-      : attempts >= RATE_LIMIT.ATTEMPTS_BEFORE_DELAY_2
-        ? RATE_LIMIT.DELAY_2_MS
-        : RATE_LIMIT.DELAY_1_MS
-    await new Promise(resolve => setTimeout(resolve, delay))
-  }
+    const attempts = getRecentFailedAttempts(db)
+    if (attempts >= RATE_LIMIT.ATTEMPTS_BEFORE_LOCK) {
+      return { success: false, error: 'Too many failed attempts. Please restart the application.' }
+    }
+    if (attempts >= RATE_LIMIT.ATTEMPTS_BEFORE_DELAY_1) {
+      const delay = attempts >= RATE_LIMIT.ATTEMPTS_BEFORE_DELAY_3
+        ? RATE_LIMIT.DELAY_3_MS
+        : attempts >= RATE_LIMIT.ATTEMPTS_BEFORE_DELAY_2
+          ? RATE_LIMIT.DELAY_2_MS
+          : RATE_LIMIT.DELAY_1_MS
+      await new Promise(resolve => setTimeout(resolve, delay))
+    }
 
-  const vault = getVault(db, targetVaultId)
-  if (!vault) {
-    return { success: false, error: 'Vault not initialized' }
-  }
+    const vault = getVault(db, targetVaultId)
+    if (!vault) {
+      return { success: false, error: 'Vault not initialized' }
+    }
 
-  // Check master password
-  const salt = Buffer.from(vault.kdf_salt, 'hex')
-  const key = deriveKey(masterPassword, salt, vault.kdf_type as 'pbkdf2')
-  const { encryptionKey } = splitDerivedKey(key)
-  const computedHash = computeVerificationHash(encryptionKey)
+    // Check master password
+    const salt = Buffer.from(vault.kdf_salt, 'hex')
+    const key = deriveKey(masterPassword, salt, vault.kdf_type as 'pbkdf2')
+    const { encryptionKey } = splitDerivedKey(key)
+    const computedHash = computeVerificationHash(encryptionKey)
 
-  let isAlarm = false
+    let isAlarm = false
 
-  if (safeEqual(computedHash, vault.master_hash)) {
-    // Master password correct
-    isAlarm = false
-  } else if (vault.alarm_hash && vault.alarm_salt) {
-    // Check alarm password
-    const alarmSalt = Buffer.from(vault.alarm_salt, 'hex')
-    const alarmKey = deriveKey(masterPassword, alarmSalt, vault.kdf_type as 'pbkdf2')
-    const { encryptionKey: alarmEncKey } = splitDerivedKey(alarmKey)
-    const alarmHash = computeVerificationHash(alarmEncKey)
+    if (safeEqual(computedHash, vault.master_hash)) {
+      // Master password correct
+      isAlarm = false
+    } else if (vault.alarm_hash && vault.alarm_salt) {
+      // Check alarm password
+      const alarmSalt = Buffer.from(vault.alarm_salt, 'hex')
+      const alarmKey = deriveKey(masterPassword, alarmSalt, vault.kdf_type as 'pbkdf2')
+      const { encryptionKey: alarmEncKey } = splitDerivedKey(alarmKey)
+      const alarmHash = computeVerificationHash(alarmEncKey)
 
-    if (safeEqual(alarmHash, vault.alarm_hash)) {
-      // Alarm password correct — open empty vault
-      isAlarm = true
+      if (safeEqual(alarmHash, vault.alarm_hash)) {
+        // Alarm password correct — open empty vault
+        isAlarm = true
+      } else {
+        // Neither password matches
+        recordAttempt(db, false)
+        saveDatabase()
+        return { success: false, error: 'Invalid master password' }
+      }
     } else {
-      // Neither password matches
+      // No alarm password set, master password wrong
       recordAttempt(db, false)
       saveDatabase()
       return { success: false, error: 'Invalid master password' }
     }
-  } else {
-    // No alarm password set, master password wrong
-    recordAttempt(db, false)
+
+    // Verify TOTP if enabled (skip in alarm mode for speed)
+    if (!isAlarm && vault.totp_enabled && vault.totp_secret) {
+      if (!totpCode) {
+        return { success: false, error: 'TOTP code required', requiresTotp: true }
+      }
+      const parsed = parseTotpSecret(vault.totp_secret)
+      if (!parsed) {
+        return { success: false, error: 'TOTP configuration is corrupted' }
+      }
+      try {
+        const decryptedSecret = decrypt(parsed, encryptionKey)
+        if (!verifyTOTP(decryptedSecret, totpCode)) {
+          recordAttempt(db, false)
+          saveDatabase()
+          return { success: false, error: 'Invalid TOTP code' }
+        }
+      } catch {
+        return { success: false, error: 'TOTP configuration is corrupted' }
+      }
+    }
+
+    derivedKey = isAlarm ? null : key // In alarm mode, don't store real key
+    alarmMode = isAlarm
+    activeVaultId = targetVaultId
+    recordAttempt(db, true)
     saveDatabase()
-    return { success: false, error: 'Invalid master password' }
+    await startAutoLockTimer()
+
+    return { success: true, alarmMode: isAlarm }
+  } finally {
+    releaseOperation()
   }
-
-  // Verify TOTP if enabled (skip in alarm mode for speed)
-  if (!isAlarm && vault.totp_enabled && vault.totp_secret) {
-    if (!totpCode) {
-      return { success: false, error: 'TOTP code required', requiresTotp: true }
-    }
-    const parts = vault.totp_secret.split(':')
-    const decryptedSecret = decrypt(
-      { iv: parts[0], ciphertext: parts[1], authTag: parts[2] },
-      encryptionKey
-    )
-    if (!verifyTOTP(decryptedSecret, totpCode)) {
-      recordAttempt(db, false)
-      saveDatabase()
-      return { success: false, error: 'Invalid TOTP code' }
-    }
-  }
-
-  derivedKey = isAlarm ? null : key // In alarm mode, don't store real key
-  alarmMode = isAlarm
-  activeVaultId = targetVaultId
-  recordAttempt(db, true)
-  saveDatabase()
-  await startAutoLockTimer()
-
-  return { success: true, alarmMode: isAlarm }
 }
 
 export function lockVault(): void {
+  // Defer lock if operation is in progress
+  if (operationCount > 0) {
+    if (autoLockTimer) clearTimeout(autoLockTimer)
+    autoLockTimer = setTimeout(lockVault, 1000)
+    return
+  }
   // Zero the key buffer before releasing it
   if (derivedKey) {
     derivedKey.fill(0)
@@ -272,185 +303,205 @@ export async function changeMasterPassword(
   newPassword: string,
   totpCode?: string
 ): Promise<{ success: boolean; error?: string }> {
-  if (!isUnlocked()) {
-    return { success: false, error: 'Vault is locked' }
-  }
-  const db = await getDatabase()
-  const vault = getVault(db, activeVaultId)
-  if (!vault) {
-    return { success: false, error: 'Vault not initialized' }
-  }
-
-  // Verify TOTP if enabled
-  if (vault.totp_enabled && vault.totp_secret) {
-    if (!totpCode) {
-      return { success: false, error: 'TOTP code required' }
+  acquireOperation()
+  try {
+    if (!isUnlocked()) {
+      return { success: false, error: 'Vault is locked' }
     }
-    const salt = Buffer.from(vault.kdf_salt, 'hex')
-    const key = deriveKey(oldPassword, salt, vault.kdf_type as 'pbkdf2')
-    const { encryptionKey: encKey } = splitDerivedKey(key)
-    const parts = vault.totp_secret.split(':')
-    const decryptedSecret = decrypt(
-      { iv: parts[0], ciphertext: parts[1], authTag: parts[2] },
-      encKey
-    )
-    if (!verifyTOTP(decryptedSecret, totpCode)) {
-      return { success: false, error: 'Invalid TOTP code' }
-    }
-  }
-
-  // Verify old password
-  const oldSalt = Buffer.from(vault.kdf_salt, 'hex')
-  const oldKey = deriveKey(oldPassword, oldSalt, vault.kdf_type as 'pbkdf2')
-  const { encryptionKey: oldEncKey } = splitDerivedKey(oldKey)
-  const oldHash = computeVerificationHash(oldEncKey)
-
-  if (!safeEqual(oldHash, vault.master_hash)) {
-    return { success: false, error: 'Current password is incorrect' }
-  }
-
-  // Derive new key
-  const newSalt = generateSalt()
-  const newKey = deriveKey(newPassword, newSalt)
-  const { encryptionKey: newEncKey } = splitDerivedKey(newKey)
-  const newHash = computeVerificationHash(newEncKey)
-
-  // Update vault
-  updateMasterHash(db, newHash, newSalt.toString('hex'), 'pbkdf2', activeVaultId)
-
-  // Re-encrypt TOTP secret if enabled
-  if (vault.totp_enabled && vault.totp_secret) {
-    const parts = vault.totp_secret.split(':')
-    const decryptedSecret = decrypt(
-      { iv: parts[0], ciphertext: parts[1], authTag: parts[2] },
-      oldEncKey
-    )
-    const reEncrypted = encrypt(decryptedSecret, newEncKey)
-    const reEncryptedStr = `${reEncrypted.iv}:${reEncrypted.ciphertext}:${reEncrypted.authTag}`
-    updateTOTP(db, reEncryptedStr, true, activeVaultId)
-  }
-
-  // Re-encrypt all entries with the new key
-  const entries = db.exec(
-    'SELECT id, encrypted_data, iv, auth_tag FROM encrypted_entries WHERE vault_id = ?',
-    [activeVaultId]
-  )
-  if (entries.length > 0) {
-    for (const row of entries[0].values) {
-      const entryId = row[0] as number
-      const encryptedData = row[1] as string
-      const ivHex = row[2] as string
-      const authTagHex = row[3] as string
-
-      const decrypted = decryptJSON<Record<string, string>>(
-        { iv: ivHex, ciphertext: encryptedData, authTag: authTagHex },
-        oldEncKey
-      )
-
-      const reEncrypted = encryptJSON(decrypted, newEncKey)
-
-      db.run(
-        `UPDATE encrypted_entries SET encrypted_data = ?, iv = ?, auth_tag = ?, updated_at = datetime('now') WHERE id = ?`,
-        [reEncrypted.ciphertext, reEncrypted.iv, reEncrypted.authTag, entryId]
-      )
+    const db = await getDatabase()
+    const vault = getVault(db, activeVaultId)
+    if (!vault) {
+      return { success: false, error: 'Vault not initialized' }
     }
 
-    // Re-encrypt history snapshots too
-    const historyRows = db.exec(
-      `SELECT h.id, h.encrypted_snapshot, h.iv, h.auth_tag
-       FROM entry_history h
-       JOIN encrypted_entries e ON h.entry_id = e.id
-       WHERE e.vault_id = ?`,
+    // Verify TOTP if enabled
+    if (vault.totp_enabled && vault.totp_secret) {
+      if (!totpCode) {
+        return { success: false, error: 'TOTP code required' }
+      }
+      const salt = Buffer.from(vault.kdf_salt, 'hex')
+      const key = deriveKey(oldPassword, salt, vault.kdf_type as 'pbkdf2')
+      const { encryptionKey: encKey } = splitDerivedKey(key)
+      const parsed = parseTotpSecret(vault.totp_secret)
+      if (!parsed) {
+        return { success: false, error: 'TOTP configuration is corrupted' }
+      }
+      try {
+        const decryptedSecret = decrypt(parsed, encKey)
+        if (!verifyTOTP(decryptedSecret, totpCode)) {
+          return { success: false, error: 'Invalid TOTP code' }
+        }
+      } catch {
+        return { success: false, error: 'TOTP configuration is corrupted' }
+      }
+    }
+
+    // Verify old password
+    const oldSalt = Buffer.from(vault.kdf_salt, 'hex')
+    const oldKey = deriveKey(oldPassword, oldSalt, vault.kdf_type as 'pbkdf2')
+    const { encryptionKey: oldEncKey } = splitDerivedKey(oldKey)
+    const oldHash = computeVerificationHash(oldEncKey)
+
+    if (!safeEqual(oldHash, vault.master_hash)) {
+      return { success: false, error: 'Current password is incorrect' }
+    }
+
+    // Derive new key
+    const newSalt = generateSalt()
+    const newKey = deriveKey(newPassword, newSalt)
+    const { encryptionKey: newEncKey } = splitDerivedKey(newKey)
+    const newHash = computeVerificationHash(newEncKey)
+
+    // Re-encrypt TOTP secret if enabled (BEFORE updating master hash)
+    if (vault.totp_enabled && vault.totp_secret) {
+      const parsed = parseTotpSecret(vault.totp_secret)
+      if (!parsed) {
+        return { success: false, error: 'TOTP configuration is corrupted' }
+      }
+      try {
+        const decryptedSecret = decrypt(parsed, oldEncKey)
+        const reEncrypted = encrypt(decryptedSecret, newEncKey)
+        const reEncryptedStr = `${reEncrypted.iv}:${reEncrypted.ciphertext}:${reEncrypted.authTag}`
+        updateTOTP(db, reEncryptedStr, true, activeVaultId)
+      } catch {
+        return { success: false, error: 'Failed to re-encrypt TOTP secret' }
+      }
+    }
+
+    // Re-encrypt all entries with the new key
+    const entries = db.exec(
+      'SELECT id, encrypted_data, iv, auth_tag FROM encrypted_entries WHERE vault_id = ?',
       [activeVaultId]
     )
-    if (historyRows.length > 0) {
-      for (const row of historyRows[0].values) {
-        const historyId = row[0] as number
-        const snapshot = row[1] as string
+    if (entries.length > 0) {
+      for (const row of entries[0].values) {
+        const entryId = row[0] as number
+        const encryptedData = row[1] as string
         const ivHex = row[2] as string
         const authTagHex = row[3] as string
 
-        try {
-          const decrypted = decryptJSON<Record<string, string>>(
-            { iv: ivHex, ciphertext: snapshot, authTag: authTagHex },
-            oldEncKey
-          )
-          const reEncrypted = encryptJSON(decrypted, newEncKey)
-          db.run(
-            `UPDATE entry_history SET encrypted_snapshot = ?, iv = ?, auth_tag = ? WHERE id = ?`,
-            [reEncrypted.ciphertext, reEncrypted.iv, reEncrypted.authTag, historyId]
-          )
-        } catch {
-          // History snapshot may be corrupted — skip
+        const decrypted = decryptJSON<Record<string, string>>(
+          { iv: ivHex, ciphertext: encryptedData, authTag: authTagHex },
+          oldEncKey
+        )
+
+        const reEncrypted = encryptJSON(decrypted, newEncKey)
+
+        db.run(
+          `UPDATE encrypted_entries SET encrypted_data = ?, iv = ?, auth_tag = ?, updated_at = datetime('now') WHERE id = ?`,
+          [reEncrypted.ciphertext, reEncrypted.iv, reEncrypted.authTag, entryId]
+        )
+      }
+
+      // Re-encrypt history snapshots too
+      const historyRows = db.exec(
+        `SELECT h.id, h.encrypted_snapshot, h.iv, h.auth_tag
+         FROM entry_history h
+         JOIN encrypted_entries e ON h.entry_id = e.id
+         WHERE e.vault_id = ?`,
+        [activeVaultId]
+      )
+      if (historyRows.length > 0) {
+        for (const row of historyRows[0].values) {
+          const historyId = row[0] as number
+          const snapshot = row[1] as string
+          const ivHex = row[2] as string
+          const authTagHex = row[3] as string
+
+          try {
+            const decrypted = decryptJSON<Record<string, string>>(
+              { iv: ivHex, ciphertext: snapshot, authTag: authTagHex },
+              oldEncKey
+            )
+            const reEncrypted = encryptJSON(decrypted, newEncKey)
+            db.run(
+              `UPDATE entry_history SET encrypted_snapshot = ?, iv = ?, auth_tag = ? WHERE id = ?`,
+              [reEncrypted.ciphertext, reEncrypted.iv, reEncrypted.authTag, historyId]
+            )
+          } catch {
+            // History snapshot may be corrupted — skip
+          }
         }
       }
     }
+
+    // Update master hash AFTER all re-encryption is complete
+    updateMasterHash(db, newHash, newSalt.toString('hex'), 'pbkdf2', activeVaultId)
+
+    saveDatabase()
+    derivedKey = newKey
+    await startAutoLockTimer()
+
+    return { success: true }
+  } finally {
+    releaseOperation()
   }
-
-  saveDatabase()
-  derivedKey = newKey
-  await startAutoLockTimer()
-
-  return { success: true }
 }
 
 // ─── TOTP Management ────────────────────────────────────
 
-export function enableTOTP(): { secret: string; qrCodeUrl: string } {
+export function enableTOTP(): { secret: string; qrCodeUrl: string } | { error: string } {
+  if (!isUnlocked()) return { error: 'Vault is locked' }
+  if (pendingTotpSecret) return { error: 'TOTP setup already in progress' }
   const secret = generateSecret()
   const qrCodeUrl = generateQRCodeUrl(secret, 'CipherVault')
-  // Store secret temporarily — will be saved after user verifies
   pendingTotpSecret = secret
   return { secret, qrCodeUrl }
 }
 
 export async function verifyAndSaveTOTP(code: string): Promise<boolean> {
-  const encKey = getEncryptionKey()
-  if (!encKey) return false
+  acquireOperation()
+  try {
+    const encKey = getEncryptionKey()
+    if (!encKey) return false
 
-  // Must have a pending secret from enableTOTP
-  if (!pendingTotpSecret) return false
+    // Must have a pending secret from enableTOTP
+    if (!pendingTotpSecret) return false
 
-  // Verify the code against the pending secret
-  if (!verifyTOTP(pendingTotpSecret, code)) return false
+    // Verify the code against the pending secret
+    if (!verifyTOTP(pendingTotpSecret, code)) return false
 
-  // Code is valid — encrypt and save the secret
-  const encrypted = encrypt(pendingTotpSecret, encKey)
-  const encryptedStr = `${encrypted.iv}:${encrypted.ciphertext}:${encrypted.authTag}`
+    // Code is valid — encrypt and save the secret
+    const encrypted = encrypt(pendingTotpSecret, encKey)
+    const encryptedStr = `${encrypted.iv}:${encrypted.ciphertext}:${encrypted.authTag}`
 
-  const db = await getDatabase()
-  updateTOTP(db, encryptedStr, true, activeVaultId)
+    const db = await getDatabase()
+    updateTOTP(db, encryptedStr, true, activeVaultId)
+    saveDatabase()
 
-  // Save TOTP status to settings
-  db.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('totp_enabled', 'true')")
-  saveDatabase()
-
-  pendingTotpSecret = null
-  return true
+    pendingTotpSecret = null
+    return true
+  } finally {
+    releaseOperation()
+  }
 }
 
 export async function disableTOTP(totpCode: string): Promise<boolean> {
-  const encKey = getEncryptionKey()
-  if (!encKey) return false
+  acquireOperation()
+  try {
+    const encKey = getEncryptionKey()
+    if (!encKey) return false
 
-  const db = await getDatabase()
-  const vault = getVault(db, activeVaultId)
-  if (!vault || !vault.totp_secret) return false
+    const db = await getDatabase()
+    const vault = getVault(db, activeVaultId)
+    if (!vault || !vault.totp_secret) return false
 
-  const parts = vault.totp_secret.split(':')
-  const decryptedSecret = decrypt(
-    { iv: parts[0], ciphertext: parts[1], authTag: parts[2] },
-    encKey
-  )
+    const parsed = parseTotpSecret(vault.totp_secret)
+    if (!parsed) return false
 
-  if (!verifyTOTP(decryptedSecret, totpCode)) return false
+    try {
+      const decryptedSecret = decrypt(parsed, encKey)
+      if (!verifyTOTP(decryptedSecret, totpCode)) return false
+    } catch {
+      return false
+    }
 
-  updateTOTP(db, null, false, activeVaultId)
-
-  // Save TOTP status to settings
-  db.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('totp_enabled', 'false')")
-  saveDatabase()
-  return true
+    updateTOTP(db, null, false, activeVaultId)
+    saveDatabase()
+    return true
+  } finally {
+    releaseOperation()
+  }
 }
 
 // ─── Auto Lock ──────────────────────────────────────────
@@ -487,65 +538,80 @@ export async function resetAutoLockTimer(): Promise<void> {
 // ─── Alarm / Duress Code ────────────────────────────────
 
 export async function setupAlarmPassword(alarmPassword: string): Promise<{ success: boolean; error?: string }> {
-  const encKey = getEncryptionKey()
-  if (!encKey) return { success: false, error: 'Vault is locked' }
+  acquireOperation()
+  try {
+    const encKey = getEncryptionKey()
+    if (!encKey) return { success: false, error: 'Vault is locked' }
 
-  const db = await getDatabase()
-  const vault = getVault(db, activeVaultId)
-  if (!vault) return { success: false, error: 'Vault not initialized' }
+    const db = await getDatabase()
+    const vault = getVault(db, activeVaultId)
+    if (!vault) return { success: false, error: 'Vault not initialized' }
 
-  const salt = generateSalt()
-  const key = deriveKey(alarmPassword, salt)
-  const { encryptionKey } = splitDerivedKey(key)
-  const alarmHash = computeVerificationHash(encryptionKey)
+    const salt = generateSalt()
+    const key = deriveKey(alarmPassword, salt)
+    const { encryptionKey } = splitDerivedKey(key)
+    const alarmHash = computeVerificationHash(encryptionKey)
 
-  updateAlarm(db, alarmHash, salt.toString('hex'), activeVaultId)
+    updateAlarm(db, alarmHash, salt.toString('hex'), activeVaultId)
 
-  // Save alarm status to settings
-  db.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('alarm_enabled', 'true')")
-  saveDatabase()
+    // Save alarm status to settings
+    db.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('alarm_enabled', 'true')")
+    saveDatabase()
 
-  return { success: true }
+    return { success: true }
+  } finally {
+    releaseOperation()
+  }
 }
 
 export async function changeAlarmPassword(oldAlarmPassword: string, newAlarmPassword: string): Promise<{ success: boolean; error?: string }> {
-  const db = await getDatabase()
-  const vault = getVault(db, activeVaultId)
-  if (!vault) return { success: false, error: 'Vault not initialized' }
+  acquireOperation()
+  try {
+    const db = await getDatabase()
+    const vault = getVault(db, activeVaultId)
+    if (!vault) return { success: false, error: 'Vault not initialized' }
 
-  if (!vault.alarm_hash || !vault.alarm_salt) {
-    return { success: false, error: 'Alarm password not set' }
+    if (!vault.alarm_hash || !vault.alarm_salt) {
+      return { success: false, error: 'Alarm password not set' }
+    }
+
+    // Verify old alarm password
+    const oldSalt = Buffer.from(vault.alarm_salt, 'hex')
+    const oldKey = deriveKey(oldAlarmPassword, oldSalt)
+    const { encryptionKey: oldEncKey } = splitDerivedKey(oldKey)
+    const oldHash = computeVerificationHash(oldEncKey)
+
+    if (!safeEqual(oldHash, vault.alarm_hash)) {
+      return { success: false, error: 'Invalid alarm password' }
+    }
+
+    // Set new alarm password
+    const newSalt = generateSalt()
+    const newKey = deriveKey(newAlarmPassword, newSalt)
+    const { encryptionKey: newEncKey } = splitDerivedKey(newKey)
+    const newHash = computeVerificationHash(newEncKey)
+
+    updateAlarm(db, newHash, newSalt.toString('hex'), activeVaultId)
+    saveDatabase()
+
+    return { success: true }
+  } finally {
+    releaseOperation()
   }
-
-  // Verify old alarm password
-  const oldSalt = Buffer.from(vault.alarm_salt, 'hex')
-  const oldKey = deriveKey(oldAlarmPassword, oldSalt)
-  const { encryptionKey: oldEncKey } = splitDerivedKey(oldKey)
-  const oldHash = computeVerificationHash(oldEncKey)
-
-  if (!safeEqual(oldHash, vault.alarm_hash)) {
-    return { success: false, error: 'Invalid alarm password' }
-  }
-
-  // Set new alarm password
-  const newSalt = generateSalt()
-  const newKey = deriveKey(newAlarmPassword, newSalt)
-  const { encryptionKey: newEncKey } = splitDerivedKey(newKey)
-  const newHash = computeVerificationHash(newEncKey)
-
-  updateAlarm(db, newHash, newSalt.toString('hex'), activeVaultId)
-  saveDatabase()
-
-  return { success: true }
 }
 
 export async function removeAlarmPassword(): Promise<{ success: boolean; error?: string }> {
-  const db = await getDatabase()
-  updateAlarm(db, null, null, activeVaultId)
+  acquireOperation()
+  try {
+    const db = await getDatabase()
+    updateAlarm(db, null, null, activeVaultId)
 
-  // Save alarm status to settings
-  db.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('alarm_enabled', 'false')")
-  saveDatabase()
+    // Save alarm status to settings
+    db.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('alarm_enabled', 'false')")
+    saveDatabase()
 
-  return { success: true }
+    return { success: true }
+  } finally {
+    releaseOperation()
+  }
 }

@@ -229,7 +229,7 @@ export async function getDecryptedHistory(id: number): Promise<Array<EntryHistor
 
 export async function getEntryTOTP(id: number): Promise<string | null> {
   const encKey = getEncryptionKey()
-  if (!encKey) throw new Error('Vault is locked')
+  if (!encKey) return null
 
   const db = await getDatabase()
   const entry = getEntryById(db, id)

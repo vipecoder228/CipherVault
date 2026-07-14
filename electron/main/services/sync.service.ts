@@ -2,7 +2,7 @@ import { watch, readFileSync, writeFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto'
 import { dialog, BrowserWindow } from 'electron'
-import { getDatabasePath, saveDatabase, getDatabase } from '../db/connection'
+import { getDatabasePath, saveDatabase, getDatabase, resetDatabase } from '../db/connection'
 import { deriveKey, splitDerivedKey } from '../crypto/keyderivation'
 import { CRYPTO } from '../crypto/constants'
 import { isAlarmMode } from './vault.service'
@@ -117,6 +117,7 @@ async function importFromSync(): Promise<boolean> {
 
     // Replace local database
     writeFileSync(dbPath, decrypted)
+    resetDatabase()
     lastSyncTime = Date.now()
     return true
   } catch (err) {
@@ -159,7 +160,8 @@ function stopWatching(): void {
 // ─── Public API ───────────────────────────────────────
 
 export async function selectSyncFolder(): Promise<{ success: boolean; folder?: string; error?: string }> {
-  const win = getWindow()!
+  const win = getWindow()
+  if (!win) return { success: false, error: 'No window available' }
   const result = await dialog.showOpenDialog(win, {
     title: 'Select Sync Folder',
     properties: ['openDirectory'],

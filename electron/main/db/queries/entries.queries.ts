@@ -142,11 +142,18 @@ export function permanentDeleteOldEntries(
   db: Database,
   daysOld: number = 30
 ): number {
-  const result = db.exec(
-    `DELETE FROM encrypted_entries WHERE deleted_at IS NOT NULL AND deleted_at < datetime('now', '-' || ? || ' days')`,
+  const countResult = db.exec(
+    `SELECT COUNT(*) FROM encrypted_entries WHERE deleted_at IS NOT NULL AND deleted_at < datetime('now', '-' || ? || ' days')`,
     [daysOld]
   )
-  return result.length > 0 ? (result[0].values[0][0] as number) : 0
+  const count = countResult.length > 0 ? (countResult[0].values[0][0] as number) : 0
+  if (count > 0) {
+    db.run(
+      `DELETE FROM encrypted_entries WHERE deleted_at IS NOT NULL AND deleted_at < datetime('now', '-' || ? || ' days')`,
+      [daysOld]
+    )
+  }
+  return count
 }
 
 export function searchEntries(

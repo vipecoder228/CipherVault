@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Modal } from '../ui/Modal'
 import { invoke } from '../../lib/ipc'
+import { useI18n } from '../../i18n'
 import type { EntryHistoryItem } from '@shared/types'
 
 interface Props {
@@ -13,13 +14,13 @@ interface DecryptedHistoryItem extends EntryHistoryItem {
   decrypted: Record<string, string> | null
 }
 
-const TYPE_LABELS: Record<string, { label: string; color: string }> = {
-  create: { label: 'Created', color: 'text-vault-success' },
-  update: { label: 'Updated', color: 'text-vault-accent' },
-  delete: { label: 'Deleted', color: 'text-vault-danger' },
-}
-
 export function HistoryViewer({ open, onClose, entryId }: Props) {
+  const { t } = useI18n()
+  const TYPE_LABELS: Record<string, { label: string; color: string }> = {
+    create: { label: t('history_created'), color: 'text-vault-success' },
+    update: { label: t('history_updated'), color: 'text-vault-accent' },
+    delete: { label: t('history_deleted'), color: 'text-vault-danger' },
+  }
   const [history, setHistory] = useState<DecryptedHistoryItem[]>([])
   const [loading, setLoading] = useState(false)
   const [expandedId, setExpandedId] = useState<number | null>(null)
@@ -50,10 +51,10 @@ export function HistoryViewer({ open, onClose, entryId }: Props) {
     const hours = Math.floor(diff / 3600000)
     const days = Math.floor(diff / 86400000)
 
-    if (mins < 1) return 'Just now'
-    if (mins < 60) return `${mins}m ago`
-    if (hours < 24) return `${hours}h ago`
-    if (days < 7) return `${days}d ago`
+    if (mins < 1) return t('just_now')
+    if (mins < 60) return t('minutes_ago', { n: mins })
+    if (hours < 24) return t('hours_ago', { n: hours })
+    if (days < 7) return t('days_ago', { n: days })
     return date.toLocaleDateString()
   }
 
@@ -62,7 +63,7 @@ export function HistoryViewer({ open, onClose, entryId }: Props) {
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Change History" maxWidth="max-w-lg">
+    <Modal open={open} onClose={onClose} title={t('change_history')} maxWidth="max-w-lg">
       <div className="space-y-3 max-h-96 overflow-y-auto">
         {loading ? (
           <div className="flex items-center justify-center py-8">
@@ -70,7 +71,7 @@ export function HistoryViewer({ open, onClose, entryId }: Props) {
           </div>
         ) : history.length === 0 ? (
           <div className="text-center py-8 text-vault-text-secondary text-sm">
-            No history available
+            {t('no_history')}
           </div>
         ) : (
           history.map((item) => {

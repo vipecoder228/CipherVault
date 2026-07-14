@@ -9,7 +9,7 @@ export function generateQRCodeUrl(secret: string, username: string = 'Vault User
 }
 
 export function verifyTOTP(secret: string, token: string): boolean {
-  return authenticator.verify({ token, secret })
+  return authenticator.check(token, secret)
 }
 
 export function generateTOTPToken(secret: string): string {

@@ -1,4 +1,4 @@
-import { ipcMain, dialog } from 'electron'
+import { ipcMain, dialog, globalShortcut } from 'electron'
 import { readFileSync, writeFileSync } from 'fs'
 import type { IPCChannels } from '../../shared/types'
 import * as vaultService from '../services/vault.service'
@@ -14,9 +14,55 @@ import { getDatabase } from '../db/connection'
 import { getCategories, createCategory, updateCategory, deleteCategory, reorderCategories } from '../db/queries/categories.queries'
 import { checkIntegrity } from '../integrity'
 import { getActiveVaultId } from '../services/vault.service'
-import { getWindow } from '../utils/window'
+import { getWindow, toggleWindow } from '../utils/window'
 
 type IPCChannel = keyof IPCChannels
+
+let currentShortcut: string = 'CommandOrControl+Shift+Space'
+
+async function loadGlobalShortcut(): Promise<void> {
+  try {
+    const db = await getDatabase()
+    const result = db.exec("SELECT value FROM settings WHERE key = 'global_shortcut'")
+    if (result.length > 0 && result[0].values.length > 0) {
+      currentShortcut = result[0].values[0][0] as string
+    }
+  } catch {}
+}
+
+function registerGlobalShortcuts(): void {
+  globalShortcut.unregisterAll()
+  const registered = globalShortcut.register(currentShortcut, () => {
+    toggleWindow()
+  })
+  if (!registered) {
+    console.warn(`Failed to register global shortcut: ${currentShortcut}`)
+  }
+}
+
+async function setGlobalShortcut(shortcut: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!shortcut || !shortcut.includes('+')) {
+      return { success: false, error: 'Invalid shortcut format' }
+    }
+    globalShortcut.unregisterAll()
+    const registered = globalShortcut.register(shortcut, () => {
+      toggleWindow()
+    })
+    if (!registered) {
+      globalShortcut.register(currentShortcut, () => {
+        toggleWindow()
+      })
+      return { success: false, error: 'Failed to register shortcut. It may be in use by another app.' }
+    }
+    currentShortcut = shortcut
+    const db = await getDatabase()
+    db.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('global_shortcut', ?)", [shortcut])
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
 
 const handlers: Record<string, (...args: any[]) => any> = {
   // Vault
@@ -27,7 +73,11 @@ const handlers: Record<string, (...args: any[]) => any> = {
   'vault:lock': () => vaultService.lockVault(),
   'vault:switch': (_: unknown, vaultId: number) => vaultService.switchVault(vaultId),
   'vault:change-master-password': (_: unknown, oldPwd: string, newPwd: string, totpCode?: string) => vaultService.changeMasterPassword(oldPwd, newPwd, totpCode),
-  'vault:enable-totp': () => vaultService.enableTOTP(),
+  'vault:enable-totp': () => {
+    const result = vaultService.enableTOTP()
+    if ('error' in result) throw new Error(result.error)
+    return result
+  },
   'vault:verify-totp': (_: unknown, code: string) => vaultService.verifyAndSaveTOTP(code),
   'vault:disable-totp': (_: unknown, totpCode: string) => vaultService.disableTOTP(totpCode),
   'vault:setup-alarm': (_: unknown, alarmPassword: string) => vaultService.setupAlarmPassword(alarmPassword),
@@ -37,8 +87,14 @@ const handlers: Record<string, (...args: any[]) => any> = {
   // Entries
   'entries:list': (_: unknown, filters?: any) => entriesService.listEntries(filters),
   'entries:get': (_: unknown, id: number) => entriesService.getEntry(id),
-  'entries:create': (_: unknown, data: any) => entriesService.createEntry(data),
-  'entries:update': (_: unknown, id: number, data: any) => entriesService.updateEntry(id, data),
+  'entries:create': (_: unknown, data: any) => {
+    if (!data || typeof data !== 'object' || !data.entry_type) throw new Error('Invalid entry data')
+    return entriesService.createEntry(data)
+  },
+  'entries:update': (_: unknown, id: number, data: any) => {
+    if (!data || typeof data !== 'object') throw new Error('Invalid update data')
+    return entriesService.updateEntry(id, data)
+  },
   'entries:delete': (_: unknown, id: number) => entriesService.deleteEntryById(id),
   'entries:restore': (_: unknown, id: number) => entriesService.restoreEntry(id),
   'entries:permanent-delete': (_: unknown, id: number) => entriesService.permanentDeleteEntry(id),
@@ -119,12 +175,20 @@ const handlers: Record<string, (...args: any[]) => any> = {
   'sync:disable': () => syncService.disableSync(),
   'sync:load-settings': () => syncService.loadSyncSettings(),
 
+  // Global Shortcut
+  'shortcut:get': async () => {
+    await loadGlobalShortcut()
+    return currentShortcut
+  },
+  'shortcut:set': (_: unknown, shortcut: string) => setGlobalShortcut(shortcut),
+
   // Integrity check
   'integrity:check': () => checkIntegrity(),
 
   // Import CSV
   'import:csv': async (_: unknown, filePath?: string) => {
-    const win = getWindow()!
+    const win = getWindow()
+    if (!win) return { imported: 0, skipped: 0, errors: ['No window available'] }
     if (!filePath) {
       const result = await dialog.showOpenDialog(win, {
         title: 'Import CSV',
@@ -151,6 +215,8 @@ const handlers: Record<string, (...args: any[]) => any> = {
         if (char === '"') {
           inQuotes = !inQuotes
           currentLine += char
+        } else if (char === '\r') {
+          // Skip \r (handles \r\n line endings)
         } else if (char === '\n' && !inQuotes) {
           if (currentLine.trim()) {
             lines.push(currentLine)
@@ -225,7 +291,8 @@ const handlers: Record<string, (...args: any[]) => any> = {
 
   // Import JSON
   'import:json': async (_: unknown, filePath?: string) => {
-    const win = getWindow()!
+    const win = getWindow()
+    if (!win) return { imported: 0, skipped: 0, errors: ['No window available'] }
     if (!filePath) {
       const result = await dialog.showOpenDialog(win, {
         title: 'Import JSON',
@@ -282,7 +349,8 @@ const handlers: Record<string, (...args: any[]) => any> = {
 
   // Export CSV
   'export:csv': async (_: unknown, filePath?: string, entryIds?: number[]) => {
-    const win = getWindow()!
+    const win = getWindow()
+    if (!win) return { success: false }
     if (!filePath) {
       const result = await dialog.showSaveDialog(win, {
         title: 'Export CSV',
@@ -320,7 +388,8 @@ const handlers: Record<string, (...args: any[]) => any> = {
 
   // Export JSON
   'export:json': async (_: unknown, filePath?: string, entryIds?: number[]) => {
-    const win = getWindow()!
+    const win = getWindow()
+    if (!win) return { success: false }
     if (!filePath) {
       const result = await dialog.showSaveDialog(win, {
         title: 'Export JSON',
@@ -376,7 +445,9 @@ function parseCSVLine(line: string): string[] {
       result.push(current.trim())
       current = ''
     } else {
-      current += char
+      if (char !== '\r') {
+        current += char
+      }
     }
   }
   result.push(current.trim())
@@ -409,4 +480,9 @@ export function unregisterIPC(): void {
   for (const channel of Object.keys(handlers)) {
     ipcMain.removeHandler(channel)
   }
+}
+
+export async function initShortcuts(): Promise<void> {
+  await loadGlobalShortcut()
+  registerGlobalShortcuts()
 }

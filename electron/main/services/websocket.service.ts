@@ -130,7 +130,6 @@ export function startWebSocketServer(): void {
       // Enforce connection limit
       if (connectionCount > MAX_CONNECTIONS) {
         ws.close(1013, 'Too many connections')
-        connectionCount--
         return
       }
 

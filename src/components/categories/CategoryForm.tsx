@@ -4,6 +4,7 @@ import { Input } from '../ui/Input'
 import { Button } from '../ui/Button'
 import { invoke } from '../../lib/ipc'
 import { useToastStore } from '../ui/Toast'
+import { useI18n } from '../../i18n'
 
 interface Props {
   open: boolean
@@ -16,6 +17,7 @@ const ICONS = ['folder', 'briefcase', 'heart', 'star', 'home', 'globe', 'credit-
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f59e0b', '#22c55e', '#06b6d4', '#3b82f6', '#f97316', '#64748b']
 
 export function CategoryForm({ open, onClose, onCreated, initialData }: Props) {
+  const { t } = useI18n()
   const [name, setName] = useState('')
   const [icon, setIcon] = useState('folder')
   const [color, setColor] = useState('#6366f1')
@@ -37,22 +39,22 @@ export function CategoryForm({ open, onClose, onCreated, initialData }: Props) {
 
   const handleSubmit = async () => {
     if (!name.trim()) {
-      addToast('Name is required', 'warning')
+      addToast(t('title_required'), 'warning')
       return
     }
     setLoading(true)
     try {
       if (initialData) {
         await invoke('categories:update', initialData.id, { name: name.trim(), icon, color })
-        addToast('Category updated', 'success')
+        addToast(t('category_updated'), 'success')
       } else {
         await invoke('categories:create', { name: name.trim(), icon, color })
-        addToast('Category created', 'success')
+        addToast(t('category_created'), 'success')
       }
       handleClose()
       onCreated?.()
     } catch {
-      addToast(initialData ? 'Failed to update category' : 'Failed to create category', 'error')
+      addToast(initialData ? t('failed_update_category') : t('failed_create_category'), 'error')
     } finally {
       setLoading(false)
     }
@@ -66,11 +68,11 @@ export function CategoryForm({ open, onClose, onCreated, initialData }: Props) {
   }
 
   return (
-    <Modal open={open} onClose={handleClose} title={initialData ? "Edit Category" : "New Category"}>
+    <Modal open={open} onClose={handleClose} title={initialData ? t('edit_category') : t('new_category')}>
       <div className="space-y-5">
         <Input
-          label="Name"
-          placeholder="e.g. Work, Personal, Finance"
+          label={t('name')}
+          placeholder={t('category_name_placeholder')}
           value={name}
           onChange={(e) => setName(e.target.value)}
           autoFocus
@@ -78,7 +80,7 @@ export function CategoryForm({ open, onClose, onCreated, initialData }: Props) {
 
         {/* Icon picker */}
         <div>
-          <label className="text-xs font-medium text-vault-text-secondary mb-2 block">Icon</label>
+          <label className="text-xs font-medium text-vault-text-secondary mb-2 block">{t('icon')}</label>
           <div className="flex flex-wrap gap-2">
             {ICONS.map((ic) => (
               <button
@@ -98,7 +100,7 @@ export function CategoryForm({ open, onClose, onCreated, initialData }: Props) {
 
         {/* Color picker */}
         <div>
-          <label className="text-xs font-medium text-vault-text-secondary mb-2 block">Color</label>
+          <label className="text-xs font-medium text-vault-text-secondary mb-2 block">{t('color')}</label>
           <div className="flex flex-wrap gap-2">
             {COLORS.map((c) => (
               <button
@@ -114,9 +116,9 @@ export function CategoryForm({ open, onClose, onCreated, initialData }: Props) {
         </div>
 
         <div className="flex justify-end gap-3 pt-2">
-          <Button variant="secondary" onClick={handleClose}>Cancel</Button>
+          <Button variant="secondary" onClick={handleClose}>{t('cancel')}</Button>
           <Button onClick={handleSubmit} disabled={loading}>
-            {loading ? (initialData ? 'Saving...' : 'Creating...') : (initialData ? 'Save Changes' : 'Create')}
+            {loading ? (initialData ? t('saving') : t('creating')) : (initialData ? t('save_changes') : t('create'))}
           </Button>
         </div>
       </div>

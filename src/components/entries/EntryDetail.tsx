@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useEntriesStore } from '../../store/entriesStore'
 import { invoke } from '../../lib/ipc'
 import { useToastStore } from '../ui/Toast'
 import { HistoryViewer } from './HistoryViewer'
 import { EditEntryModal } from './EditEntryModal'
+import { useI18n } from '../../i18n'
 import {
   X, Copy, ExternalLink, Star, Trash2, Clock, Shield, Pencil,
   Eye, EyeOff
@@ -12,10 +13,18 @@ import {
 export function EntryDetail() {
   const { selectedEntry: entry, selectEntry, deleteEntry, toggleFavorite } = useEntriesStore()
   const addToast = useToastStore((s) => s.addToast)
+  const { t } = useI18n()
   const [showPassword, setShowPassword] = useState(false)
   const [copiedField, setCopiedField] = useState<string | null>(null)
   const [showHistory, setShowHistory] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    }
+  }, [])
 
   if (!entry) return null
 
@@ -23,17 +32,18 @@ export function EntryDetail() {
     try {
       await invoke('clipboard:copy', text, 30000)
       setCopiedField(field)
-      addToast('Copied to clipboard (clears in 30s)', 'success')
-      setTimeout(() => setCopiedField(null), 2000)
+      addToast(t('copied_to_clipboard'), 'success')
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+      timeoutRef.current = setTimeout(() => setCopiedField(null), 2000)
     } catch {
-      addToast('Failed to copy', 'error')
+      addToast(t('failed_to_copy'), 'error')
     }
   }
 
   const handleDelete = async () => {
-    if (confirm('Are you sure you want to delete this entry?')) {
+    if (confirm(t('delete_entry_confirm'))) {
       await deleteEntry(entry.id)
-      addToast('Entry deleted', 'success')
+      addToast(t('entry_deleted'), 'success')
     }
   }
 
@@ -55,14 +65,14 @@ export function EntryDetail() {
             <button
               onClick={() => setShowEdit(true)}
               className="p-1.5 rounded-lg text-vault-text-secondary hover:text-vault-accent transition-colors"
-              title="Edit"
+              title={t('edit')}
             >
               <Pencil size={16} />
             </button>
             <button
               onClick={() => setShowHistory(true)}
               className="p-1.5 rounded-lg text-vault-text-secondary hover:text-vault-text transition-colors"
-              title="History"
+              title={t('history')}
             >
               <Clock size={16} />
             </button>
@@ -93,13 +103,13 @@ export function EntryDetail() {
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {/* Title */}
           {entry.title && (
-            <FieldRow label="Title" value={entry.title} />
+            <FieldRow label={t('field_title')} value={entry.title} />
           )}
 
           {/* Username */}
           {entry.username && (
             <FieldRow
-              label="Username"
+              label={t('field_username')}
               value={entry.username}
               copied={copiedField === 'username'}
               onCopy={() => handleCopy(entry.username, 'username')}
@@ -109,7 +119,7 @@ export function EntryDetail() {
           {/* Password */}
           {entry.password && (
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-vault-text-secondary">Password</label>
+              <label className="text-xs font-medium text-vault-text-secondary">{t('field_password')}</label>
               <div className="flex items-center gap-2">
                 <div className="flex-1 flex items-center h-10 px-3 rounded-lg bg-vault-surface border border-vault-border">
                   <span className="flex-1 text-sm text-vault-text font-mono truncate">
@@ -139,7 +149,7 @@ export function EntryDetail() {
           {/* URL */}
           {entry.url && (
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-vault-text-secondary">URL</label>
+              <label className="text-xs font-medium text-vault-text-secondary">{t('field_url')}</label>
               <div className="flex items-center gap-2">
                 <div className="flex-1 h-10 px-3 rounded-lg bg-vault-surface border border-vault-border flex items-center">
                   <span className="flex-1 text-sm text-vault-text truncate">{entry.url}</span>
@@ -166,17 +176,17 @@ export function EntryDetail() {
             <>
               {entry.card_number && (
                 <FieldRow
-                  label="Card Number"
+                  label={t('card_number')}
                   value={entry.card_number}
                   copied={copiedField === 'card_number'}
                   onCopy={() => handleCopy(entry.card_number, 'card_number')}
                 />
               )}
               {entry.card_holder && (
-                <FieldRow label="Cardholder" value={entry.card_holder} />
+                <FieldRow label={t('cardholder')} value={entry.card_holder} />
               )}
               {entry.card_expiry && (
-                <FieldRow label="Expiry" value={entry.card_expiry} />
+                <FieldRow label={t('expiry')} value={entry.card_expiry} />
               )}
             </>
           )}
@@ -186,13 +196,13 @@ export function EntryDetail() {
             <>
               {(entry.identity_first_name || entry.identity_last_name) && (
                 <FieldRow
-                  label="Name"
+                  label={t('field_name')}
                   value={`${entry.identity_first_name || ''} ${entry.identity_last_name || ''}`.trim()}
                 />
               )}
               {entry.identity_phone && (
                 <FieldRow
-                  label="Phone"
+                  label={t('field_phone')}
                   value={entry.identity_phone}
                   copied={copiedField === 'identity_phone'}
                   onCopy={() => handleCopy(entry.identity_phone, 'identity_phone')}
@@ -200,25 +210,25 @@ export function EntryDetail() {
               )}
               {entry.identity_email && (
                 <FieldRow
-                  label="Email"
+                  label={t('field_email')}
                   value={entry.identity_email}
                   copied={copiedField === 'identity_email'}
                   onCopy={() => handleCopy(entry.identity_email, 'identity_email')}
                 />
               )}
               {entry.identity_address && (
-                <FieldRow label="Address" value={entry.identity_address} />
+                <FieldRow label={t('field_address')} value={entry.identity_address} />
               )}
               {entry.identity_passport && (
                 <FieldRow
-                  label="Passport / ID"
+                  label={t('passport_id')}
                   value={entry.identity_passport}
                   copied={copiedField === 'identity_passport'}
                   onCopy={() => handleCopy(entry.identity_passport, 'identity_passport')}
                 />
               )}
               {entry.identity_birthdate && (
-                <FieldRow label="Birthdate" value={entry.identity_birthdate} />
+                <FieldRow label={t('birthdate')} value={entry.identity_birthdate} />
               )}
             </>
           )}
@@ -226,7 +236,7 @@ export function EntryDetail() {
           {/* Notes */}
           {entry.notes && (
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-vault-text-secondary">Notes</label>
+              <label className="text-xs font-medium text-vault-text-secondary">{t('field_notes')}</label>
               <div className="p-3 rounded-lg bg-vault-surface border border-vault-border">
                 <p className="text-sm text-vault-text whitespace-pre-wrap">{entry.notes}</p>
               </div>
@@ -237,11 +247,11 @@ export function EntryDetail() {
           <div className="pt-4 border-t border-vault-border space-y-2">
             <div className="flex items-center gap-2 text-xs text-vault-text-secondary">
               <Clock size={12} />
-              <span>Created: {new Date(entry.created_at).toLocaleDateString()}</span>
+              <span>{t('created')}: {new Date(entry.created_at).toLocaleDateString()}</span>
             </div>
             <div className="flex items-center gap-2 text-xs text-vault-text-secondary">
               <Clock size={12} />
-              <span>Modified: {new Date(entry.updated_at).toLocaleDateString()}</span>
+              <span>{t('modified')}: {new Date(entry.updated_at).toLocaleDateString()}</span>
             </div>
           </div>
         </div>
@@ -297,6 +307,7 @@ function FieldRow({
 }
 
 function TOTPField({ entryId }: { entryId: number }) {
+  const { t } = useI18n()
   const [code, setCode] = useState('------')
   const [timeLeft, setTimeLeft] = useState(30)
 
@@ -332,7 +343,7 @@ function TOTPField({ entryId }: { entryId: number }) {
     <div className="space-y-1.5">
       <label className="text-xs font-medium text-vault-text-secondary flex items-center gap-1">
         <Shield size={12} />
-        Two-Factor Code
+        {t('two_factor_code')}
       </label>
       <div className="flex items-center gap-2">
         <div className="flex-1 h-12 px-3 rounded-lg bg-vault-surface border border-vault-border flex items-center justify-center">

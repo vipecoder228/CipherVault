@@ -46,9 +46,7 @@ export function MobileNav() {
       id: 'security',
       icon: <Shield size={24} />,
       label: 'Безопасность',
-      onClick: () => {
-        // TODO: Navigate to security page
-      },
+      onClick: () => setShowSettings(true),
     },
     {
       id: 'settings',

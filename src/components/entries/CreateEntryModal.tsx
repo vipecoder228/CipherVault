@@ -6,6 +6,7 @@ import { useEntriesStore } from '../../store/entriesStore'
 import { useToastStore } from '../ui/Toast'
 import { useUIStore } from '../../store/uiStore'
 import { invoke } from '../../lib/ipc'
+import { useI18n } from '../../i18n'
 import { AlertTriangle, RefreshCw, Copy, Key, Shield } from 'lucide-react'
 import { calculateStrength } from '../../lib/passwordStrength'
 import type { EntryType, CreateEntryPayload, PasswordOptions } from '@shared/types'
@@ -43,6 +44,7 @@ export function CreateEntryModal({ open, onClose, initialPassword }: Props) {
   })
   const { createEntry } = useEntriesStore()
   const addToast = useToastStore((s) => s.addToast)
+  const { t } = useI18n()
 
   useEffect(() => {
     if (open && initialPassword) {
@@ -74,7 +76,7 @@ export function CreateEntryModal({ open, onClose, initialPassword }: Props) {
 
   const handleSubmit = async () => {
     if (!title.trim()) {
-      addToast('Title is required', 'warning')
+      addToast(t('title_required'), 'warning')
       return
     }
 
@@ -106,11 +108,11 @@ export function CreateEntryModal({ open, onClose, initialPassword }: Props) {
       }
 
       await createEntry(data)
-      addToast('Entry created successfully', 'success')
+      addToast(t('entry_created'), 'success')
       handleClose()
     } catch (e: any) {
       console.error('Create entry failed:', e)
-      addToast(e?.message || 'Failed to create entry', 'error')
+      addToast(e?.message || t('failed_to_create_entry'), 'error')
     } finally {
       setLoading(false)
     }
@@ -129,17 +131,17 @@ export function CreateEntryModal({ open, onClose, initialPassword }: Props) {
   const strength = genPassword ? calculateStrength(genPassword) : null
 
   return (
-    <Modal open={open} onClose={handleClose} title="New Entry">
+    <Modal open={open} onClose={handleClose} title={t('new_entry')}>
       <div className="space-y-4">
         {/* Entry type selector */}
         <div>
-          <label className="text-xs font-medium text-vault-text-secondary mb-2 block">Type</label>
+          <label className="text-xs font-medium text-vault-text-secondary mb-2 block">{t('type')}</label>
           <div className="flex gap-2">
             {([
-              { type: 'login' as EntryType, emoji: '🔑', label: 'Login' },
-              { type: 'card' as EntryType, emoji: '💳', label: 'Card' },
-              { type: 'secure_note' as EntryType, emoji: '📝', label: 'Note' },
-              { type: 'identity' as EntryType, emoji: '👤', label: 'Identity' },
+              { type: 'login' as EntryType, emoji: '🔑', label: t('type_login') },
+              { type: 'card' as EntryType, emoji: '💳', label: t('type_card') },
+              { type: 'secure_note' as EntryType, emoji: '📝', label: t('type_note') },
+              { type: 'identity' as EntryType, emoji: '👤', label: t('type_identity') },
             ]).map(({ type, emoji, label }) => (
               <button
                 key={type}
@@ -157,8 +159,8 @@ export function CreateEntryModal({ open, onClose, initialPassword }: Props) {
         </div>
 
         <Input
-          label="Title"
-          placeholder="e.g. Google Account"
+          label={t('field_title')}
+          placeholder={t('title_placeholder')}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           autoFocus
@@ -168,26 +170,26 @@ export function CreateEntryModal({ open, onClose, initialPassword }: Props) {
         {entryType === 'login' && (
           <>
             <Input
-              label="Username / Email"
-              placeholder="user@example.com"
+              label={t('username_email')}
+              placeholder={t('email_placeholder')}
               value={username}
               onChange={(e) => setUsername(e.target.value)}
             />
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-vault-text-secondary">Password</label>
+                <label className="text-xs font-medium text-vault-text-secondary">{t('field_password')}</label>
                 <button
                   type="button"
                   onClick={() => setShowGen(!showGen)}
                   className="flex items-center gap-1 text-xs text-vault-accent hover:text-vault-accent-hover transition-colors"
                 >
                   <Key size={12} />
-                  {showGen ? 'Hide Generator' : 'Generate'}
+                  {showGen ? t('hide_generator') : t('generate')}
                 </button>
               </div>
               <input
-                type="text"
-                placeholder="Enter password"
+                type="password"
+                placeholder={t('enter_password')}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full h-10 px-3 rounded-lg bg-vault-surface border border-vault-border text-sm text-vault-text font-mono placeholder:text-vault-text-secondary/50 placeholder:font-sans focus:outline-none focus:ring-2 focus:ring-vault-accent/50 focus:border-vault-accent transition-colors"
@@ -199,10 +201,10 @@ export function CreateEntryModal({ open, onClose, initialPassword }: Props) {
               <div className="p-3 rounded-xl bg-vault-bg border border-vault-border space-y-3 animate-slide-up">
                 <div className="flex items-center gap-2">
                   <div className="flex-1 font-mono text-sm text-vault-accent break-all">{genPassword}</div>
-                  <button onClick={doGenerate} className="p-1.5 rounded-lg text-vault-text-secondary hover:text-vault-text transition-colors" title="Regenerate">
+                  <button onClick={doGenerate} className="p-1.5 rounded-lg text-vault-text-secondary hover:text-vault-text transition-colors" title={t('regenerate')}>
                     <RefreshCw size={14} />
                   </button>
-                  <button onClick={async () => { await invoke('clipboard:copy', genPassword, 30000); addToast('Copied', 'success') }} className="p-1.5 rounded-lg text-vault-text-secondary hover:text-vault-accent transition-colors" title="Copy">
+                  <button onClick={async () => { await invoke('clipboard:copy', genPassword, 30000); addToast(t('copied'), 'success') }} className="p-1.5 rounded-lg text-vault-text-secondary hover:text-vault-accent transition-colors" title={t('copy')}>
                     <Copy size={14} />
                   </button>
                 </div>
@@ -212,12 +214,12 @@ export function CreateEntryModal({ open, onClose, initialPassword }: Props) {
                   </div>
                 )}
                 <div className="flex items-center gap-3">
-                  <span className="text-[10px] text-vault-text-secondary">Length: {genOptions.length}</span>
+                  <span className="text-[10px] text-vault-text-secondary">{t('length_label')}: {genOptions.length}</span>
                   <input type="range" min="8" max="64" value={genOptions.length} onChange={(e) => setGenOptions({ ...genOptions, length: +e.target.value })} className="flex-1 h-1 accent-vault-accent" />
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => { setPassword(genPassword); setShowGen(false) }} className="flex-1 py-2 bg-vault-accent text-white rounded-lg text-xs font-medium hover:bg-vault-accent-hover transition-colors">
-                    Use This Password
+                    {t('use_this_password')}
                   </button>
                 </div>
               </div>
@@ -228,16 +230,16 @@ export function CreateEntryModal({ open, onClose, initialPassword }: Props) {
               <div className="flex items-start gap-2 p-3 rounded-lg bg-vault-warning/10 border border-vault-warning/30">
                 <AlertTriangle size={16} className="text-vault-warning flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm font-medium text-vault-warning">Password found in data breach</p>
+                  <p className="text-sm font-medium text-vault-warning">{t('password_breach_warning')}</p>
                   <p className="text-xs text-vault-text-secondary mt-1">
-                    Seen {breachWarning.count.toLocaleString()} times. Consider using a generated password.
+                    {t('password_breach_count', {n: breachWarning.count})}
                   </p>
                 </div>
               </div>
             )}
             <Input
-              label="URL"
-              placeholder="https://example.com"
+              label={t('field_url')}
+              placeholder={t('field_url')}
               value={url}
               onChange={(e) => setUrl(e.target.value)}
             />
@@ -247,18 +249,18 @@ export function CreateEntryModal({ open, onClose, initialPassword }: Props) {
               <div className="flex items-center justify-between">
                 <label className="text-xs font-medium text-vault-text-secondary flex items-center gap-1">
                   <Shield size={12} />
-                  2FA Secret (TOTP)
+                  {t('totp_secret')}
                 </label>
               </div>
               <input
                 type="text"
-                placeholder="Enter TOTP secret key (from authenticator setup)"
+                placeholder={t('totp_secret_placeholder')}
                 value={totpSecret}
                 onChange={(e) => setTotpSecret(e.target.value)}
                 className="w-full h-10 px-3 rounded-lg bg-vault-surface border border-vault-border text-sm text-vault-text font-mono placeholder:text-vault-text-secondary/50 placeholder:font-sans focus:outline-none focus:ring-2 focus:ring-vault-accent/50 focus:border-vault-accent transition-colors"
               />
               <p className="text-[10px] text-vault-text-secondary">
-                Paste the secret key from your 2FA setup page. Codes will be generated automatically.
+                {t('totp_secret_hint')}
               </p>
             </div>
           </>
@@ -268,20 +270,20 @@ export function CreateEntryModal({ open, onClose, initialPassword }: Props) {
         {entryType === 'card' && (
           <>
             <Input
-              label="Card Number"
-              placeholder="4242 4242 4242 4242"
+              label={t('card_number')}
+              placeholder={t('card_number_placeholder')}
               value={cardNumber}
               onChange={(e) => setCardNumber(e.target.value)}
             />
             <Input
-              label="Cardholder Name"
-              placeholder="JOHN DOE"
+              label={t('cardholder_name')}
+              placeholder={t('cardholder_name')}
               value={cardHolder}
               onChange={(e) => setCardHolder(e.target.value)}
             />
             <Input
-              label="Expiry"
-              placeholder="MM/YY"
+              label={t('expiry')}
+              placeholder={t('expiry')}
               value={cardExpiry}
               onChange={(e) => setCardExpiry(e.target.value)}
             />
@@ -293,46 +295,46 @@ export function CreateEntryModal({ open, onClose, initialPassword }: Props) {
           <>
             <div className="grid grid-cols-2 gap-3">
               <Input
-                label="First Name"
-                placeholder="John"
+                label={t('first_name')}
+                placeholder={t('first_name')}
                 value={identityFirstName}
                 onChange={(e) => setIdentityFirstName(e.target.value)}
               />
               <Input
-                label="Last Name"
-                placeholder="Doe"
+                label={t('last_name')}
+                placeholder={t('last_name')}
                 value={identityLastName}
                 onChange={(e) => setIdentityLastName(e.target.value)}
               />
             </div>
             <Input
-              label="Phone"
-              placeholder="+1 (555) 123-4567"
+              label={t('field_phone')}
+              placeholder={t('phone_placeholder')}
               value={identityPhone}
               onChange={(e) => setIdentityPhone(e.target.value)}
             />
             <Input
-              label="Email"
-              placeholder="john@example.com"
+              label={t('field_email')}
+              placeholder={t('email_placeholder')}
               value={identityEmail}
               onChange={(e) => setIdentityEmail(e.target.value)}
             />
             <Input
-              label="Address"
-              placeholder="123 Main St, City, Country"
+              label={t('field_address')}
+              placeholder={t('address_placeholder')}
               value={identityAddress}
               onChange={(e) => setIdentityAddress(e.target.value)}
             />
             <div className="grid grid-cols-2 gap-3">
               <Input
-                label="Passport / ID"
-                placeholder="AB1234567"
+                label={t('passport_id')}
+                placeholder={t('passport_placeholder')}
                 value={identityPassport}
                 onChange={(e) => setIdentityPassport(e.target.value)}
               />
               <Input
-                label="Birthdate"
-                placeholder="DD.MM.YYYY"
+                label={t('birthdate')}
+                placeholder={t('birthdate_placeholder')}
                 value={identityBirthdate}
                 onChange={(e) => setIdentityBirthdate(e.target.value)}
               />
@@ -341,9 +343,9 @@ export function CreateEntryModal({ open, onClose, initialPassword }: Props) {
         )}
 
         <div>
-          <label className="text-xs font-medium text-vault-text-secondary mb-1.5 block">Notes</label>
+          <label className="text-xs font-medium text-vault-text-secondary mb-1.5 block">{t('field_notes')}</label>
           <textarea
-            placeholder="Additional notes..."
+            placeholder={t('notes_placeholder')}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             className="w-full h-20 px-3 py-2 rounded-lg bg-vault-surface border border-vault-border text-sm text-vault-text placeholder:text-vault-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-vault-accent/50 focus:border-vault-accent transition-colors resize-none"
@@ -351,9 +353,9 @@ export function CreateEntryModal({ open, onClose, initialPassword }: Props) {
         </div>
 
         <div className="flex justify-end gap-3 pt-2">
-          <Button variant="secondary" onClick={handleClose}>Cancel</Button>
+          <Button variant="secondary" onClick={handleClose}>{t('cancel')}</Button>
           <Button onClick={handleSubmit} disabled={loading}>
-            {loading ? 'Creating...' : 'Create Entry'}
+            {loading ? t('creating') : t('create_entry')}
           </Button>
         </div>
       </div>

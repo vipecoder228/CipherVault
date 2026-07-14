@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '../../lib/ipc'
 import { useToastStore } from '../ui/Toast'
+import { useI18n } from '../../i18n'
 import { Copy, RefreshCw } from 'lucide-react'
 import { calculateStrength } from '../../lib/passwordStrength'
 import type { PasswordOptions } from '@shared/types'
@@ -8,6 +9,7 @@ import type { PasswordOptions } from '@shared/types'
 type GeneratorMode = 'password' | 'passphrase' | 'username'
 
 export function PasswordGenerator({ onUsePassword }: { onUsePassword?: (pwd: string) => void }) {
+  const { t } = useI18n()
   const [mode, setMode] = useState<GeneratorMode>('password')
   const [options, setOptions] = useState<PasswordOptions>({
     length: 16,
@@ -40,7 +42,7 @@ export function PasswordGenerator({ onUsePassword }: { onUsePassword?: (pwd: str
 
   const handleCopy = async () => {
     await invoke('clipboard:copy', password, 30000)
-    addToast('Password copied (clears in 30s)', 'success')
+    addToast(t('copied_toast'), 'success')
   }
 
   return (
@@ -48,9 +50,9 @@ export function PasswordGenerator({ onUsePassword }: { onUsePassword?: (pwd: str
       {/* Mode selector */}
       <div className="flex gap-1 p-1 bg-vault-bg rounded-lg">
         {([
-          { key: 'password' as GeneratorMode, label: 'Password' },
-          { key: 'passphrase' as GeneratorMode, label: 'Passphrase' },
-          { key: 'username' as GeneratorMode, label: 'Username' },
+          { key: 'password' as GeneratorMode, label: t('password_tab') },
+          { key: 'passphrase' as GeneratorMode, label: t('passphrase_tab') },
+          { key: 'username' as GeneratorMode, label: t('username_tab') },
         ]).map(({ key, label }) => (
           <button
             key={key}
@@ -76,14 +78,14 @@ export function PasswordGenerator({ onUsePassword }: { onUsePassword?: (pwd: str
             <button
               onClick={generate}
               className="p-2 rounded-lg text-vault-text-secondary hover:text-vault-text hover:bg-vault-surface-hover transition-colors"
-              title="Regenerate"
+              title={t('regenerate')}
             >
               <RefreshCw size={16} />
             </button>
             <button
               onClick={handleCopy}
               className="p-2 rounded-lg text-vault-text-secondary hover:text-vault-accent hover:bg-vault-accent/10 transition-colors"
-              title="Copy"
+              title={t('copy')}
             >
               <Copy size={16} />
             </button>
@@ -94,7 +96,7 @@ export function PasswordGenerator({ onUsePassword }: { onUsePassword?: (pwd: str
       {/* Strength meter */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-xs text-vault-text-secondary">Strength</span>
+          <span className="text-xs text-vault-text-secondary">{t('strength')}</span>
           <span className="text-xs font-medium" style={{ color: strength.color }}>{strength.label}</span>
         </div>
         <div className="h-1.5 rounded-full bg-vault-border overflow-hidden">
@@ -114,7 +116,7 @@ export function PasswordGenerator({ onUsePassword }: { onUsePassword?: (pwd: str
           {/* Length slider */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-vault-text-secondary">Length</span>
+              <span className="text-xs text-vault-text-secondary">{t('length')}</span>
               <span className="text-xs font-medium text-vault-text">{options.length}</span>
             </div>
             <input
@@ -136,13 +138,13 @@ export function PasswordGenerator({ onUsePassword }: { onUsePassword?: (pwd: str
 
           {/* Character options */}
           <div className="space-y-2">
-            <span className="text-xs text-vault-text-secondary">Character Types</span>
+            <span className="text-xs text-vault-text-secondary">{t('character_types')}</span>
             <div className="grid grid-cols-2 gap-2">
               {[
-                { key: 'uppercase' as const, label: 'A-Z', desc: 'Uppercase' },
-                { key: 'lowercase' as const, label: 'a-z', desc: 'Lowercase' },
-                { key: 'numbers' as const, label: '0-9', desc: 'Numbers' },
-                { key: 'symbols' as const, label: '!@#', desc: 'Symbols' },
+                { key: 'uppercase' as const, label: 'A-Z', desc: t('uppercase') },
+                { key: 'lowercase' as const, label: 'a-z', desc: t('lowercase') },
+                { key: 'numbers' as const, label: '0-9', desc: t('numbers') },
+                { key: 'symbols' as const, label: '!@#', desc: t('symbols') },
               ].map(({ key, label, desc }) => (
                 <label
                   key={key}
@@ -182,7 +184,7 @@ export function PasswordGenerator({ onUsePassword }: { onUsePassword?: (pwd: str
       {mode === 'passphrase' && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-vault-text-secondary">Number of words</span>
+            <span className="text-xs text-vault-text-secondary">{t('number_of_words')}</span>
             <span className="text-xs font-medium text-vault-text">{passphraseWords}</span>
           </div>
           <input
@@ -209,7 +211,7 @@ export function PasswordGenerator({ onUsePassword }: { onUsePassword?: (pwd: str
           onClick={() => onUsePassword(password)}
           className="w-full py-2.5 bg-vault-accent text-white rounded-lg hover:bg-vault-accent-hover transition-colors text-sm font-medium"
         >
-          Use This Password
+          {t('use_password')}
         </button>
       )}
     </div>

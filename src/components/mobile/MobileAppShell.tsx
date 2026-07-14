@@ -15,7 +15,7 @@ const TYPE_LABELS: Record<EntryType, string> = {
 }
 
 export function MobileAppShell() {
-  const { entries, loading, selectEntry, selectedEntry, toggleFavorite, filters, setFilters } = useEntriesStore()
+  const { entries, loading, selectEntry, selectedEntry, toggleFavorite, filters, setFilters, loadEntries } = useEntriesStore()
   const { setShowPasswordGenerator, showSettings, setShowSettings } = useUIStore()
   const { alarmMode } = useVaultStore()
   const [searchQuery, setSearchQuery] = useState('')
@@ -23,6 +23,7 @@ export function MobileAppShell() {
 
   useEffect(() => {
     // Load entries on mount
+    loadEntries()
   }, [])
 
   const filteredEntries = entries.filter((entry) => {

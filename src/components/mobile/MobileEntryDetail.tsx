@@ -1,12 +1,14 @@
 import { ArrowLeft, Copy, ExternalLink, Star, Trash2, Edit2 } from 'lucide-react'
 import { useEntriesStore } from '../../store/entriesStore'
 import { useUIStore } from '../../store/uiStore'
+import { EditEntryModal } from '../entries/EditEntryModal'
 import { useState } from 'react'
 
 export function MobileEntryDetail() {
   const { selectedEntry, selectEntry, toggleFavorite, deleteEntry } = useEntriesStore()
   const { setShowPasswordGenerator } = useUIStore()
   const [showPassword, setShowPassword] = useState(false)
+  const [showEdit, setShowEdit] = useState(false)
 
   if (!selectedEntry) return null
 
@@ -27,7 +29,7 @@ export function MobileEntryDetail() {
   }
 
   const handleEdit = () => {
-    // TODO: Open edit modal
+    setShowEdit(true)
   }
 
   const handleOpenUrl = () => {
@@ -73,7 +75,7 @@ export function MobileEntryDetail() {
         {/* Title */}
         <div>
           <h1 className="text-xl font-semibold text-vault-text">
-            {selectedEntry.display_title || 'Без названия'}
+            {selectedEntry.title || 'Без названия'}
           </h1>
           {selectedEntry.url && (
             <button
@@ -89,15 +91,15 @@ export function MobileEntryDetail() {
         {/* Fields */}
         <div className="space-y-3">
           {/* Username */}
-          {selectedEntry.encrypted_username && (
+          {selectedEntry.username && (
             <div className="p-3 bg-vault-surface rounded-xl border border-vault-border">
               <div className="text-xs text-vault-text-secondary mb-1">Имя пользователя</div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-vault-text">
-                  {selectedEntry.decrypted_username || '••••••••'}
+                  {selectedEntry.username || '••••••••'}
                 </span>
                 <button
-                  onClick={() => handleCopy(selectedEntry.decrypted_username || '')}
+                  onClick={() => handleCopy(selectedEntry.username || '')}
                   className="p-1 text-vault-text-secondary hover:text-vault-accent"
                 >
                   <Copy size={16} />
@@ -107,12 +109,12 @@ export function MobileEntryDetail() {
           )}
 
           {/* Password */}
-          {selectedEntry.encrypted_password && (
+          {selectedEntry.password && (
             <div className="p-3 bg-vault-surface rounded-xl border border-vault-border">
               <div className="text-xs text-vault-text-secondary mb-1">Пароль</div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-vault-text font-mono">
-                  {showPassword ? selectedEntry.decrypted_password : '••••••••'}
+                  {showPassword ? selectedEntry.password : '••••••••'}
                 </span>
                 <div className="flex items-center gap-1">
                   <button
@@ -122,7 +124,7 @@ export function MobileEntryDetail() {
                     {showPassword ? 'Скрыть' : 'Показать'}
                   </button>
                   <button
-                    onClick={() => handleCopy(selectedEntry.decrypted_password || '')}
+                    onClick={() => handleCopy(selectedEntry.password || '')}
                     className="p-1 text-vault-text-secondary hover:text-vault-accent"
                   >
                     <Copy size={16} />
@@ -133,21 +135,21 @@ export function MobileEntryDetail() {
           )}
 
           {/* Notes */}
-          {selectedEntry.encrypted_notes && (
+          {selectedEntry.notes && (
             <div className="p-3 bg-vault-surface rounded-xl border border-vault-border">
               <div className="text-xs text-vault-text-secondary mb-1">Заметки</div>
               <div className="text-sm text-vault-text whitespace-pre-wrap">
-                {selectedEntry.decrypted_notes || '••••••••'}
+                {selectedEntry.notes || '••••••••'}
               </div>
             </div>
           )}
 
           {/* TOTP */}
-          {selectedEntry.encrypted_totp_secret && (
+          {selectedEntry.totp_secret && (
             <div className="p-3 bg-vault-surface rounded-xl border border-vault-border">
               <div className="text-xs text-vault-text-secondary mb-1">TOTP</div>
               <div className="text-sm text-vault-text font-mono">
-                {selectedEntry.decrypted_totp_secret || '••••••••'}
+                {selectedEntry.totp_secret || '••••••••'}
               </div>
             </div>
           )}
@@ -158,11 +160,16 @@ export function MobileEntryDetail() {
           <div className="p-3 bg-vault-surface rounded-xl border border-vault-border">
             <div className="text-xs text-vault-text-secondary mb-1">Категория</div>
             <div className="text-sm text-vault-text">
-              {selectedEntry.category_name || 'Без категории'}
+              {'Категория ' + selectedEntry.category_id}
             </div>
           </div>
         )}
       </div>
+      <EditEntryModal
+        open={showEdit}
+        onClose={() => setShowEdit(false)}
+        entry={selectedEntry}
+      />
     </div>
   )
 }

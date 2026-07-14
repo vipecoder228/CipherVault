@@ -20,23 +20,29 @@ interface EntriesState {
   setFilters: (filters: EntryFilters) => void
 }
 
-export const useEntriesStore = create<EntriesState>((set, get) => ({
-  entries: [],
-  selectedEntry: null,
-  viewMode: 'list',
-  filters: {},
-  loading: false,
+export const useEntriesStore = create<EntriesState>((set, get) => {
+  let loadRequestId = 0
 
-  loadEntries: async (filters?: EntryFilters) => {
-    set({ loading: true })
-    try {
-      const f = filters ?? get().filters
-      const entries = await invoke('entries:list', f)
-      set({ entries, loading: false })
-    } catch {
-      set({ loading: false })
-    }
-  },
+  return {
+    entries: [],
+    selectedEntry: null,
+    viewMode: 'list',
+    filters: {},
+    loading: false,
+
+    loadEntries: async (filters?: EntryFilters) => {
+      const requestId = ++loadRequestId
+      set({ loading: true })
+      try {
+        const f = filters ?? get().filters
+        const entries = await invoke('entries:list', f)
+        if (requestId !== loadRequestId) return
+        set({ entries, loading: false })
+      } catch {
+        if (requestId !== loadRequestId) return
+        set({ loading: false })
+      }
+    },
 
   selectEntry: async (id: number | null) => {
     if (id === null) {
@@ -98,4 +104,5 @@ export const useEntriesStore = create<EntriesState>((set, get) => ({
     set({ filters })
     get().loadEntries(filters)
   },
-}))
+  }
+})

@@ -60,7 +60,7 @@ export interface DecryptedEntry {
   url: string
   notes: string
   category_id: number | null
-  is_favorite: number
+  is_favorite: boolean
   totp_secret: string
   card_number: string
   card_holder: string
@@ -179,11 +179,11 @@ export interface EntryHistoryItem {
 
 export interface IPCChannels {
   // Vault
-  'vault:status': () => VaultStatus
+  'vault:status': () => Promise<VaultStatus>
   'vault:setup': (masterPassword: string, alarmPassword?: string, displayName?: string) => Promise<VaultSetupResult>
   'vault:create': (masterPassword: string, displayName: string) => Promise<VaultSetupResult>
   'vault:unlock': (masterPassword: string, totpCode?: string, vaultId?: number) => Promise<VaultUnlockResult>
-  'vault:lock': () => void
+  'vault:lock': () => Promise<void>
   'vault:switch': (vaultId: number) => Promise<{ success: boolean; error?: string }>
   'vault:change-master-password': (oldPassword: string, newPassword: string, totpCode?: string) => Promise<VaultSetupResult>
   'vault:enable-totp': () => Promise<{ secret: string; qrCodeUrl: string }>
@@ -210,7 +210,7 @@ export interface IPCChannels {
   'entries:get-totp': (id: number) => Promise<string | null>
 
   // Password
-  'password:generate': (options: PasswordOptions) => string
+  'password:generate': (options: PasswordOptions) => Promise<string>
   'password:check-breach': (password: string) => Promise<BreachCheckResult>
 
   // Categories
@@ -244,8 +244,8 @@ export interface IPCChannels {
   'health:analyze': () => Promise<PasswordHealth>
 
   // Generators
-  'password:generate-username': () => string
-  'password:generate-passphrase': (wordCount?: number) => string
+  'password:generate-username': () => Promise<string>
+  'password:generate-passphrase': (wordCount?: number) => Promise<string>
 
   // Sync
   'sync:get-status': () => Promise<{ enabled: boolean; folder: string | null; lastSyncTime: number; isSyncing: boolean }>

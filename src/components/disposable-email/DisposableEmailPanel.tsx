@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '../../lib/ipc'
 import { useToastStore } from '../ui/Toast'
+import { useI18n } from '../../i18n'
 import {
   Mail, Plus, Trash2, ArrowLeft, Copy, ExternalLink, RefreshCw, Inbox
 } from 'lucide-react'
@@ -30,6 +31,7 @@ interface EmailMessageDetail {
 }
 
 export function DisposableEmailPanel() {
+  const { t } = useI18n()
   const [emails, setEmails] = useState<DisposableEmail[]>([])
   const [loading, setLoading] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -50,7 +52,7 @@ export function DisposableEmailPanel() {
       const list = await invoke('disposable:list')
       setEmails(list)
     } catch (e: any) {
-      addToast(e?.message || 'Failed to load emails', 'error')
+      addToast(e?.message || t('failed_load_emails'), 'error')
     } finally {
       setLoading(false)
     }
@@ -60,10 +62,10 @@ export function DisposableEmailPanel() {
     setCreating(true)
     try {
       const result = await invoke('disposable:create')
-      addToast(`Created: ${result.address}`, 'success')
+      addToast(t('email_created', { address: result.address }), 'success')
       await loadEmails()
     } catch (e: any) {
-      addToast(e?.message || 'Failed to create email', 'error')
+      addToast(e?.message || t('failed_create_email'), 'error')
     } finally {
       setCreating(false)
     }
@@ -77,7 +79,7 @@ export function DisposableEmailPanel() {
       const msgs = await invoke('disposable:messages', email.id)
       setMessages(msgs)
     } catch (e: any) {
-      addToast(e?.message || 'Failed to load messages', 'error')
+      addToast(e?.message || t('failed_load_messages'), 'error')
       setMessages([])
     } finally {
       setLoadingMessages(false)
@@ -91,7 +93,7 @@ export function DisposableEmailPanel() {
       const msg = await invoke('disposable:message', selectedEmail.id, messageId)
       setSelectedMessage(msg)
     } catch (e: any) {
-      addToast(e?.message || 'Failed to load message', 'error')
+      addToast(e?.message || t('failed_load_message'), 'error')
     } finally {
       setLoadingMessage(false)
     }
@@ -105,14 +107,14 @@ export function DisposableEmailPanel() {
       if (selectedMessage?.id === messageId) {
         setSelectedMessage(null)
       }
-      addToast('Message deleted', 'success')
+      addToast(t('message_deleted'), 'success')
     } catch (e: any) {
-      addToast(e?.message || 'Failed to delete message', 'error')
+      addToast(e?.message || t('failed_delete_message'), 'error')
     }
   }
 
   const handleDeleteAccount = async (email: DisposableEmail) => {
-    if (!confirm(`Delete ${email.address}? This cannot be undone.`)) return
+    if (!confirm(t('confirm_delete_email', { address: email.address }))) return
     try {
       await invoke('disposable:delete-account', email.id)
       setEmails(emails.filter(e => e.id !== email.id))
@@ -121,18 +123,18 @@ export function DisposableEmailPanel() {
         setSelectedMessage(null)
         setMessages([])
       }
-      addToast('Email deleted', 'success')
+      addToast(t('email_deleted'), 'success')
     } catch (e: any) {
-      addToast(e?.message || 'Failed to delete email', 'error')
+      addToast(e?.message || t('failed_delete_email'), 'error')
     }
   }
 
   const handleCopyAddress = async (address: string) => {
     try {
       await invoke('clipboard:copy', address, 30000)
-      addToast('Copied to clipboard', 'success')
+      addToast(t('copied_toast'), 'success')
     } catch {
-      addToast('Failed to copy', 'error')
+      addToast(t('failed_copy'), 'error')
     }
   }
 
@@ -142,9 +144,9 @@ export function DisposableEmailPanel() {
     try {
       const msgs = await invoke('disposable:messages', selectedEmail.id)
       setMessages(msgs)
-      addToast('Refreshed', 'success')
+      addToast(t('refreshed'), 'success')
     } catch (e: any) {
-      addToast(e?.message || 'Failed to refresh', 'error')
+      addToast(e?.message || t('failed_refresh'), 'error')
     } finally {
       setLoadingMessages(false)
     }
@@ -163,7 +165,7 @@ export function DisposableEmailPanel() {
           </button>
           <div className="flex-1 min-w-0">
             <h3 className="text-sm font-semibold text-vault-text truncate">{selectedMessage.subject}</h3>
-            <p className="text-xs text-vault-text-secondary">From: {selectedMessage.from}</p>
+            <p className="text-xs text-vault-text-secondary">{t('from')}: {selectedMessage.from}</p>
           </div>
         </div>
         <div className="flex-1 overflow-y-auto p-4">
@@ -182,7 +184,7 @@ export function DisposableEmailPanel() {
               />
             </div>
           ) : (
-            <p className="text-sm text-vault-text-secondary italic">No content</p>
+            <p className="text-sm text-vault-text-secondary italic">{t('no_content')}</p>
           )}
         </div>
       </div>
@@ -206,7 +208,7 @@ export function DisposableEmailPanel() {
           <button
             onClick={() => handleCopyAddress(selectedEmail.address)}
             className="p-1.5 rounded-lg text-vault-text-secondary hover:text-vault-accent transition-colors"
-            title="Copy address"
+            title={t('copy_address')}
           >
             <Copy size={14} />
           </button>
@@ -214,7 +216,7 @@ export function DisposableEmailPanel() {
             onClick={handleRefreshMessages}
             disabled={loadingMessages}
             className="p-1.5 rounded-lg text-vault-text-secondary hover:text-vault-text transition-colors"
-            title="Refresh"
+            title={t('refresh')}
           >
             <RefreshCw size={14} className={loadingMessages ? 'animate-spin' : ''} />
           </button>
@@ -228,8 +230,8 @@ export function DisposableEmailPanel() {
           ) : messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-32 text-vault-text-secondary">
               <Inbox size={24} className="mb-2 opacity-50" />
-              <p className="text-sm">No messages yet</p>
-              <p className="text-xs mt-1">Send an email to {selectedEmail.address}</p>
+              <p className="text-sm">{t('no_messages_yet')}</p>
+              <p className="text-xs mt-1">{t('send_email_to', { address: selectedEmail.address })}</p>
             </div>
           ) : (
             <div className="divide-y divide-vault-border">
@@ -241,8 +243,8 @@ export function DisposableEmailPanel() {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-vault-text truncate">{msg.subject || '(no subject)'}</p>
-                      <p className="text-xs text-vault-text-secondary mt-0.5">From: {msg.from}</p>
+                      <p className="text-sm font-medium text-vault-text truncate">{msg.subject || t('no_subject')}</p>
+                      <p className="text-xs text-vault-text-secondary mt-0.5">{t('from')}: {msg.from}</p>
                       <p className="text-xs text-vault-text-secondary mt-1 line-clamp-2">{msg.intro}</p>
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
@@ -272,7 +274,7 @@ export function DisposableEmailPanel() {
       <div className="flex items-center justify-between p-4 border-b border-vault-border">
         <div className="flex items-center gap-2">
           <Mail size={18} className="text-vault-accent" />
-          <h2 className="text-sm font-semibold text-vault-text">Temp Email</h2>
+          <h2 className="text-sm font-semibold text-vault-text">{t('disposable_email_title')}</h2>
         </div>
         <button
           onClick={handleCreate}
@@ -284,7 +286,7 @@ export function DisposableEmailPanel() {
           ) : (
             <Plus size={14} />
           )}
-          {creating ? 'Creating...' : 'New'}
+          {creating ? t('creating') : t('new')}
         </button>
       </div>
 
@@ -296,8 +298,8 @@ export function DisposableEmailPanel() {
         ) : emails.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-32 text-vault-text-secondary">
             <Mail size={24} className="mb-2 opacity-50" />
-            <p className="text-sm">No disposable emails</p>
-            <p className="text-xs mt-1">Create one to get started</p>
+            <p className="text-sm">{t('no_disposable_emails')}</p>
+            <p className="text-xs mt-1">{t('create_to_get_started')}</p>
           </div>
         ) : (
           <div className="divide-y divide-vault-border">
@@ -313,21 +315,21 @@ export function DisposableEmailPanel() {
                   >
                     <p className="text-sm font-medium text-vault-text truncate font-mono">{email.address}</p>
                     <p className="text-xs text-vault-text-secondary mt-0.5">
-                      Created {new Date(email.createdAt).toLocaleDateString()}
+                      {t('created')} {new Date(email.createdAt).toLocaleDateString()}
                     </p>
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={() => handleCopyAddress(email.address)}
                       className="p-1.5 rounded-lg text-vault-text-secondary hover:text-vault-accent transition-colors"
-                      title="Copy address"
+                      title={t('copy_address')}
                     >
                       <Copy size={14} />
                     </button>
                     <button
                       onClick={() => handleDeleteAccount(email)}
                       className="p-1.5 rounded-lg text-vault-text-secondary hover:text-vault-danger transition-colors"
-                      title="Delete"
+                      title={t('delete')}
                     >
                       <Trash2 size={14} />
                     </button>

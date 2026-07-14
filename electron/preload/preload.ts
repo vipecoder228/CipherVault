@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { IPCChannels } from '../../shared/types'
 
-const api: Record<string, (...args: any[]) => Promise<any>> = {}
+const api: Record<string, (...args: any[]) => any> = {}
 
 // All IPC channels the renderer can invoke
 const channels: (keyof IPCChannels)[] = [
@@ -74,7 +74,9 @@ for (const channel of channels) {
 }
 
 // Expose event listener for main process -> renderer events
+const ALLOWED_EVENTS = ['vault:locked', 'sync:imported']
 api.on = (channel: string, callback: (...args: any[]) => void) => {
+  if (!ALLOWED_EVENTS.includes(channel)) return () => {}
   const subscription = (_event: Electron.IpcRendererEvent, ...args: any[]) => callback(...args)
   ipcRenderer.on(channel, subscription)
   return () => {

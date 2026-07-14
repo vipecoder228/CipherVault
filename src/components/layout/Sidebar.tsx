@@ -11,13 +11,14 @@ import {
   Shield, Star, LayoutGrid, Settings, Lock, Mail,
   Plus, ChevronLeft, ChevronRight, Folder, Pencil, Trash2
 } from 'lucide-react'
+import { useI18n } from '../../i18n'
 
 export function Sidebar() {
+  const { t } = useI18n()
   const [categories, setCategories] = useState<Category[]>([])
   const [showCategoryForm, setShowCategoryForm] = useState(false)
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
-  const [showTrash, setShowTrash] = useState(false)
-  const { activeCategoryId, setActiveCategory, sidebarCollapsed, toggleSidebar, showSettings, setShowSettings, showDisposableEmail, setShowDisposableEmail } = useUIStore()
+  const { activeCategoryId, setActiveCategory, sidebarCollapsed, toggleSidebar, showSettings, setShowSettings, showDisposableEmail, setShowDisposableEmail, showTrash, setShowTrash } = useUIStore()
   const { setFilters } = useEntriesStore()
   const { lock, activeVaultId, vaults } = useVaultStore()
 
@@ -40,7 +41,7 @@ export function Sidebar() {
   }
 
   const handleDeleteCategory = async (id: number) => {
-    if (!confirm('Delete this category? Entries in this category will not be deleted.')) return
+    if (!confirm(t('delete_category_confirm'))) return
     try {
       await invoke('categories:delete', id)
       await loadCategories()
@@ -79,35 +80,35 @@ export function Sidebar() {
           <div className="space-y-1">
             <NavItem
               icon={<LayoutGrid size={18} />}
-              label="All Entries"
+              label={t('all_entries')}
               active={activeCategoryId === null}
               collapsed={sidebarCollapsed}
               onClick={() => handleCategoryClick(null)}
             />
             <NavItem
               icon={<Star size={18} />}
-              label="Favorites"
+              label={t('favorites')}
               active={false}
               collapsed={sidebarCollapsed}
               onClick={() => setFilters({ is_favorite: true })}
             />
             <NavItem
               icon={<Mail size={18} />}
-              label="Temp Email"
+              label={t('temp_email')}
               active={showDisposableEmail}
               collapsed={sidebarCollapsed}
               onClick={() => { setShowDisposableEmail(!showDisposableEmail); setShowSettings(false); setShowTrash(false) }}
             />
             <NavItem
               icon={<Trash2 size={18} />}
-              label="Trash"
+              label={t('trash')}
               active={showTrash}
               collapsed={sidebarCollapsed}
               onClick={() => { setShowTrash(!showTrash); setShowSettings(false); setShowDisposableEmail(false) }}
             />
             {!sidebarCollapsed && showDisposableEmail && (
               <p className="px-3 text-[10px] text-vault-text-secondary leading-tight">
-                Disposable email via mail.tm
+                {t('disposable_email_hint')}
               </p>
             )}
           </div>
@@ -117,7 +118,7 @@ export function Sidebar() {
             <div className="mt-6">
               <div className="flex items-center justify-between px-3 mb-2">
                 <span className="text-xs font-medium text-vault-text-secondary uppercase tracking-wider">
-                  Categories
+                  {t('categories')}
                 </span>
                 <button
                   onClick={() => setShowCategoryForm(true)}
@@ -164,13 +165,13 @@ export function Sidebar() {
         <div className="p-2 border-t border-vault-border space-y-1">
           <NavItem
             icon={<Settings size={18} />}
-            label="Settings"
+            label={t('settings')}
             collapsed={sidebarCollapsed}
             onClick={() => setShowSettings(true)}
           />
           <NavItem
             icon={<Lock size={18} />}
-            label="Lock"
+            label={t('lock')}
             collapsed={sidebarCollapsed}
             onClick={lock}
           />

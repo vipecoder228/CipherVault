@@ -3,9 +3,11 @@ import { invoke } from '../../lib/ipc'
 import { useToastStore } from '../ui/Toast'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
+import { useI18n } from '../../i18n'
 import { FolderOpen, RefreshCw, CloudOff, Cloud, Check } from 'lucide-react'
 
 export function SyncSettings() {
+  const { t } = useI18n()
   const [enabled, setEnabled] = useState(false)
   const [folder, setFolder] = useState<string | null>(null)
   const [password, setPassword] = useState('')
@@ -33,10 +35,10 @@ export function SyncSettings() {
       if (result.success && result.folder) {
         setFolder(result.folder)
         setEnabled(true)
-        addToast(`Sync folder set: ${result.folder}`, 'success')
+        addToast(t('sync_folder_set', { folder: result.folder }), 'success')
       }
     } catch {
-      addToast('Failed to select folder', 'error')
+      addToast(t('failed_select_folder'), 'error')
     } finally {
       setLoading(false)
     }
@@ -44,16 +46,16 @@ export function SyncSettings() {
 
   const handleSetPassword = async () => {
     if (!password) {
-      addToast('Enter sync password', 'warning')
+      addToast(t('enter_sync_password'), 'warning')
       return
     }
     await invoke('sync:set-password', password)
-    addToast('Sync password set', 'success')
+    addToast(t('sync_password_set'), 'success')
   }
 
   const handleSyncNow = async () => {
     if (!password) {
-      addToast('Enter sync password first', 'warning')
+      addToast(t('enter_sync_password_first'), 'warning')
       return
     }
     setSyncing(true)
@@ -61,36 +63,36 @@ export function SyncSettings() {
       await invoke('sync:set-password', password)
       const result = await invoke('sync:now')
       if (result.success) {
-        addToast('Synced successfully', 'success')
+        addToast(t('synced_successfully'), 'success')
         setLastSyncTime(Date.now())
       } else {
-        addToast(result.error || 'Sync failed', 'error')
+        addToast(result.error || t('sync_failed'), 'error')
       }
     } catch {
-      addToast('Sync failed', 'error')
+      addToast(t('sync_failed'), 'error')
     } finally {
       setSyncing(false)
     }
   }
 
   const handleDisable = async () => {
-    if (!confirm('Disable sync? The sync file in the folder will not be deleted.')) return
+    if (!confirm(t('confirm_disable_sync'))) return
     try {
       await invoke('sync:disable')
       setEnabled(false)
       setFolder(null)
       setPassword('')
-      addToast('Sync disabled', 'success')
+      addToast(t('sync_disabled'), 'success')
     } catch {
-      addToast('Failed to disable sync', 'error')
+      addToast(t('failed_disable_sync'), 'error')
     }
   }
 
   const formatLastSync = () => {
-    if (!lastSyncTime) return 'Never'
+    if (!lastSyncTime) return t('never')
     const diff = Date.now() - lastSyncTime
-    if (diff < 60000) return 'Just now'
-    if (diff < 3600000) return `${Math.floor(diff / 60000)} min ago`
+    if (diff < 60000) return t('just_now')
+    if (diff < 3600000) return t('minutes_ago', { n: Math.floor(diff / 60000) })
     return new Date(lastSyncTime).toLocaleTimeString()
   }
 
@@ -105,7 +107,7 @@ export function SyncSettings() {
         )}
         <div className="flex-1">
           <p className="text-sm font-medium text-vault-text">
-            {enabled ? 'Sync Enabled' : 'Sync Disabled'}
+            {enabled ? t('sync_enabled') : t('sync_disabled_label')}
           </p>
           {folder && (
             <p className="text-xs text-vault-text-secondary truncate">{folder}</p>
@@ -113,7 +115,7 @@ export function SyncSettings() {
         </div>
         {enabled && (
           <span className="text-xs text-vault-text-secondary">
-            Last sync: {formatLastSync()}
+            {t('last_sync')}: {formatLastSync()}
           </span>
         )}
       </div>
@@ -122,7 +124,7 @@ export function SyncSettings() {
       {!enabled && (
         <Button variant="secondary" onClick={handleSelectFolder} disabled={loading} className="w-full">
           <FolderOpen size={16} className="mr-2" />
-          {loading ? 'Selecting...' : 'Select Sync Folder'}
+          {loading ? t('selecting') : t('select_sync_folder')}
         </Button>
       )}
 
@@ -130,15 +132,15 @@ export function SyncSettings() {
       {enabled && (
         <>
           <Input
-            label="Sync Password"
+            label={t('sync_password')}
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="Enter sync password"
+            placeholder={t('enter_sync_password')}
             showPasswordToggle
           />
           <p className="text-[10px] text-vault-text-secondary">
-            This password encrypts the sync file. Use the same password on all devices.
+            {t('sync_password_hint')}
           </p>
         </>
       )}
@@ -157,10 +159,10 @@ export function SyncSettings() {
             ) : (
               <RefreshCw size={16} className="mr-2" />
             )}
-            {syncing ? 'Syncing...' : 'Sync Now'}
+            {syncing ? t('syncing') : t('sync_now')}
           </Button>
           <Button variant="danger" onClick={handleDisable} className="flex-1">
-            Disable
+            {t('disable')}
           </Button>
         </div>
       )}

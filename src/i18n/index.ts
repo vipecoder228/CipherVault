@@ -4,8 +4,12 @@ import ru from './locales/ru'
 
 type Locale = 'en' | 'ru'
 type TranslationKeys = keyof typeof en
+type TranslationMap = Record<TranslationKeys, string>
 
-const locales: Record<Locale, typeof en> = { en, ru }
+const locales: Record<Locale, TranslationMap> = {
+  en: en as TranslationMap,
+  ru: ru as TranslationMap,
+}
 
 interface I18nState {
   locale: Locale

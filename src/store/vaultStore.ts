@@ -100,7 +100,11 @@ export const useVaultStore = create<VaultState>((set, get) => ({
         })
         return false
       } else {
-        set({ error: result.error || 'Unlock failed', loading: false, pendingPassword: null })
+        set((state) => ({
+          error: result.error || 'Unlock failed',
+          loading: false,
+          pendingPassword: state.requiresTotp ? state.pendingPassword : null,
+        }))
         return false
       }
     } catch (err) {

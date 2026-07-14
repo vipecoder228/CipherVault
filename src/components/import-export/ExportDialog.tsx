@@ -3,6 +3,7 @@ import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { invoke } from '../../lib/ipc'
 import { useToastStore } from '../ui/Toast'
+import { useI18n } from '../../i18n'
 
 interface Props {
   open: boolean
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export function ExportDialog({ open, onClose }: Props) {
+  const { t } = useI18n()
   const [format, setFormat] = useState<'csv' | 'json'>('csv')
   const [loading, setLoading] = useState(false)
   const addToast = useToastStore((s) => s.addToast)
@@ -24,21 +26,21 @@ export function ExportDialog({ open, onClose }: Props) {
         result = await invoke('export:json')
       }
       if (result?.success === false) return
-      addToast('Export completed', 'success')
+      addToast(t('export_completed'), 'success')
       onClose()
     } catch {
-      addToast('Export failed', 'error')
+      addToast(t('export_failed'), 'error')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Export Entries">
+    <Modal open={open} onClose={onClose} title={t('export_entries')}>
       <div className="space-y-5">
         {/* Format selection */}
         <div>
-          <label className="text-xs font-medium text-vault-text-secondary mb-2 block">Format</label>
+          <label className="text-xs font-medium text-vault-text-secondary mb-2 block">{t('format')}</label>
           <div className="flex gap-3">
             {(['csv', 'json'] as const).map((f) => (
               <button
@@ -59,14 +61,14 @@ export function ExportDialog({ open, onClose }: Props) {
         {/* Warning */}
         <div className="p-3 rounded-lg bg-vault-warning/10 border border-vault-warning/30">
           <p className="text-xs text-vault-warning leading-relaxed">
-            Exported data will contain your passwords in plain text. Keep the file secure and delete it after use.
+            {t('export_warning')}
           </p>
         </div>
 
         <div className="flex justify-end gap-3">
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="secondary" onClick={onClose}>{t('cancel')}</Button>
           <Button onClick={handleExport} disabled={loading}>
-            {loading ? 'Exporting...' : 'Export'}
+            {loading ? t('exporting') : t('export')}
           </Button>
         </div>
       </div>
