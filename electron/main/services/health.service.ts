@@ -48,29 +48,28 @@ export async function analyzePasswordHealth(): Promise<PasswordHealth> {
       const title = decrypted.title || entry.display_title
       const issues: string[] = []
 
-      // Check strength
-      if (pwd.length < 12) {
-        issues.push('Too short (less than 12 characters)')
-        weak++
-      }
+      // Check complexity (any length is fine)
       if (!/[A-Z]/.test(pwd)) {
-        issues.push('Missing uppercase letters')
+        issues.push('missing_uppercase')
       }
       if (!/[a-z]/.test(pwd)) {
-        issues.push('Missing lowercase letters')
+        issues.push('missing_lowercase')
       }
       if (!/[0-9]/.test(pwd)) {
-        issues.push('Missing numbers')
+        issues.push('missing_numbers')
       }
       if (!/[^a-zA-Z0-9]/.test(pwd)) {
-        issues.push('Missing special characters')
+        issues.push('missing_special')
+      }
+      if (issues.length > 0) {
+        weak++
       }
 
       // Check breach status
       try {
         const breachResult = await checkBreach(pwd)
         if (breachResult.breached) {
-          issues.push(`Found in ${breachResult.count.toLocaleString()} data breaches`)
+          issues.push('breached')
           exposed++
         }
       } catch {
@@ -86,7 +85,7 @@ export async function analyzePasswordHealth(): Promise<PasswordHealth> {
       const updated = new Date(entry.updated_at)
       const daysSinceUpdate = (Date.now() - updated.getTime()) / (1000 * 60 * 60 * 24)
       if (daysSinceUpdate > 180) {
-        issues.push(`Not updated in ${Math.floor(daysSinceUpdate)} days`)
+        issues.push('old_password')
         old++
       }
 
@@ -105,14 +104,14 @@ export async function analyzePasswordHealth(): Promise<PasswordHealth> {
       for (const id of ids) {
         const item = details.find(d => d.entryId === id)
         if (item) {
-          item.issues.push(`Reused in ${ids.length} entries`)
+          item.issues.push('reused')
         } else {
           const entry = entries.find(e => e.id === id)
           if (entry) {
             details.push({
               entryId: id,
               title: entry.display_title,
-              issues: [`Reused in ${ids.length} entries`],
+              issues: ['reused'],
             })
           }
         }

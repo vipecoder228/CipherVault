@@ -7,6 +7,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { invoke } from '../../lib/ipc'
 import { useUIStore } from '../../store/uiStore'
 import { useToastStore } from '../ui/Toast'
+import { useI18n } from '../../i18n'
 import { BackupDialog } from '../import-export/BackupDialog'
 import { SecurityHealth } from '../health/SecurityHealth'
 import { SyncSettings } from './SyncSettings'
@@ -24,15 +25,16 @@ export function SettingsPanel({ open, onClose }: Props) {
   const [tab, setTab] = useState<Tab>('security')
   const { theme, setTheme } = useUIStore()
   const addToast = useToastStore((s) => s.addToast)
+  const { t } = useI18n()
 
   return (
-    <Modal open={open} onClose={onClose} title="Settings" maxWidth="max-w-xl">
+    <Modal open={open} onClose={onClose} title={t('settings_title')} maxWidth="max-w-xl">
       {/* Tabs */}
       <div className="flex gap-1 p-1 bg-vault-bg rounded-lg mb-6">
         {([
-          { key: 'security' as Tab, icon: Shield, label: 'Security' },
-          { key: 'appearance' as Tab, icon: Palette, label: 'Appearance' },
-          { key: 'about' as Tab, icon: Info, label: 'About' },
+          { key: 'security' as Tab, icon: Shield, label: t('tab_security') },
+          { key: 'appearance' as Tab, icon: Palette, label: t('tab_appearance') },
+          { key: 'about' as Tab, icon: Info, label: t('tab_about') },
         ]).map(({ key, icon: Icon, label }) => (
           <button
             key={key}
@@ -573,23 +575,46 @@ function AlarmSetupModal({ onClose, onStatusChange }: { onClose: () => void; onS
 }
 
 function AppearanceTab({ theme, setTheme }: { theme: string; setTheme: (t: 'dark' | 'light') => void }) {
+  const { locale, setLocale, t } = useI18n()
+
   return (
     <div className="space-y-6">
       <div>
-        <label className="text-sm font-medium text-vault-text block mb-3">Theme</label>
+        <label className="text-sm font-medium text-vault-text block mb-3">{t('theme_label')}</label>
         <div className="flex gap-3">
-          {(['dark', 'light'] as const).map((t) => (
+          {(['dark', 'light'] as const).map((th) => (
             <button
-              key={t}
-              onClick={() => setTheme(t)}
+              key={th}
+              onClick={() => setTheme(th)}
               className={`flex-1 h-24 rounded-xl border-2 flex flex-col items-center justify-center gap-2 transition-all ${
-                theme === t
+                theme === th
                   ? 'border-vault-accent bg-vault-accent/10'
                   : 'border-vault-border bg-vault-surface hover:border-vault-accent/30'
               }`}
             >
-              <div className={`w-12 h-8 rounded-md ${t === 'dark' ? 'bg-[#1a1a24]' : 'bg-[#f8f9fc] border border-gray-200'}`} />
-              <span className="text-xs font-medium text-vault-text capitalize">{t}</span>
+              <div className={`w-12 h-8 rounded-md ${th === 'dark' ? 'bg-[#1a1a24]' : 'bg-[#f8f9fc] border border-gray-200'}`} />
+              <span className="text-xs font-medium text-vault-text capitalize">{t(th === 'dark' ? 'dark' : 'light')}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <label className="text-sm font-medium text-vault-text block mb-3">{t('language_label')}</label>
+        <div className="flex gap-3">
+          {([
+            { key: 'en' as const, label: 'English' },
+            { key: 'ru' as const, label: 'Русский' },
+          ]).map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setLocale(key)}
+              className={`flex-1 h-12 rounded-xl border-2 flex items-center justify-center text-sm font-medium transition-all ${
+                locale === key
+                  ? 'border-vault-accent bg-vault-accent/10 text-vault-accent'
+                  : 'border-vault-border bg-vault-surface text-vault-text hover:border-vault-accent/30'
+              }`}
+            >
+              {label}
             </button>
           ))}
         </div>
