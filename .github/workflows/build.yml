@@ -11,6 +11,8 @@ permissions:
 jobs:
   build-windows:
     runs-on: windows-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -26,17 +28,20 @@ jobs:
 
       - name: Package Electron app
         run: npm run dist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Windows builds to release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            dist/*.exe
+          files: dist/*.exe
           draft: false
           prerelease: false
 
   build-linux:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -52,6 +57,8 @@ jobs:
 
       - name: Package Linux packages
         run: npm run dist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Linux builds to release
         uses: softprops/action-gh-release@v2
@@ -87,7 +94,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
       - name: Build Android APK
         working-directory: android
