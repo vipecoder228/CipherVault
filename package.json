@@ -36,6 +36,7 @@
     "react-dom": "^19.0.0",
     "sql.js": "^1.11.0",
     "tailwind-merge": "^2.6.0",
+    "ws": "^8.18.0",
     "zustand": "^5.0.2"
   },
   "devDependencies": {
