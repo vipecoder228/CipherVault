@@ -87,6 +87,8 @@ export interface EncryptedEntry {
   display_title: string
   category_id: number | null
   is_favorite: number
+  vault_id: number
+  deleted_at: string | null
   created_at: string
   updated_at: string
 }

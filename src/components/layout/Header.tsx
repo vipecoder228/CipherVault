@@ -17,8 +17,8 @@ export function Header() {
   const [generatedPassword, setGeneratedPassword] = useState<string | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
 
-  const { viewMode, setViewMode, theme, toggleTheme, showPasswordGenerator, setShowPasswordGenerator } = useUIStore()
-  const { search, loadEntries } = useEntriesStore()
+  const { theme, toggleTheme, showPasswordGenerator, setShowPasswordGenerator } = useUIStore()
+  const { viewMode, setViewMode, search, loadEntries } = useEntriesStore()
   const { lock } = useVaultStore()
 
   // Keyboard shortcuts

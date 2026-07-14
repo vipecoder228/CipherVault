@@ -1,7 +1,7 @@
 import { watch, readFileSync, writeFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto'
-import { dialog } from 'electron'
+import { dialog, BrowserWindow } from 'electron'
 import { getDatabasePath, saveDatabase, getDatabase } from '../db/connection'
 import { deriveKey, splitDerivedKey } from '../crypto/keyderivation'
 import { CRYPTO } from '../crypto/constants'

@@ -2,16 +2,10 @@ import { useState, useEffect } from 'react'
 import { invoke } from '../../lib/ipc'
 import { useEntriesStore } from '../../store/entriesStore'
 import { Trash2, RotateCcw, X } from 'lucide-react'
-
-interface DeletedEntry {
-  id: number
-  display_title: string
-  entry_type: string
-  deleted_at: string
-}
+import type { EncryptedEntry } from '@shared/types'
 
 export function TrashPanel() {
-  const [entries, setEntries] = useState<DeletedEntry[]>([])
+  const [entries, setEntries] = useState<EncryptedEntry[]>([])
   const [loading, setLoading] = useState(true)
   const loadEntries = useEntriesStore((s) => s.loadEntries)
 
