@@ -1,5 +1,7 @@
 let ws = null;
 let connected = false;
+let reconnectDelay = 1000; // Start with 1 second
+const MAX_RECONNECT_DELAY = 30000; // Max 30 seconds
 
 function connect() {
   if (ws && ws.readyState === WebSocket.OPEN) return;
@@ -7,10 +9,12 @@ function connect() {
   try {
     ws = new WebSocket('ws://127.0.0.1:19823');
   } catch {
+    scheduleReconnect();
     return;
   }
 
   ws.onopen = () => {
+    reconnectDelay = 1000; // Reset delay on successful connection
     chrome.storage.local.get(['authToken'], (result) => {
       if (result.authToken) {
         ws.send(JSON.stringify({ action: 'auth', token: result.authToken }));
@@ -41,12 +45,19 @@ function connect() {
 
   ws.onclose = () => {
     connected = false;
-    setTimeout(connect, 3000);
+    scheduleReconnect();
   };
 
   ws.onerror = () => {
     connected = false;
   };
+}
+
+function scheduleReconnect() {
+  setTimeout(() => {
+    reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
+    connect();
+  }, reconnectDelay);
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -64,6 +75,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'SET_TOKEN') {
     chrome.storage.local.set({ authToken: msg.token });
+    reconnectDelay = 1000; // Reset delay when user manually connects
     connect();
     return false;
   }

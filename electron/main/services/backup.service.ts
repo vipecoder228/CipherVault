@@ -1,19 +1,15 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto'
 import { readFileSync, writeFileSync } from 'fs'
-import { dialog, BrowserWindow } from 'electron'
+import { dialog } from 'electron'
 import { getDatabasePath, saveDatabase } from '../db/connection'
 import { deriveKey, splitDerivedKey } from '../crypto/keyderivation'
 import { CRYPTO } from '../crypto/constants'
+import { getWindow } from '../utils/window'
 
 const MAGIC = 'CIPHERVAULT'
 const VERSION = 1
 // Header: magic(11) + version(1) + salt(32) + iv(12) + authTag(16) = 72 bytes
 const HEADER_SIZE = 11 + 1 + CRYPTO.SALT_SIZE + CRYPTO.IV_SIZE + CRYPTO.AUTH_TAG_SIZE
-
-// Get focused window or fallback to first available window
-function getWindow(): BrowserWindow | undefined {
-  return BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? undefined
-}
 
 export async function exportEncryptedBackup(
   backupPassword: string

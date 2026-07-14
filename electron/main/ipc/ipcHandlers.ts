@@ -1,25 +1,20 @@
-import { ipcMain, dialog, BrowserWindow } from 'electron'
+import { ipcMain, dialog } from 'electron'
 import { readFileSync, writeFileSync } from 'fs'
 import type { IPCChannels } from '../../shared/types'
 import * as vaultService from '../services/vault.service'
 import * as entriesService from '../services/entries.service'
 import * as clipboardService from '../services/clipboard.service'
 import * as disposableEmailService from '../services/disposable-email.service'
-import { generatePassword } from '../services/password-gen.service'
+import { generatePassword, generateUsername, generatePassphrase } from '../services/password-gen.service'
 import { checkBreach } from '../services/breach-check.service'
 import * as backupService from '../services/backup.service'
-
-// Get focused window or fallback to first available window
-function getWindow(): BrowserWindow | undefined {
-  return BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? undefined
-}
 import { analyzePasswordHealth } from '../services/health.service'
-import { generateUsername, generatePassphrase } from '../services/password-gen.service'
 import * as syncService from '../services/sync.service'
 import { getDatabase } from '../db/connection'
 import { getCategories, createCategory, updateCategory, deleteCategory, reorderCategories } from '../db/queries/categories.queries'
 import { checkIntegrity } from '../integrity'
 import { getActiveVaultId } from '../services/vault.service'
+import { getWindow } from '../utils/window'
 
 type IPCChannel = keyof IPCChannels
 

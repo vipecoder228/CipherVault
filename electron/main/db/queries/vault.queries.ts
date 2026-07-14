@@ -1,4 +1,5 @@
 import type { Database } from 'sql.js'
+import { queryAll, queryOne } from '../helpers'
 
 export interface VaultRow {
   id: number
@@ -14,27 +15,6 @@ export interface VaultRow {
   auto_lock_ms: number
   created_at: string
   updated_at: string
-}
-
-function queryOne<T>(db: Database, sql: string, params: any[] = []): T | undefined {
-  const result = db.exec(sql, params)
-  if (result.length === 0 || result[0].values.length === 0) return undefined
-  const row = result[0].values[0]
-  const columns = result[0].columns
-  const obj: any = {}
-  columns.forEach((col, i) => { obj[col] = row[i] })
-  return obj as T
-}
-
-function queryAll<T>(db: Database, sql: string, params: any[] = []): T[] {
-  const result = db.exec(sql, params)
-  if (result.length === 0) return []
-  const columns = result[0].columns
-  return result[0].values.map((row) => {
-    const obj: any = {}
-    columns.forEach((col, i) => { obj[col] = row[i] })
-    return obj as T
-  })
 }
 
 export function getVault(db: Database, vaultId: number = 1): VaultRow | undefined {

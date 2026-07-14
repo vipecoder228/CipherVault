@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useEntriesStore } from '../../store/entriesStore'
 import { useUIStore } from '../../store/uiStore'
+import { useVaultStore } from '../../store/vaultStore'
 import { Search, Plus, LayoutGrid, List, Sun, Moon, Download, Upload, Key } from 'lucide-react'
 import { CreateEntryModal } from '../entries/CreateEntryModal'
 import { ImportDialog } from '../import-export/ImportDialog'
@@ -16,20 +17,33 @@ export function Header() {
   const [generatedPassword, setGeneratedPassword] = useState<string | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
 
-  // Ctrl+K shortcut
+  const { viewMode, setViewMode, theme, toggleTheme, showPasswordGenerator, setShowPasswordGenerator } = useUIStore()
+  const { search, loadEntries } = useEntriesStore()
+  const { lock } = useVaultStore()
+
+  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+K - Focus search
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault()
         searchRef.current?.focus()
         searchRef.current?.select()
       }
+      // Ctrl+N - New entry
+      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+        e.preventDefault()
+        setShowCreate(true)
+      }
+      // Ctrl+L - Lock vault
+      if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
+        e.preventDefault()
+        lock()
+      }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
-  const { viewMode, setViewMode, theme, toggleTheme, showPasswordGenerator, setShowPasswordGenerator } = useUIStore()
-  const { search, loadEntries } = useEntriesStore()
+  }, [lock])
 
   const handleSearch = useCallback(
     (value: string) => {

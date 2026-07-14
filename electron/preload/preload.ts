@@ -7,6 +7,7 @@ const api: Record<string, (...args: any[]) => Promise<any>> = {}
 const channels: (keyof IPCChannels)[] = [
   'vault:status',
   'vault:setup',
+  'vault:create',
   'vault:unlock',
   'vault:lock',
   'vault:switch',
@@ -22,6 +23,10 @@ const channels: (keyof IPCChannels)[] = [
   'entries:create',
   'entries:update',
   'entries:delete',
+  'entries:restore',
+  'entries:permanent-delete',
+  'entries:deleted',
+  'entries:cleanup-old',
   'entries:search',
   'entries:toggle-favorite',
   'entries:get-history',

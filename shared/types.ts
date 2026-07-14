@@ -66,6 +66,14 @@ export interface DecryptedEntry {
   card_holder: string
   card_expiry: string
   card_cvv: string
+  identity_first_name: string
+  identity_last_name: string
+  identity_phone: string
+  identity_email: string
+  identity_address: string
+  identity_ssn: string
+  identity_passport: string
+  identity_birthdate: string
   created_at: string
   updated_at: string
 }
@@ -250,6 +258,9 @@ export interface IPCChannels {
   'import:json': (filePath?: string) => Promise<ImportResult>
   'export:csv': (filePath?: string, entryIds?: number[]) => Promise<{ success: boolean } | void>
   'export:json': (filePath?: string, entryIds?: number[]) => Promise<{ success: boolean } | void>
+
+  // Integrity
+  'integrity:check': () => Promise<{ ok: boolean; current?: string; expected?: string }>
 }
 
 export type IPCChannel = keyof IPCChannels

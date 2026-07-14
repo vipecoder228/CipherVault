@@ -1,11 +1,12 @@
 import { watch, readFileSync, writeFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto'
-import { dialog, BrowserWindow } from 'electron'
+import { dialog } from 'electron'
 import { getDatabasePath, saveDatabase, getDatabase } from '../db/connection'
 import { deriveKey, splitDerivedKey } from '../crypto/keyderivation'
 import { CRYPTO } from '../crypto/constants'
 import { isAlarmMode } from './vault.service'
+import { getWindow } from '../utils/window'
 
 const SYNC_FILENAME = 'ciphervault.vault'
 const MAGIC = 'CIPHERVAULT'
@@ -156,11 +157,6 @@ function stopWatching(): void {
 }
 
 // ─── Public API ───────────────────────────────────────
-
-// Get focused window or fallback to first available window
-function getWindow(): BrowserWindow | undefined {
-  return BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? undefined
-}
 
 export async function selectSyncFolder(): Promise<{ success: boolean; folder?: string; error?: string }> {
   const win = getWindow()!

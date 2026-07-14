@@ -176,7 +176,7 @@ export function DisposableEmailPanel() {
             <div className="text-sm text-vault-text prose prose-sm max-w-none">
               <iframe
                 srcDoc={selectedMessage.html}
-                sandbox="allow-same-origin"
+                sandbox=""
                 className="w-full border-0 min-h-[200px]"
                 title="Email content"
               />
