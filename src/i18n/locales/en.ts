@@ -361,4 +361,28 @@ export default {
   syncing: 'Syncing...',
   sync_now: 'Sync Now',
   disable: 'Disable',
+
+  // Header
+  search_placeholder: 'Search entries... (Ctrl+K)',
+  password_generator: 'Password Generator',
+  import: 'Import',
+  export: 'Export',
+  add: 'Add',
+
+  // Vault Switcher
+  main_vault: 'Main Vault',
+  create_new_vault: 'Create New Vault',
+  vault_name: 'Vault Name',
+  vault_name_placeholder: 'e.g., Work, Personal',
+  creating: 'Creating...',
+
+  // AppShell
+  duress_mode: 'Duress mode — viewing decoy vault. Real data is hidden.',
+  decoy_vault_empty: 'Decoy vault is empty',
+  duress_hidden: 'You are in duress mode. Real data is hidden.',
+  no_entries: 'No entries yet',
+  no_entries_hint: 'Add your first password or import from another manager',
+  generate_password: 'Generate Password',
+  all: 'All',
+  version: 'Version',
 } as const

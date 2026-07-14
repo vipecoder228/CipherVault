@@ -624,21 +624,20 @@ function AppearanceTab({ theme, setTheme }: { theme: string; setTheme: (t: 'dark
 }
 
 function AboutTab() {
+  const { t } = useI18n()
   return (
     <div className="space-y-4 text-center">
       <div className="w-16 h-16 rounded-2xl bg-vault-accent/10 border border-vault-accent/30 flex items-center justify-center mx-auto">
         <Shield size={32} className="text-vault-accent" />
       </div>
       <div>
-        <h3 className="text-lg font-bold text-vault-text">CipherVault</h3>
-        <p className="text-sm text-vault-text-secondary">Password Manager</p>
-        <p className="text-xs text-vault-text-secondary mt-1">Version 7.0.0</p>
+        <h3 className="text-lg font-bold text-vault-text">{t('about_title')}</h3>
+        <p className="text-sm text-vault-text-secondary">{t('about_subtitle')}</p>
+        <p className="text-xs text-vault-text-secondary mt-1">{t('version')} 11.3.0</p>
       </div>
       <div className="p-4 rounded-xl bg-vault-bg border border-vault-border text-left">
         <p className="text-xs text-vault-text-secondary leading-relaxed">
-          Secure password manager with AES-256-GCM encryption.
-          All data is stored locally and encrypted with your master password.
-          Zero-knowledge architecture — we never see your passwords.
+          {t('about_description')}
         </p>
       </div>
     </div>

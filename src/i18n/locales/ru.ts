@@ -361,4 +361,28 @@ export default {
   syncing: 'Синхронизация...',
   sync_now: 'Синхронизировать',
   disable: 'Отключить',
+
+  // Header
+  search_placeholder: 'Поиск записей... (Ctrl+K)',
+  password_generator: 'Генератор паролей',
+  import: 'Импорт',
+  export: 'Экспорт',
+  add: 'Добавить',
+
+  // Vault Switcher
+  main_vault: 'Основное хранилище',
+  create_new_vault: 'Создать новое хранилище',
+  vault_name: 'Название хранилища',
+  vault_name_placeholder: 'напр. Работа, Личное',
+  creating: 'Создание...',
+
+  // AppShell
+  duress_mode: 'Режим принуждения — отображается запасное хранилище. Реальные данные скрыты.',
+  decoy_vault_empty: 'Запасное хранилище пусто',
+  duress_hidden: 'Вы в режиме принуждения. Реальные данные скрыты.',
+  no_entries: 'Записей пока нет',
+  no_entries_hint: 'Добавьте первый пароль или импортируйте из другого менеджера',
+  generate_password: 'Сгенерировать пароль',
+  all: 'Все',
+  version: 'Версия',
 } as const

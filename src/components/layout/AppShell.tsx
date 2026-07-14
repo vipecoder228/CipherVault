@@ -7,10 +7,12 @@ import { TrashPanel } from '../trash/TrashPanel'
 import { useEntriesStore } from '../../store/entriesStore'
 import { useUIStore } from '../../store/uiStore'
 import { useVaultStore } from '../../store/vaultStore'
+import { useI18n } from '../../i18n'
 import { AlertTriangle } from 'lucide-react'
 import type { EntryType } from '@shared/types'
 
 export function AppShell() {
+  const { t } = useI18n()
   const selectedEntry = useEntriesStore((s) => s.selectedEntry)
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed)
   const showDisposableEmail = useUIStore((s) => s.showDisposableEmail)
@@ -34,7 +36,7 @@ export function AppShell() {
         {alarmMode && (
           <div className="flex items-center gap-2 px-4 py-2 bg-vault-warning/10 border-b border-vault-warning/30 text-vault-warning text-xs font-medium">
             <AlertTriangle size={14} />
-            <span>Duress mode — viewing decoy vault. Real data is hidden.</span>
+            <span>{t('duress_mode')}</span>
           </div>
         )}
         <Header />
@@ -78,6 +80,7 @@ const TYPE_LABELS: Record<EntryType, string> = {
 }
 
 function EntryGrid() {
+  const { t } = useI18n()
   const { entries, viewMode, loading, selectEntry, selectedEntry, toggleFavorite, filters, setFilters } = useEntriesStore()
   const setShowPasswordGenerator = useUIStore((s) => s.setShowPasswordGenerator)
   const alarmMode = useVaultStore((s) => s.alarmMode)
@@ -110,7 +113,7 @@ function EntryGrid() {
                 : 'bg-vault-surface text-vault-text-secondary border border-vault-border hover:text-vault-text'
             }`}
           >
-            {type ? TYPE_LABELS[type] : 'All'}
+            {type ? TYPE_LABELS[type] : t('all')}
           </button>
         ))}
       </div>
@@ -122,8 +125,8 @@ function EntryGrid() {
               <div className="w-16 h-16 rounded-2xl bg-vault-surface border border-vault-border flex items-center justify-center mb-4">
                 <AlertTriangle size={32} className="text-vault-warning" />
               </div>
-              <p className="text-lg font-medium mb-2">Decoy vault is empty</p>
-              <p className="text-sm mb-4">You are in duress mode. Real data is hidden.</p>
+              <p className="text-lg font-medium mb-2">{t('decoy_vault_empty')}</p>
+              <p className="text-sm mb-4">{t('duress_hidden')}</p>
             </>
           ) : (
             <>
@@ -133,14 +136,14 @@ function EntryGrid() {
                   <line x1="8" y1="12" x2="16" y2="12" />
                 </svg>
               </div>
-              <p className="text-lg font-medium mb-2">No entries yet</p>
-              <p className="text-sm mb-4">Add your first password or import from another manager</p>
+              <p className="text-lg font-medium mb-2">{t('no_entries')}</p>
+              <p className="text-sm mb-4">{t('no_entries_hint')}</p>
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowPasswordGenerator(true)}
                   className="px-4 py-2 bg-vault-accent text-white rounded-lg hover:bg-vault-accent-hover transition-colors text-sm"
                 >
-                  Generate Password
+                  {t('generate_password')}
                 </button>
               </div>
             </>

@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { invoke } from '../../lib/ipc'
 import { useVaultStore } from '../../store/vaultStore'
+import { useI18n } from '../../i18n'
 import { ChevronDown, Plus, Lock } from 'lucide-react'
 
 export function VaultSwitcher() {
+  const { t } = useI18n()
   const [showDropdown, setShowDropdown] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [newVaultName, setNewVaultName] = useState('')
@@ -40,7 +42,7 @@ export function VaultSwitcher() {
         >
           <Lock size={16} className="text-vault-accent" />
           <span className="flex-1 text-left text-sm text-vault-text truncate">
-            {currentVault?.displayName || 'Main Vault'}
+            {currentVault?.displayName || t('main_vault')}
           </span>
           <ChevronDown size={14} className={`text-vault-text-secondary transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
         </button>
@@ -73,7 +75,7 @@ export function VaultSwitcher() {
                   className="w-full flex items-center gap-2 px-3 py-2 text-left text-vault-text-secondary hover:bg-vault-surface-hover transition-colors"
                 >
                   <Plus size={14} />
-                  <span className="text-sm">Create new vault</span>
+                  <span className="text-sm">{t('create_new_vault')}</span>
                 </button>
               </div>
             </div>
@@ -85,27 +87,27 @@ export function VaultSwitcher() {
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-vault-surface border border-vault-border rounded-xl p-6 w-[400px] shadow-xl">
-            <h3 className="text-lg font-semibold text-vault-text mb-4">Create New Vault</h3>
+            <h3 className="text-lg font-semibold text-vault-text mb-4">{t('create_new_vault')}</h3>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-vault-text-secondary mb-1">Vault Name</label>
+                <label className="block text-sm text-vault-text-secondary mb-1">{t('vault_name')}</label>
                 <input
                   type="text"
                   value={newVaultName}
                   onChange={(e) => setNewVaultName(e.target.value)}
-                  placeholder="e.g., Work, Personal"
+                  placeholder={t('vault_name_placeholder')}
                   className="w-full px-3 py-2 bg-vault-bg border border-vault-border rounded-lg text-vault-text placeholder-vault-text-secondary focus:outline-none focus:border-vault-accent"
                 />
               </div>
 
               <div>
-                <label className="block text-sm text-vault-text-secondary mb-1">Master Password</label>
+                <label className="block text-sm text-vault-text-secondary mb-1">{t('master_password_placeholder')}</label>
                 <input
                   type="password"
                   value={newVaultPassword}
                   onChange={(e) => setNewVaultPassword(e.target.value)}
-                  placeholder="Enter a strong password"
+                  placeholder={t('enter_password')}
                   className="w-full px-3 py-2 bg-vault-bg border border-vault-border rounded-lg text-vault-text placeholder-vault-text-secondary focus:outline-none focus:border-vault-accent"
                 />
               </div>
@@ -116,14 +118,14 @@ export function VaultSwitcher() {
                 onClick={() => setShowCreateModal(false)}
                 className="px-4 py-2 text-sm text-vault-text-secondary hover:text-vault-text transition-colors"
               >
-                Cancel
+                {t('cancel')}
               </button>
               <button
                 onClick={handleCreateVault}
                 disabled={!newVaultName.trim() || !newVaultPassword.trim() || creating}
                 className="px-4 py-2 bg-vault-accent text-white rounded-lg text-sm font-medium hover:bg-vault-accent-hover transition-colors disabled:opacity-50"
               >
-                {creating ? 'Creating...' : 'Create'}
+                {creating ? t('creating') : t('create')}
               </button>
             </div>
           </div>

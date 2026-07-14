@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { useEntriesStore } from '../../store/entriesStore'
 import { useUIStore } from '../../store/uiStore'
 import { useVaultStore } from '../../store/vaultStore'
+import { useI18n } from '../../i18n'
 import { Search, Plus, LayoutGrid, List, Sun, Moon, Download, Upload, Key } from 'lucide-react'
 import { CreateEntryModal } from '../entries/CreateEntryModal'
 import { ImportDialog } from '../import-export/ImportDialog'
@@ -10,6 +11,7 @@ import { Modal } from '../ui/Modal'
 import { PasswordGenerator } from '../password-gen/PasswordGenerator'
 
 export function Header() {
+  const { t } = useI18n()
   const [searchQuery, setSearchQuery] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [showImport, setShowImport] = useState(false)
@@ -66,7 +68,7 @@ export function Header() {
           <input
             ref={searchRef}
             type="text"
-            placeholder="Search entries... (Ctrl+K)"
+            placeholder={t('search_placeholder')}
             value={searchQuery}
             onChange={(e) => handleSearch(e.target.value)}
             className="w-full h-9 pl-9 pr-4 rounded-lg bg-vault-bg border border-vault-border text-sm text-vault-text placeholder:text-vault-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-vault-accent/50 focus:border-vault-accent transition-colors"
@@ -105,7 +107,7 @@ export function Header() {
         <button
           onClick={() => setShowPasswordGenerator(true)}
           className="p-2 rounded-lg text-vault-text-secondary hover:text-vault-text hover:bg-vault-surface-hover transition-colors"
-          title="Password Generator"
+          title={t('password_generator')}
         >
           <Key size={16} />
         </button>
@@ -114,7 +116,7 @@ export function Header() {
         <button
           onClick={() => setShowImport(true)}
           className="p-2 rounded-lg text-vault-text-secondary hover:text-vault-text hover:bg-vault-surface-hover transition-colors"
-          title="Import"
+          title={t('import')}
         >
           <Download size={16} />
         </button>
@@ -123,7 +125,7 @@ export function Header() {
         <button
           onClick={() => setShowExport(true)}
           className="p-2 rounded-lg text-vault-text-secondary hover:text-vault-text hover:bg-vault-surface-hover transition-colors"
-          title="Export"
+          title={t('export')}
         >
           <Upload size={16} />
         </button>
@@ -134,7 +136,7 @@ export function Header() {
           className="flex items-center gap-2 px-3 py-1.5 bg-vault-accent text-white rounded-lg hover:bg-vault-accent-hover transition-colors text-sm font-medium"
         >
           <Plus size={16} />
-          <span>Add</span>
+          <span>{t('add')}</span>
         </button>
       </div>
 
@@ -147,7 +149,7 @@ export function Header() {
       <ExportDialog open={showExport} onClose={() => setShowExport(false)} />
 
       {/* Password Generator Modal */}
-      <Modal open={showPasswordGenerator} onClose={() => setShowPasswordGenerator(false)} title="Password Generator">
+      <Modal open={showPasswordGenerator} onClose={() => setShowPasswordGenerator(false)} title={t('password_generator')}>
         <PasswordGenerator onUsePassword={(pwd) => {
           setShowPasswordGenerator(false)
           setGeneratedPassword(pwd)
