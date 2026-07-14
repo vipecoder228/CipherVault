@@ -96,6 +96,12 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
+      - name: Set version in build.gradle
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          sed -i "s/versionCode 1/versionCode ${VERSION//./}/" android/app/build.gradle
+          sed -i "s/versionName \"1.0\"/versionName \"$VERSION\"/" android/app/build.gradle
+
       - name: Build Android APK
         working-directory: android
         run: ./gradlew assembleDebug
@@ -104,11 +110,17 @@ jobs:
         working-directory: android
         run: ./gradlew bundleDebug
 
+      - name: Rename Android artifacts
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          mv android/app/build/outputs/apk/debug/app-debug.apk "dist/CipherVault-${VERSION}-android.apk"
+          mv android/app/build/outputs/bundle/debug/app-debug.aab "dist/CipherVault-${VERSION}-android.aab"
+
       - name: Upload Android builds to release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            android/app/build/outputs/apk/debug/app-debug.apk
-            android/app/build/outputs/bundle/debug/app-debug.aab
+            dist/CipherVault-*-android.apk
+            dist/CipherVault-*-android.aab
           draft: false
           prerelease: false
