@@ -109,11 +109,11 @@ jobs:
 
       - name: Build Android APK
         working-directory: android
-        run: ./gradlew assembleDebug
+        run: chmod +x gradlew && ./gradlew assembleDebug
 
       - name: Build Android AAB (for Play Store)
         working-directory: android
-        run: ./gradlew bundleDebug
+        run: chmod +x gradlew && ./gradlew bundleDebug
 
       - name: Rename Android artifacts
         run: |
