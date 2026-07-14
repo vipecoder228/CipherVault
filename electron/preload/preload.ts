@@ -65,6 +65,8 @@ const channels: (keyof IPCChannels)[] = [
   'export:csv',
   'export:json',
   'integrity:check',
+  'shortcut:get',
+  'shortcut:set',
 ]
 
 for (const channel of channels) {

@@ -68,6 +68,9 @@ function SecurityTab() {
   const [totpEnabled, setTotpEnabled] = useState(false)
   const [alarmEnabled, setAlarmEnabled] = useState(false)
   const [autoLockMs, setAutoLockMs] = useState('300000')
+  const [globalShortcut, setGlobalShortcut] = useState('CommandOrControl+Shift+Space')
+  const [shortcutInput, setShortcutInput] = useState('')
+  const [recordingShortcut, setRecordingShortcut] = useState(false)
   const addToast = useToastStore((s) => s.addToast)
 
   useEffect(() => {
@@ -85,6 +88,10 @@ function SecurityTab() {
 
       const alarmData = await invoke('settings:get', 'alarm_enabled')
       if (alarmData === 'true' || alarmData === '1') setAlarmEnabled(true)
+
+      // Load global shortcut
+      const shortcut = await invoke('shortcut:get')
+      if (shortcut) setGlobalShortcut(shortcut)
     } catch {}
   }
 
@@ -111,6 +118,16 @@ function SecurityTab() {
       addToast('Clipboard cleared', 'success')
     } catch {
       addToast('Failed to clear clipboard', 'error')
+    }
+  }
+
+  const handleShortcutChange = async (shortcut: string) => {
+    const result = await invoke('shortcut:set', shortcut)
+    if (result.success) {
+      setGlobalShortcut(shortcut)
+      addToast('Global shortcut updated', 'success')
+    } else {
+      addToast(result.error || 'Failed to update shortcut', 'error')
     }
   }
 
@@ -141,6 +158,59 @@ function SecurityTab() {
           <option value="1800000">30 minutes</option>
           <option value="3600000">1 hour</option>
         </select>
+      </div>
+
+      {/* Global Shortcut */}
+      <div>
+        <label className="text-sm font-medium text-vault-text block mb-2">Global Shortcut</label>
+        <p className="text-xs text-vault-text-secondary mb-2">
+          Keyboard shortcut to open CipherVault from anywhere. Click record and press your desired key combination.
+        </p>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={recordingShortcut ? 'Press keys...' : formatShortcut(globalShortcut)}
+            readOnly
+            className="flex-1 h-10 px-3 rounded-lg bg-vault-surface border border-vault-border text-sm text-vault-text focus:outline-none"
+          />
+          <Button
+            variant={recordingShortcut ? 'danger' : 'secondary'}
+            onClick={() => {
+              if (recordingShortcut) {
+                setRecordingShortcut(false)
+                setShortcutInput('')
+              } else {
+                setRecordingShortcut(true)
+                setShortcutInput('')
+              }
+            }}
+          >
+            {recordingShortcut ? 'Cancel' : 'Record'}
+          </Button>
+        </div>
+        {recordingShortcut && (
+          <ShortcutRecorder
+            onRecord={(shortcut) => {
+              setRecordingShortcut(false)
+              handleShortcutChange(shortcut)
+            }}
+          />
+        )}
+        <div className="mt-2 flex flex-wrap gap-1">
+          {['CommandOrControl+Shift+Space', 'CommandOrControl+Shift+X', 'CommandOrControl+Alt+Space', 'CommandOrControl+Shift+C'].map((s) => (
+            <button
+              key={s}
+              onClick={() => handleShortcutChange(s)}
+              className={`px-2 py-1 text-xs rounded border transition-colors ${
+                globalShortcut === s
+                  ? 'bg-vault-accent/10 border-vault-accent text-vault-accent'
+                  : 'bg-vault-surface border-vault-border text-vault-text-secondary hover:text-vault-text'
+              }`}
+            >
+              {formatShortcut(s)}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Change master password */}
@@ -546,6 +616,49 @@ function AboutTab() {
           Zero-knowledge architecture — we never see your passwords.
         </p>
       </div>
+    </div>
+  )
+}
+
+function formatShortcut(shortcut: string): string {
+  return shortcut
+    .replace('CommandOrControl', 'Ctrl')
+    .replace('Control', 'Ctrl')
+    .replace('Meta', 'Cmd')
+    .replace('Alt', 'Alt')
+    .replace('Shift', 'Shift')
+    .replace(/\+/g, ' + ')
+}
+
+function ShortcutRecorder({ onRecord }: { onRecord: (shortcut: string) => void }) {
+  const [keys, setKeys] = useState<string[]>([])
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+
+      const parts: string[] = []
+      if (e.ctrlKey || e.metaKey) parts.push('CommandOrControl')
+      if (e.altKey) parts.push('Alt')
+      if (e.shiftKey) parts.push('Shift')
+
+      // Add the main key (ignore modifier keys alone)
+      const key = e.key.toLowerCase()
+      if (!['control', 'meta', 'alt', 'shift'].includes(key)) {
+        parts.push(e.key.toUpperCase())
+        onRecord(parts.join('+'))
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown, true)
+    return () => window.removeEventListener('keydown', handleKeyDown, true)
+  }, [onRecord])
+
+  return (
+    <div className="mt-2 p-3 rounded-lg bg-vault-accent/10 border border-vault-accent/30 text-center">
+      <p className="text-sm text-vault-accent font-medium">Press your desired key combination...</p>
+      <p className="text-xs text-vault-text-secondary mt-1">Release all keys when done</p>
     </div>
   )
 }

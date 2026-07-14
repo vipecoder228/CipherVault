@@ -263,6 +263,10 @@ export interface IPCChannels {
 
   // Integrity
   'integrity:check': () => Promise<{ ok: boolean; current?: string; expected?: string }>
+
+  // Global Shortcut
+  'shortcut:get': () => Promise<string>
+  'shortcut:set': (shortcut: string) => Promise<{ success: boolean; error?: string }>
 }
 
 export type IPCChannel = keyof IPCChannels

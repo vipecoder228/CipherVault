@@ -4,7 +4,7 @@ import { readFileSync } from 'fs'
 import AutoLaunch from 'auto-launch'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { registerIPC, unregisterIPC } from './ipc/ipcHandlers'
-import { closeDatabase } from './db/connection'
+import { closeDatabase, getDatabase } from './db/connection'
 import { lockVault } from './services/vault.service'
 import { startWebSocketServer, stopWebSocketServer } from './services/websocket.service'
 import { loadSyncSettings, stopSync } from './services/sync.service'
@@ -12,6 +12,7 @@ import { loadSyncSettings, stopSync } from './services/sync.service'
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let isQuitting = false
+let currentShortcut: string = 'CommandOrControl+Shift+Space'
 
 const autoLauncher = new AutoLaunch({
   name: 'CipherVault',
@@ -148,13 +149,59 @@ function toggleWindow(): void {
   }
 }
 
+async function loadGlobalShortcut(): Promise<void> {
+  try {
+    const db = await getDatabase()
+    const result = db.exec("SELECT value FROM settings WHERE key = 'global_shortcut'")
+    if (result.length > 0 && result[0].values.length > 0) {
+      currentShortcut = result[0].values[0][0] as string
+    }
+  } catch {}
+}
+
 function registerGlobalShortcuts(): void {
-  const registered = globalShortcut.register('CommandOrControl+Shift+Space', () => {
+  // Unregister previous shortcut if any
+  globalShortcut.unregisterAll()
+
+  const registered = globalShortcut.register(currentShortcut, () => {
     toggleWindow()
   })
 
   if (!registered) {
-    console.warn('Failed to register global shortcut: Ctrl+Shift+Space')
+    console.warn(`Failed to register global shortcut: ${currentShortcut}`)
+  }
+}
+
+async function setGlobalShortcut(shortcut: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Validate shortcut format
+    if (!shortcut || !shortcut.includes('+')) {
+      return { success: false, error: 'Invalid shortcut format' }
+    }
+
+    // Try to register the new shortcut
+    globalShortcut.unregisterAll()
+    const registered = globalShortcut.register(shortcut, () => {
+      toggleWindow()
+    })
+
+    if (!registered) {
+      // Re-register old shortcut if new one fails
+      globalShortcut.register(currentShortcut, () => {
+        toggleWindow()
+      })
+      return { success: false, error: 'Failed to register shortcut. It may be in use by another app.' }
+    }
+
+    currentShortcut = shortcut
+
+    // Save to database
+    const db = await getDatabase()
+    db.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('global_shortcut', ?)", [shortcut])
+
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message }
   }
 }
 
@@ -168,9 +215,14 @@ app.whenReady().then(() => {
   registerIPC()
   createWindow()
   createTray()
+  await loadGlobalShortcut()
   registerGlobalShortcuts()
   startWebSocketServer()
   loadSyncSettings()
+
+  // IPC handlers for global shortcut
+  ipcMain.handle('shortcut:get', () => currentShortcut)
+  ipcMain.handle('shortcut:set', (_: unknown, shortcut: string) => setGlobalShortcut(shortcut))
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
