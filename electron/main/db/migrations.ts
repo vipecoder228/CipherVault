@@ -87,6 +87,10 @@ const MIGRATIONS = [
     account_id  TEXT,
     created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
   );`,
+
+  // v13: Soft delete support — add deleted_at column
+  `ALTER TABLE encrypted_entries ADD COLUMN deleted_at TEXT;`,
+  `CREATE INDEX IF NOT EXISTS idx_entries_deleted ON encrypted_entries(deleted_at);`,
 ]
 
 export function runMigrations(db: Database): void {

@@ -8,6 +8,11 @@ import * as disposableEmailService from '../services/disposable-email.service'
 import { generatePassword } from '../services/password-gen.service'
 import { checkBreach } from '../services/breach-check.service'
 import * as backupService from '../services/backup.service'
+
+// Get focused window or fallback to first available window
+function getWindow(): BrowserWindow | undefined {
+  return BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? undefined
+}
 import { analyzePasswordHealth } from '../services/health.service'
 import { generateUsername, generatePassphrase } from '../services/password-gen.service'
 import * as syncService from '../services/sync.service'
@@ -22,6 +27,7 @@ const handlers: Record<string, (...args: any[]) => any> = {
   // Vault
   'vault:status': () => vaultService.getVaultStatus(),
   'vault:setup': (_: unknown, masterPassword: string, alarmPassword?: string, displayName?: string) => vaultService.setupVault(masterPassword, alarmPassword, displayName),
+  'vault:create': (_: unknown, masterPassword: string, displayName: string) => vaultService.setupVault(masterPassword, undefined, displayName),
   'vault:unlock': (_: unknown, masterPassword: string, totpCode?: string, vaultId?: number) => vaultService.unlockVault(masterPassword, totpCode, vaultId),
   'vault:lock': () => vaultService.lockVault(),
   'vault:switch': (_: unknown, vaultId: number) => vaultService.switchVault(vaultId),
@@ -39,6 +45,10 @@ const handlers: Record<string, (...args: any[]) => any> = {
   'entries:create': (_: unknown, data: any) => entriesService.createEntry(data),
   'entries:update': (_: unknown, id: number, data: any) => entriesService.updateEntry(id, data),
   'entries:delete': (_: unknown, id: number) => entriesService.deleteEntryById(id),
+  'entries:restore': (_: unknown, id: number) => entriesService.restoreEntry(id),
+  'entries:permanent-delete': (_: unknown, id: number) => entriesService.permanentDeleteEntry(id),
+  'entries:deleted': () => entriesService.getDeletedEntries(),
+  'entries:cleanup-old': () => entriesService.cleanupOldDeletedEntries(),
   'entries:search': (_: unknown, query: string, filters?: any) => entriesService.searchEntries(query, filters),
   'entries:toggle-favorite': (_: unknown, id: number) => entriesService.toggleFavoriteEntry(id),
   'entries:get-history': (_: unknown, id: number) => entriesService.getEntryHistoryList(id),
@@ -119,9 +129,9 @@ const handlers: Record<string, (...args: any[]) => any> = {
 
   // Import CSV
   'import:csv': async (_: unknown, filePath?: string) => {
-    const win = BrowserWindow.getFocusedWindow()
+    const win = getWindow()!
     if (!filePath) {
-      const result = await dialog.showOpenDialog(win!, {
+      const result = await dialog.showOpenDialog(win, {
         title: 'Import CSV',
         filters: [{ name: 'CSV Files', extensions: ['csv'] }],
         properties: ['openFile'],
@@ -138,7 +148,26 @@ const handlers: Record<string, (...args: any[]) => any> = {
       if (content.charCodeAt(0) === 0xFEFF) {
         content = content.slice(1)
       }
-      const lines = content.split('\n').filter(l => l.trim())
+      // Handle CSV files with quoted fields containing newlines
+      const lines: string[] = []
+      let currentLine = ''
+      let inQuotes = false
+      for (const char of content) {
+        if (char === '"') {
+          inQuotes = !inQuotes
+          currentLine += char
+        } else if (char === '\n' && !inQuotes) {
+          if (currentLine.trim()) {
+            lines.push(currentLine)
+          }
+          currentLine = ''
+        } else {
+          currentLine += char
+        }
+      }
+      if (currentLine.trim()) {
+        lines.push(currentLine)
+      }
       const header = lines[0].toLowerCase()
       let imported = 0
       let skipped = 0
@@ -201,9 +230,9 @@ const handlers: Record<string, (...args: any[]) => any> = {
 
   // Import JSON
   'import:json': async (_: unknown, filePath?: string) => {
-    const win = BrowserWindow.getFocusedWindow()
+    const win = getWindow()!
     if (!filePath) {
-      const result = await dialog.showOpenDialog(win!, {
+      const result = await dialog.showOpenDialog(win, {
         title: 'Import JSON',
         filters: [{ name: 'JSON Files', extensions: ['json'] }],
         properties: ['openFile'],
@@ -258,9 +287,9 @@ const handlers: Record<string, (...args: any[]) => any> = {
 
   // Export CSV
   'export:csv': async (_: unknown, filePath?: string, entryIds?: number[]) => {
-    const win = BrowserWindow.getFocusedWindow()
+    const win = getWindow()!
     if (!filePath) {
-      const result = await dialog.showSaveDialog(win!, {
+      const result = await dialog.showSaveDialog(win, {
         title: 'Export CSV',
         defaultPath: 'vault-export.csv',
         filters: [{ name: 'CSV Files', extensions: ['csv'] }],
@@ -296,9 +325,9 @@ const handlers: Record<string, (...args: any[]) => any> = {
 
   // Export JSON
   'export:json': async (_: unknown, filePath?: string, entryIds?: number[]) => {
-    const win = BrowserWindow.getFocusedWindow()
+    const win = getWindow()!
     if (!filePath) {
-      const result = await dialog.showSaveDialog(win!, {
+      const result = await dialog.showSaveDialog(win, {
         title: 'Export JSON',
         defaultPath: 'vault-export.json',
         filters: [{ name: 'JSON Files', extensions: ['json'] }],
@@ -363,6 +392,7 @@ async function isDuplicateEntry(title: string, username: string, vaultId?: numbe
   try {
     const db = await getDatabase()
     const vid = vaultId ?? 1
+    // Use display_title for duplicate check (username is encrypted and not searchable)
     const result = db.exec(
       "SELECT COUNT(*) as count FROM encrypted_entries WHERE display_title = ? AND vault_id = ?",
       [title, vid]

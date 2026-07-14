@@ -5,17 +5,19 @@ import * as entriesService from './entries.service'
 import { isUnlocked, isAlarmMode } from './vault.service'
 
 const PORT = 19823
+const MAX_CONNECTIONS = 3
 let wss: WebSocketServer | null = null
 let sessionToken: string | null = null
+let connectionCount = 0
 
 function generateToken(): string {
   return randomBytes(32).toString('hex')
 }
 
-function getOrGenerateToken(): string {
+async function getOrGenerateToken(): Promise<string> {
   if (sessionToken) return sessionToken
 
-  const db = getDatabase() as any
+  const db = await getDatabase()
   try {
     const result = db.exec("SELECT value FROM settings WHERE key = 'extension_token'")
     if (result.length > 0 && result[0].values.length > 0) {
@@ -49,14 +51,18 @@ function handleMessage(ws: WebSocket, data: string) {
 
   switch (msg.action) {
     case 'auth': {
-      const token = getOrGenerateToken()
-      if (msg.token === token) {
-        (ws as any).authenticated = true
-        ws.send(JSON.stringify({ action: 'auth-result', ok: true }))
-      } else {
+      getOrGenerateToken().then(token => {
+        if (msg.token === token) {
+          (ws as any).authenticated = true
+          ws.send(JSON.stringify({ action: 'auth-result', ok: true }))
+        } else {
+          ws.send(JSON.stringify({ action: 'auth-result', ok: false }))
+          ws.close()
+        }
+      }).catch(() => {
         ws.send(JSON.stringify({ action: 'auth-result', ok: false }))
         ws.close()
-      }
+      })
       break
     }
 
@@ -119,6 +125,15 @@ export function startWebSocketServer(): void {
     wss = new WebSocketServer({ port: PORT, host: '127.0.0.1' })
 
     wss.on('connection', (ws) => {
+      connectionCount++
+
+      // Enforce connection limit
+      if (connectionCount > MAX_CONNECTIONS) {
+        ws.close(1013, 'Too many connections')
+        connectionCount--
+        return
+      }
+
       (ws as any).authenticated = false
 
       ws.on('message', (data) => {
@@ -126,7 +141,8 @@ export function startWebSocketServer(): void {
       })
 
       ws.on('close', () => {
-        (ws as any).authenticated = false
+        connectionCount = Math.max(0, connectionCount - 1)
+        ;(ws as any).authenticated = false
       })
     })
 
@@ -152,6 +168,6 @@ export function stopWebSocketServer(): void {
   }
 }
 
-export function getSessionToken(): string {
+export async function getSessionToken(): Promise<string> {
   return getOrGenerateToken()
 }

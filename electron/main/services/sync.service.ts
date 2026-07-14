@@ -14,7 +14,7 @@ const HEADER_SIZE = 11 + 1 + CRYPTO.SALT_SIZE + CRYPTO.IV_SIZE + CRYPTO.AUTH_TAG
 
 let syncWatcher: any = null
 let syncFolder: string | null = null
-let syncPassword: string | null = null
+let syncPassword: string | null = null // Note: JS strings cannot be securely zeroed
 let syncEnabled = false
 let lastSyncTime: number = 0
 let isSyncing = false
@@ -157,9 +157,14 @@ function stopWatching(): void {
 
 // ─── Public API ───────────────────────────────────────
 
+// Get focused window or fallback to first available window
+function getWindow(): BrowserWindow | undefined {
+  return BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? undefined
+}
+
 export async function selectSyncFolder(): Promise<{ success: boolean; folder?: string; error?: string }> {
-  const win = BrowserWindow.getFocusedWindow()
-  const result = await dialog.showOpenDialog(win!, {
+  const win = getWindow()!
+  const result = await dialog.showOpenDialog(win, {
     title: 'Select Sync Folder',
     properties: ['openDirectory'],
   })

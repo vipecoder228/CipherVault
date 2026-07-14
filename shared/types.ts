@@ -171,6 +171,7 @@ export interface IPCChannels {
   // Vault
   'vault:status': () => VaultStatus
   'vault:setup': (masterPassword: string, alarmPassword?: string, displayName?: string) => Promise<VaultSetupResult>
+  'vault:create': (masterPassword: string, displayName: string) => Promise<VaultSetupResult>
   'vault:unlock': (masterPassword: string, totpCode?: string, vaultId?: number) => Promise<VaultUnlockResult>
   'vault:lock': () => void
   'vault:switch': (vaultId: number) => Promise<{ success: boolean; error?: string }>
@@ -188,6 +189,10 @@ export interface IPCChannels {
   'entries:create': (data: CreateEntryPayload) => Promise<EncryptedEntry>
   'entries:update': (id: number, data: UpdateEntryPayload) => Promise<void>
   'entries:delete': (id: number) => Promise<void>
+  'entries:restore': (id: number) => Promise<void>
+  'entries:permanent-delete': (id: number) => Promise<void>
+  'entries:deleted': () => Promise<EncryptedEntry[]>
+  'entries:cleanup-old': () => Promise<number>
   'entries:search': (query: string, filters?: EntryFilters) => Promise<EncryptedEntry[]>
   'entries:toggle-favorite': (id: number) => Promise<void>
   'entries:get-history': (id: number) => Promise<EntryHistoryItem[]>

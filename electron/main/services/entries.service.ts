@@ -2,10 +2,14 @@ import { getDatabase, saveDatabase } from '../db/connection'
 import {
   getEntries,
   getEntryById,
+  getDeletedEntries as dbGetDeletedEntries,
   createEntry as dbCreateEntry,
   updateEntry as dbUpdateEntry,
   toggleFavorite as dbToggleFavorite,
   deleteEntry as dbDeleteEntry,
+  restoreEntry as dbRestoreEntry,
+  permanentDeleteEntry as dbPermanentDeleteEntry,
+  permanentDeleteOldEntries as dbPermanentDeleteOldEntries,
   searchEntries as dbSearchEntries,
 } from '../db/queries/entries.queries'
 import { addHistoryEntry, getEntryHistory, getFullEntryHistory } from '../db/queries/history.queries'
@@ -138,6 +142,39 @@ export async function deleteEntryById(id: number): Promise<void> {
   const db = await getDatabase()
   dbDeleteEntry(db, id)
   saveDatabase()
+}
+
+export async function restoreEntry(id: number): Promise<void> {
+  const encKey = getEncryptionKey()
+  if (!encKey) return
+  const db = await getDatabase()
+  dbRestoreEntry(db, id)
+  saveDatabase()
+}
+
+export async function permanentDeleteEntry(id: number): Promise<void> {
+  const encKey = getEncryptionKey()
+  if (!encKey) return
+  const db = await getDatabase()
+  dbPermanentDeleteEntry(db, id)
+  saveDatabase()
+}
+
+export async function getDeletedEntries(): Promise<EncryptedEntry[]> {
+  const encKey = getEncryptionKey()
+  if (!encKey) return []
+  const db = await getDatabase()
+  const vaultId = getActiveVaultId()
+  return dbGetDeletedEntries(db, vaultId)
+}
+
+export async function cleanupOldDeletedEntries(): Promise<number> {
+  const encKey = getEncryptionKey()
+  if (!encKey) return 0
+  const db = await getDatabase()
+  const deleted = dbPermanentDeleteOldEntries(db, 30)
+  if (deleted > 0) saveDatabase()
+  return deleted
 }
 
 export async function searchEntries(query: string, filters?: EntryFilters): Promise<EncryptedEntry[]> {

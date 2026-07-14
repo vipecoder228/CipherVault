@@ -5,6 +5,7 @@ import { useUIStore } from '../../store/uiStore'
 import { useVaultStore } from '../../store/vaultStore'
 import { CategoryForm } from '../categories/CategoryForm'
 import { SettingsPanel } from '../settings/SettingsPanel'
+import { VaultSwitcher } from '../vault/VaultSwitcher'
 import type { Category } from '@shared/types'
 import {
   Shield, Star, LayoutGrid, Settings, Lock, Mail,
@@ -15,6 +16,7 @@ export function Sidebar() {
   const [categories, setCategories] = useState<Category[]>([])
   const [showCategoryForm, setShowCategoryForm] = useState(false)
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
+  const [showTrash, setShowTrash] = useState(false)
   const { activeCategoryId, setActiveCategory, sidebarCollapsed, toggleSidebar, showSettings, setShowSettings, showDisposableEmail, setShowDisposableEmail } = useUIStore()
   const { setFilters } = useEntriesStore()
   const { lock, activeVaultId, vaults } = useVaultStore()
@@ -54,18 +56,15 @@ export function Sidebar() {
       <div className="h-full bg-vault-surface border-r border-vault-border flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-vault-border">
-          {!sidebarCollapsed && (
-            <div className="flex items-center gap-2">
+          {!sidebarCollapsed ? (
+            <VaultSwitcher />
+          ) : (
+            <button
+              onClick={toggleSidebar}
+              className="p-1.5 rounded-lg text-vault-text-secondary hover:text-vault-text hover:bg-vault-surface-hover transition-colors"
+            >
               <Shield size={20} className="text-vault-accent" />
-              <div className="flex flex-col">
-                <span className="font-semibold text-vault-text">CipherVault</span>
-                {currentVault && (
-                  <span className="text-[10px] text-vault-text-secondary truncate max-w-[120px]">
-                    {currentVault.displayName}
-                  </span>
-                )}
-              </div>
-            </div>
+            </button>
           )}
           <button
             onClick={toggleSidebar}
@@ -97,7 +96,14 @@ export function Sidebar() {
               label="Temp Email"
               active={showDisposableEmail}
               collapsed={sidebarCollapsed}
-              onClick={() => { setShowDisposableEmail(!showDisposableEmail); setShowSettings(false) }}
+              onClick={() => { setShowDisposableEmail(!showDisposableEmail); setShowSettings(false); setShowTrash(false) }}
+            />
+            <NavItem
+              icon={<Trash2 size={18} />}
+              label="Trash"
+              active={showTrash}
+              collapsed={sidebarCollapsed}
+              onClick={() => { setShowTrash(!showTrash); setShowSettings(false); setShowDisposableEmail(false) }}
             />
             {!sidebarCollapsed && showDisposableEmail && (
               <p className="px-3 text-[10px] text-vault-text-secondary leading-tight">

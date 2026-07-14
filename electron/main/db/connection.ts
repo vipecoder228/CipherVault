@@ -6,6 +6,7 @@ import { runMigrations } from './migrations'
 
 let db: Database | null = null
 let dbPath: string = ''
+let saveLock = false
 
 export function getDatabasePath(): string {
   const userDataPath = app.getPath('userData')
@@ -39,10 +40,15 @@ export async function getDatabase(): Promise<Database> {
 }
 
 export function saveDatabase(): void {
-  if (db && dbPath) {
-    const data = db.export()
-    const buffer = Buffer.from(data)
-    writeFileSync(dbPath, buffer)
+  if (db && dbPath && !saveLock) {
+    saveLock = true
+    try {
+      const data = db.export()
+      const buffer = Buffer.from(data)
+      writeFileSync(dbPath, buffer)
+    } finally {
+      saveLock = false
+    }
   }
 }
 

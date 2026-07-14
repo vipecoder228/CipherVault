@@ -7,6 +7,7 @@ interface UIState {
   showPasswordGenerator: boolean
   showSettings: boolean
   showDisposableEmail: boolean
+  showTrash: boolean
 
   toggleTheme: () => void
   setTheme: (theme: 'dark' | 'light') => void
@@ -15,6 +16,7 @@ interface UIState {
   setShowPasswordGenerator: (show: boolean) => void
   setShowSettings: (show: boolean) => void
   setShowDisposableEmail: (show: boolean) => void
+  setShowTrash: (show: boolean) => void
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -24,6 +26,7 @@ export const useUIStore = create<UIState>((set) => ({
   showPasswordGenerator: false,
   showSettings: false,
   showDisposableEmail: false,
+  showTrash: false,
 
   toggleTheme: () => set((state) => {
     const newTheme = state.theme === 'dark' ? 'light' : 'dark'
@@ -41,4 +44,5 @@ export const useUIStore = create<UIState>((set) => ({
   setShowPasswordGenerator: (show) => set({ showPasswordGenerator: show }),
   setShowSettings: (show) => set({ showSettings: show }),
   setShowDisposableEmail: (show) => set({ showDisposableEmail: show }),
+  setShowTrash: (show) => set({ showTrash: show }),
 }))

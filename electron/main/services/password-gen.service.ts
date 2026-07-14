@@ -327,8 +327,14 @@ const WORDLIST = [
 export function generatePassphrase(wordCount: number = 4): string {
   const count = Math.max(3, Math.min(8, wordCount))
   const words: string[] = []
+  const maxValid = Math.floor(65536 / WORDLIST.length) * WORDLIST.length
   for (let i = 0; i < count; i++) {
-    const idx = randomBytes(2).readUInt16BE(0) % WORDLIST.length
+    // Rejection sampling to avoid bias
+    let idx: number
+    do {
+      idx = randomBytes(2).readUInt16BE(0)
+    } while (idx >= maxValid)
+    idx = idx % WORDLIST.length
     words.push(WORDLIST[idx])
   }
   // Capitalize first letter of each word

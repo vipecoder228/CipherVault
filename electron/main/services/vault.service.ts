@@ -4,7 +4,7 @@ import { generateSalt, deriveKey, computeVerificationHash, splitDerivedKey } fro
 import { encrypt, decrypt, encryptJSON, decryptJSON } from '../crypto/encryption'
 import { generateSecret, verifyTOTP, generateQRCodeUrl } from '../crypto/totp'
 import { RATE_LIMIT } from '../crypto/constants'
-import type { Buffer } from 'buffer'
+import { timingSafeEqual } from 'crypto'
 
 // Held in memory ONLY — never written to disk
 let derivedKey: Buffer | null = null
@@ -14,6 +14,19 @@ let activeVaultId: number = 1
 
 // Pending TOTP secret (set during enableTOTP, used during verifyAndSaveTOTP)
 let pendingTotpSecret: string | null = null
+
+// Constant-time string comparison to prevent timing attacks
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  const bufA = Buffer.from(a, 'utf8')
+  const bufB = Buffer.from(b, 'utf8')
+  return timingSafeEqual(bufA, bufB)
+}
+
+// Clean up old unlock attempts (older than 5 minutes)
+function cleanupOldAttempts(db: any): void {
+  db.run(`DELETE FROM unlock_attempts WHERE attempted_at < datetime('now', '-5 minutes')`)
+}
 
 export function isUnlocked(): boolean {
   return derivedKey !== null
@@ -45,6 +58,7 @@ function getRecentFailedAttempts(db: any): number {
 }
 
 function recordAttempt(db: any, success: boolean): void {
+  cleanupOldAttempts(db)
   db.run('INSERT INTO unlock_attempts (success) VALUES (?)', [success ? 1 : 0])
 }
 
@@ -108,14 +122,18 @@ export async function setupVault(masterPassword: string, alarmPassword?: string,
 
   createVault(db, masterHash, salt.toString('hex'))
 
+  // Get the actual vault ID from SQLite
+  const lastIdResult = db.exec('SELECT last_insert_rowid()')
+  const actualVaultId = lastIdResult[0].values[0][0] as number
+
   // Set alarm password if provided
   if (alarmHash && alarmSaltHex) {
-    updateAlarm(db, alarmHash, alarmSaltHex, newVaultId)
+    updateAlarm(db, alarmHash, alarmSaltHex, actualVaultId)
   }
 
   // Update display name if provided
   if (displayName) {
-    db.run('UPDATE vault SET display_name = ? WHERE id = ?', [displayName, newVaultId])
+    db.run('UPDATE vault SET display_name = ? WHERE id = ?', [displayName, actualVaultId])
   }
 
   saveDatabase()
@@ -123,10 +141,10 @@ export async function setupVault(masterPassword: string, alarmPassword?: string,
   // Unlock immediately after setup
   derivedKey = key
   alarmMode = false
-  activeVaultId = newVaultId
+  activeVaultId = actualVaultId
   await startAutoLockTimer()
 
-  return { success: true, vaultId: newVaultId }
+  return { success: true, vaultId: actualVaultId }
 }
 
 export async function unlockVault(
@@ -167,7 +185,7 @@ export async function unlockVault(
 
   let isAlarm = false
 
-  if (computedHash === vault.master_hash) {
+  if (safeEqual(computedHash, vault.master_hash)) {
     // Master password correct
     isAlarm = false
   } else if (vault.alarm_hash && vault.alarm_salt) {
@@ -177,7 +195,7 @@ export async function unlockVault(
     const { encryptionKey: alarmEncKey } = splitDerivedKey(alarmKey)
     const alarmHash = computeVerificationHash(alarmEncKey)
 
-    if (alarmHash === vault.alarm_hash) {
+    if (safeEqual(alarmHash, vault.alarm_hash)) {
       // Alarm password correct — open empty vault
       isAlarm = true
     } else {
@@ -254,6 +272,9 @@ export async function changeMasterPassword(
   newPassword: string,
   totpCode?: string
 ): Promise<{ success: boolean; error?: string }> {
+  if (!isUnlocked()) {
+    return { success: false, error: 'Vault is locked' }
+  }
   const db = await getDatabase()
   const vault = getVault(db, activeVaultId)
   if (!vault) {
@@ -284,7 +305,7 @@ export async function changeMasterPassword(
   const { encryptionKey: oldEncKey } = splitDerivedKey(oldKey)
   const oldHash = computeVerificationHash(oldEncKey)
 
-  if (oldHash !== vault.master_hash) {
+  if (!safeEqual(oldHash, vault.master_hash)) {
     return { success: false, error: 'Current password is incorrect' }
   }
 
@@ -502,7 +523,7 @@ export async function changeAlarmPassword(oldAlarmPassword: string, newAlarmPass
   const { encryptionKey: oldEncKey } = splitDerivedKey(oldKey)
   const oldHash = computeVerificationHash(oldEncKey)
 
-  if (oldHash !== vault.alarm_hash) {
+  if (!safeEqual(oldHash, vault.alarm_hash)) {
     return { success: false, error: 'Invalid alarm password' }
   }
 

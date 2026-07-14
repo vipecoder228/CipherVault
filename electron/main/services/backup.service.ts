@@ -10,6 +10,11 @@ const VERSION = 1
 // Header: magic(11) + version(1) + salt(32) + iv(12) + authTag(16) = 72 bytes
 const HEADER_SIZE = 11 + 1 + CRYPTO.SALT_SIZE + CRYPTO.IV_SIZE + CRYPTO.AUTH_TAG_SIZE
 
+// Get focused window or fallback to first available window
+function getWindow(): BrowserWindow | undefined {
+  return BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? undefined
+}
+
 export async function exportEncryptedBackup(
   backupPassword: string
 ): Promise<{ success: boolean; path?: string; error?: string }> {
@@ -29,8 +34,8 @@ export async function exportEncryptedBackup(
   const encrypted = Buffer.concat([cipher.update(dbBuffer), cipher.final()])
   const authTag = cipher.getAuthTag()
 
-  const win = BrowserWindow.getFocusedWindow()
-  const result = await dialog.showSaveDialog(win!, {
+  const win = getWindow()!
+  const result = await dialog.showSaveDialog(win, {
     title: 'Export Encrypted Backup',
     defaultPath: 'cipher-vault-backup.ciphervault',
     filters: [{ name: 'CipherVault Backup', extensions: ['ciphervault'] }],
@@ -57,8 +62,8 @@ export async function importEncryptedBackup(
   filePath?: string
 ): Promise<{ success: boolean; error?: string }> {
   if (!filePath) {
-    const win = BrowserWindow.getFocusedWindow()
-    const result = await dialog.showOpenDialog(win!, {
+    const win = getWindow()!
+    const result = await dialog.showOpenDialog(win, {
       title: 'Import Encrypted Backup',
       filters: [{ name: 'CipherVault Backup', extensions: ['ciphervault'] }],
       properties: ['openFile'],

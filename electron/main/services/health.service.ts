@@ -2,6 +2,7 @@ import { getDatabase } from '../db/connection'
 import { getEntries } from '../db/queries/entries.queries'
 import { decryptJSON } from '../crypto/encryption'
 import { getEncryptionKey, getActiveVaultId } from './vault.service'
+import { checkBreach } from './breach-check.service'
 
 export interface PasswordHealth {
   total: number
@@ -32,6 +33,7 @@ export async function analyzePasswordHealth(): Promise<PasswordHealth> {
   let weak = 0
   let reused = 0
   let old = 0
+  let exposed = 0
 
   for (const entry of entries) {
     try {
@@ -62,6 +64,17 @@ export async function analyzePasswordHealth(): Promise<PasswordHealth> {
       }
       if (!/[^a-zA-Z0-9]/.test(pwd)) {
         issues.push('Missing special characters')
+      }
+
+      // Check breach status
+      try {
+        const breachResult = await checkBreach(pwd)
+        if (breachResult.breached) {
+          issues.push(`Found in ${breachResult.count.toLocaleString()} data breaches`)
+          exposed++
+        }
+      } catch {
+        // Network error — skip breach check
       }
 
       // Track for reuse detection
@@ -110,5 +123,5 @@ export async function analyzePasswordHealth(): Promise<PasswordHealth> {
   const total = entries.length
   const score = total === 0 ? 100 : Math.max(0, Math.round(100 - (details.length / total) * 100))
 
-  return { total, weak, reused, old, exposed: 0, score, details }
+  return { total, weak, reused, old, exposed, score, details }
 }

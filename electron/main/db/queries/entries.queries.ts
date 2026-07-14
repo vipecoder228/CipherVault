@@ -22,7 +22,7 @@ export function getEntries(
   filters?: EntryFilters,
   vaultId?: number
 ): EncryptedEntry[] {
-  let query = 'SELECT * FROM encrypted_entries WHERE 1=1'
+  let query = 'SELECT * FROM encrypted_entries WHERE deleted_at IS NULL'
   const params: any[] = []
 
   // Always filter by vault_id (default to 1)
@@ -53,7 +53,31 @@ export function getEntryById(
   db: Database,
   id: number
 ): EncryptedEntry | undefined {
+  return queryOne<EncryptedEntry>(db, 'SELECT * FROM encrypted_entries WHERE id = ? AND deleted_at IS NULL', [id])
+}
+
+export function getEntryByIdIncludingDeleted(
+  db: Database,
+  id: number
+): EncryptedEntry | undefined {
   return queryOne<EncryptedEntry>(db, 'SELECT * FROM encrypted_entries WHERE id = ?', [id])
+}
+
+export function getDeletedEntries(
+  db: Database,
+  vaultId?: number
+): EncryptedEntry[] {
+  let query = 'SELECT * FROM encrypted_entries WHERE deleted_at IS NOT NULL'
+  const params: any[] = []
+
+  if (vaultId !== undefined) {
+    query += ' AND vault_id = ?'
+    params.push(vaultId)
+  }
+
+  query += ' ORDER BY deleted_at DESC'
+
+  return queryAll<EncryptedEntry>(db, query, params)
 }
 
 export function createEntry(
@@ -112,7 +136,32 @@ export function deleteEntry(
   db: Database,
   id: number
 ): void {
+  db.run(`UPDATE encrypted_entries SET deleted_at = datetime('now') WHERE id = ? AND deleted_at IS NULL`, [id])
+}
+
+export function restoreEntry(
+  db: Database,
+  id: number
+): void {
+  db.run(`UPDATE encrypted_entries SET deleted_at = NULL WHERE id = ?`, [id])
+}
+
+export function permanentDeleteEntry(
+  db: Database,
+  id: number
+): void {
   db.run('DELETE FROM encrypted_entries WHERE id = ?', [id])
+}
+
+export function permanentDeleteOldEntries(
+  db: Database,
+  daysOld: number = 30
+): number {
+  const result = db.exec(
+    `DELETE FROM encrypted_entries WHERE deleted_at IS NOT NULL AND deleted_at < datetime('now', '-' || ? || ' days')`,
+    [daysOld]
+  )
+  return result.length > 0 ? (result[0].values[0][0] as number) : 0
 }
 
 export function searchEntries(
@@ -121,7 +170,7 @@ export function searchEntries(
   vaultId?: number,
   filters?: EntryFilters
 ): EncryptedEntry[] {
-  let sql = `SELECT * FROM encrypted_entries WHERE vault_id = ? AND (display_title LIKE ? OR entry_type LIKE ?)`
+  let sql = `SELECT * FROM encrypted_entries WHERE deleted_at IS NULL AND vault_id = ? AND (display_title LIKE ? OR entry_type LIKE ?)`
   const params: any[] = [vaultId ?? 1, `%${query}%`, `%${query}%`]
 
   if (filters) {
