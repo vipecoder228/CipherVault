@@ -129,6 +129,8 @@ function runMigrations(database: Database): void {
 
 // ─── Database Persistence ───────────────────────────────
 
+const SQLITE_MAGIC = 'SQLite format 3'
+
 function arrayToBase64(bytes: Uint8Array): string {
   let binary = ''
   for (let i = 0; i < bytes.length; i++) {
@@ -146,7 +148,14 @@ function base64ToArray(b64: string): Uint8Array {
   return bytes
 }
 
+function isValidSqlite(bytes: Uint8Array): boolean {
+  if (bytes.length < 16) return false
+  const header = new TextDecoder().decode(bytes.slice(0, 16))
+  return header === SQLITE_MAGIC
+}
+
 // Try Capacitor filesystem first, fall back to localStorage
+// Validates data is a real SQLite database before returning
 async function loadDbFromDisk(): Promise<Uint8Array | null> {
   // Try Capacitor filesystem first
   try {
@@ -155,15 +164,33 @@ async function loadDbFromDisk(): Promise<Uint8Array | null> {
       directory: Directory.Data,
     })
     const b64 = (result as any).data as string
-    return base64ToArray(b64)
+    if (b64 && b64.length > 0) {
+      const bytes = base64ToArray(b64)
+      if (isValidSqlite(bytes)) {
+        console.log('[DB] Loaded valid database from Capacitor filesystem')
+        return bytes
+      }
+      console.warn('[DB] Capacitor filesystem has invalid DB, falling back to localStorage')
+    }
   } catch {
-    // File doesn't exist or Capacitor not available — try localStorage
-    try {
-      const stored = localStorage.getItem('ciphervault_db')
-      if (stored) return base64ToArray(stored)
-    } catch {}
-    return null
+    // File doesn't exist or Capacitor not available
   }
+
+  // Fallback: localStorage
+  try {
+    const stored = localStorage.getItem('ciphervault_db')
+    if (stored && stored.length > 0) {
+      const bytes = base64ToArray(stored)
+      if (isValidSqlite(bytes)) {
+        console.log('[DB] Loaded valid database from localStorage')
+        return bytes
+      }
+      console.warn('[DB] localStorage has invalid DB data')
+    }
+  } catch {}
+
+  console.log('[DB] No valid database found, will create new one')
+  return null
 }
 
 async function saveDbToDisk(database: Database): Promise<void> {
@@ -178,7 +205,10 @@ async function saveDbToDisk(database: Database): Promise<void> {
     const bytes = new Uint8Array(data)
     const base64 = arrayToBase64(bytes)
 
-    // Try Capacitor filesystem first
+    // ALWAYS save to localStorage (most reliable in WebView)
+    localStorage.setItem('ciphervault_db', base64)
+
+    // Also try Capacitor filesystem (backup)
     try {
       await Filesystem.writeFile({
         path: DB_FILE,
@@ -187,8 +217,7 @@ async function saveDbToDisk(database: Database): Promise<void> {
         encoding: 'base64' as any,
       })
     } catch {
-      // Capacitor not available — fall back to localStorage
-      localStorage.setItem('ciphervault_db', base64)
+      // Capacitor not available — localStorage already saved above
     }
   } catch (err) {
     console.error('Failed to save database:', err)
