@@ -549,16 +549,26 @@ async function forcePermanentDeleteEntry(id: number): Promise<void> {
   await saveWebDatabase()
 }
 
-// Simple email send via fetch (mail.tm doesn't support sending, so we use a different approach)
+// Save backup as downloadable file (web version)
 async function sendBackupEmailWeb(to: string, backupData: string): Promise<{ success: boolean; error?: string }> {
-  // For web, we use a simple approach: create a downloadable file
-  // In a real app, you'd integrate with an email API
   try {
-    // Try using a free email API or just save to clipboard
-    // For now, we'll use the browser's mailto: approach
+    // Save backup as downloadable file
+    const blob = new Blob([backupData], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+    a.href = url
+    a.download = `panic-backup-${timestamp}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+
+    // Also open email client
     const subject = encodeURIComponent('CipherVault Panic Backup')
-    const body = encodeURIComponent(backupData)
+    const body = encodeURIComponent('Backup file downloaded. Please attach it to this email.')
     window.open(`mailto:${to}?subject=${subject}&body=${body}`, '_blank')
+
     return { success: true }
   } catch (err: any) {
     return { success: false, error: err.message }

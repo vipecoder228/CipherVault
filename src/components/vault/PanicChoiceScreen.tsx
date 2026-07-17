@@ -44,11 +44,10 @@ export function PanicChoiceScreen({ onChoice }: Props) {
         entries: entries,
       }, null, 2)
 
-      // 4. Send backup email
+      // 4. Save backup + open email client
       const sendResult = await invoke('email:send-backup', email, backupData)
       if (!sendResult?.success) {
-        addToast('Failed to send backup email: ' + (sendResult?.error || 'Unknown error'), 'error')
-        // Still allow wipe even if email fails
+        addToast('Backup save failed: ' + (sendResult?.error || 'Unknown error'), 'error')
       }
 
       // 5. Permanently delete all entries (using alarm-mode bypass)
@@ -56,7 +55,8 @@ export function PanicChoiceScreen({ onChoice }: Props) {
         await invoke('entries:force-delete', entry.id)
       }
 
-      addToast(`Backup sent to ${email}. All data wiped.`, 'success')
+      const pathInfo = sendResult?.filePath ? ` (${sendResult.filePath})` : ''
+      addToast(`Backup saved${pathInfo}. Email client opened. All data wiped.`, 'success')
       onChoice('wipe')
     } catch (err: any) {
       console.error('Panic backup failed:', err)

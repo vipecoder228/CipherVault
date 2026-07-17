@@ -273,7 +273,7 @@ export interface IPCChannels {
   'entries:force-delete': (id: number) => Promise<void>
 
   // Email
-  'email:send-backup': (to: string, backupData: string) => Promise<{ success: boolean; error?: string }>
+  'email:send-backup': (to: string, backupData: string) => Promise<{ success: boolean; error?: string; filePath?: string }>
 }
 
 export type IPCChannel = keyof IPCChannels
