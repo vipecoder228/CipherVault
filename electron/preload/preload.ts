@@ -35,6 +35,8 @@ const channels: (keyof IPCChannels)[] = [
   'entries:force-list',
   'entries:force-delete',
   'email:send-backup',
+  'email:set-smtp',
+  'email:get-smtp',
   'password:generate',
   'password:check-breach',
   'categories:list',

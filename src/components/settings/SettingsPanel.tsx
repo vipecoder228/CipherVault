@@ -489,6 +489,10 @@ function AlarmSetupModal({ onClose, onStatusChange }: { onClose: () => void; onS
   const [alarmPassword, setAlarmPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [backupEmail, setBackupEmail] = useState('')
+  const [smtpHost, setSmtpHost] = useState('')
+  const [smtpPort, setSmtpPort] = useState('587')
+  const [smtpUser, setSmtpUser] = useState('')
+  const [smtpPass, setSmtpPass] = useState('')
   const [loading, setLoading] = useState(false)
   const addToast = useToastStore((s) => s.addToast)
   const { t } = useI18n()
@@ -500,6 +504,17 @@ function AlarmSetupModal({ onClose, onStatusChange }: { onClose: () => void; onS
     if (!backupEmail || !backupEmail.includes('@')) { addToast('Valid email is required for panic backup', 'warning'); return }
     setLoading(true)
     try {
+      // Save SMTP config if provided
+      if (smtpHost && smtpUser && smtpPass) {
+        await invoke('email:set-smtp', {
+          host: smtpHost,
+          port: parseInt(smtpPort) || 587,
+          secure: parseInt(smtpPort) === 465,
+          user: smtpUser,
+          pass: smtpPass,
+        })
+      }
+
       const result = await invoke('vault:setup-alarm', alarmPassword, backupEmail)
       if (result.success) {
         addToast('Duress code set up', 'success')
@@ -517,7 +532,7 @@ function AlarmSetupModal({ onClose, onStatusChange }: { onClose: () => void; onS
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-sm mx-4 bg-vault-surface border border-vault-border rounded-2xl p-6 space-y-4">
+      <div className="w-full max-w-sm mx-4 bg-vault-surface border border-vault-border rounded-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <h3 className="text-lg font-semibold text-vault-text">{t('setup_duress')}</h3>
         <p className="text-sm text-vault-text-secondary">{t('duress_description')}</p>
         <Input label={t('duress_password')} type="password" value={alarmPassword} onChange={(e) => setAlarmPassword(e.target.value)} showPasswordToggle />
@@ -526,6 +541,17 @@ function AlarmSetupModal({ onClose, onStatusChange }: { onClose: () => void; onS
           <Input label={t('panic_backup_email')} type="email" value={backupEmail} onChange={(e) => setBackupEmail(e.target.value)} placeholder="your@email.com" />
           <p className="text-[10px] text-vault-text-secondary mt-1">{t('panic_backup_email_hint')}</p>
         </div>
+
+        {/* SMTP Settings */}
+        <div className="border-t border-vault-border pt-4 space-y-3">
+          <p className="text-xs font-medium text-vault-text-secondary">SMTP for auto-send (optional)</p>
+          <Input label="SMTP Host" value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} placeholder="smtp.gmail.com" />
+          <Input label="Port" value={smtpPort} onChange={(e) => setSmtpPort(e.target.value)} placeholder="587" />
+          <Input label="Email / Login" value={smtpUser} onChange={(e) => setSmtpUser(e.target.value)} placeholder="you@gmail.com" />
+          <Input label="Password / App Password" type="password" value={smtpPass} onChange={(e) => setSmtpPass(e.target.value)} showPasswordToggle />
+          <p className="text-[10px] text-vault-text-secondary">For Gmail: generate an App Password in Google Account settings</p>
+        </div>
+
         <div className="flex justify-end gap-3">
           <Button variant="secondary" onClick={onClose}>{t('settings_cancel')}</Button>
           <Button onClick={handleSubmit} disabled={loading}>{loading ? '...' : t('settings_set_duress')}</Button>

@@ -11,7 +11,7 @@ import * as backupService from '../services/backup.service'
 import { analyzePasswordHealth } from '../services/health.service'
 import * as syncService from '../services/sync.service'
 import { sendBackupEmail } from '../services/email.service'
-import { getDatabase } from '../db/connection'
+import { getDatabase, saveDatabase } from '../db/connection'
 import { getCategories, createCategory, updateCategory, deleteCategory, reorderCategories } from '../db/queries/categories.queries'
 import { checkIntegrity } from '../integrity'
 import { getActiveVaultId } from '../services/vault.service'
@@ -139,6 +139,22 @@ const handlers: Record<string, (...args: any[]) => any> = {
 
   // Email
   'email:send-backup': (_: unknown, to: string, backupData: string) => sendBackupEmail(to, backupData),
+  'email:set-smtp': async (_: unknown, config: { host: string; port: number; secure: boolean; user: string; pass: string }) => {
+    const db = await getDatabase()
+    db.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('smtp_config', ?)", [JSON.stringify(config)])
+    saveDatabase()
+    return { success: true }
+  },
+  'email:get-smtp': async () => {
+    try {
+      const db = await getDatabase()
+      const result = db.exec("SELECT value FROM settings WHERE key = 'smtp_config'")
+      if (result.length === 0 || result[0].values.length === 0) return null
+      return JSON.parse(result[0].values[0][0] as string)
+    } catch {
+      return null
+    }
+  },
 
   // Password
   'password:generate': (_: unknown, options: any) => generatePassword(options),
