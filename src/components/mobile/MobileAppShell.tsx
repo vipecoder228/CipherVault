@@ -3,12 +3,13 @@ import { MobileNav } from './MobileNav'
 import { MobileEntryDetail } from './MobileEntryDetail'
 import { PasswordGenerator } from '../password-gen/PasswordGenerator'
 import { SettingsPanel } from '../settings/SettingsPanel'
+import { ImportDialog } from '../import-export/ImportDialog'
 import { Modal } from '../ui/Modal'
 import { useEntriesStore } from '../../store/entriesStore'
 import { useUIStore } from '../../store/uiStore'
 import { useVaultStore } from '../../store/vaultStore'
 import { useI18n } from '../../i18n'
-import { AlertTriangle, Search, Plus } from 'lucide-react'
+import { AlertTriangle, Search, Plus, Download } from 'lucide-react'
 import type { EntryType } from '@shared/types'
 
 function getTypeLabels(t: (key: string) => string): Record<EntryType, string> {
@@ -27,6 +28,7 @@ export function MobileAppShell() {
   const { t } = useI18n()
   const TYPE_LABELS = getTypeLabels(t)
   const [searchQuery, setSearchQuery] = useState('')
+  const [showImport, setShowImport] = useState(false)
 
   useEffect(() => {
     // Load entries on mount
@@ -65,12 +67,21 @@ export function MobileAppShell() {
       <div className="sticky top-0 z-30 bg-vault-surface border-b border-vault-border">
         <div className="flex items-center justify-between p-4">
           <h1 className="text-lg font-semibold text-vault-text">CipherVault</h1>
-          <button
-            onClick={() => setShowPasswordGenerator(true)}
-            className="p-2 text-vault-accent"
-          >
-            <Plus size={24} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setShowImport(true)}
+              className="p-2 text-vault-text-secondary hover:text-vault-accent"
+              title={t('import')}
+            >
+              <Download size={20} />
+            </button>
+            <button
+              onClick={() => setShowPasswordGenerator(true)}
+              className="p-2 text-vault-accent"
+            >
+              <Plus size={24} />
+            </button>
+          </div>
         </div>
 
         {/* Search bar */}
@@ -179,6 +190,12 @@ export function MobileAppShell() {
       <SettingsPanel
         open={showSettings}
         onClose={() => setShowSettings(false)}
+      />
+
+      {/* Import */}
+      <ImportDialog
+        open={showImport}
+        onClose={() => setShowImport(false)}
       />
     </div>
   )
