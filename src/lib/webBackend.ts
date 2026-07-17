@@ -136,6 +136,10 @@ function lockVault(): void {
     clearTimeout(autoLockTimer)
     autoLockTimer = null
   }
+  // Notify the UI that vault is locked (web equivalent of Electron IPC event)
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('webvault:locked'))
+  }
 }
 
 // ─── Vault Operations ───────────────────────────────────

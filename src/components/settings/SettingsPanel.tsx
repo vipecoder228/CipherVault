@@ -583,7 +583,7 @@ function AboutTab() {
       <div>
         <h3 className="text-lg font-bold text-vault-text">{t('about_title')}</h3>
         <p className="text-sm text-vault-text-secondary">{t('about_subtitle')}</p>
-        <p className="text-xs text-vault-text-secondary mt-1">{t('version')} 12.0.1</p>
+        <p className="text-xs text-vault-text-secondary mt-1">{t('version')} 12.0.2</p>
       </div>
       <div className="p-4 rounded-xl bg-vault-bg border border-vault-border text-left">
         <p className="text-xs text-vault-text-secondary leading-relaxed">{t('about_description')}</p>

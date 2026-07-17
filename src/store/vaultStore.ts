@@ -141,3 +141,16 @@ if (typeof window !== 'undefined' && window.electronAPI?.on) {
     useEntriesStore.setState({ entries: [], selectedEntry: null })
   })
 }
+
+// Listen for web vault lock event (auto-lock in Capacitor/web)
+if (typeof window !== 'undefined' && !window.electronAPI) {
+  window.addEventListener('webvault:locked', () => {
+    useVaultStore.setState({
+      locked: true,
+      requiresTotp: false,
+      pendingPassword: null,
+      alarmMode: false,
+    })
+    useEntriesStore.setState({ entries: [], selectedEntry: null })
+  })
+}
