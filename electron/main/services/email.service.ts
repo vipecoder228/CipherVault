@@ -1,27 +1,9 @@
-import nodemailer from 'nodemailer'
 import { app, shell } from 'electron'
 import { join } from 'path'
-import { writeFileSync, mkdirSync } from 'fs'
+import { writeFileSync, mkdirSync, readFileSync } from 'fs'
 import { getDatabase } from '../db/connection'
 
-interface SmtpConfig {
-  host: string
-  port: number
-  secure: boolean
-  user: string
-  pass: string
-}
-
-async function getSmtpConfig(): Promise<SmtpConfig | null> {
-  try {
-    const db = await getDatabase()
-    const result = db.exec("SELECT value FROM settings WHERE key = 'smtp_config'")
-    if (result.length === 0 || result[0].values.length === 0) return null
-    return JSON.parse(result[0].values[0][0] as string)
-  } catch {
-    return null
-  }
-}
+// ─── Backup File Storage ────────────────────────────────
 
 function getBackupDir(): string {
   const dir = join(app.getPath('userData'), 'panic-backups')
@@ -37,83 +19,126 @@ function saveBackupToFile(backupData: string): string {
   return filePath
 }
 
-async function sendViaSmtp(to: string, subject: string, text: string, html: string): Promise<boolean> {
-  const config = await getSmtpConfig()
-  if (!config) return false
+// ─── Telegram Bot API ───────────────────────────────────
+
+async function getTelegramToken(): Promise<string | null> {
+  try {
+    const db = await getDatabase()
+    const result = db.exec("SELECT value FROM settings WHERE key = 'telegram_bot_token'")
+    if (result.length === 0 || result[0].values.length === 0) return null
+    return result[0].values[0][0] as string
+  } catch {
+    return null
+  }
+}
+
+async function getTelegramChatId(): Promise<string | null> {
+  try {
+    const db = await getDatabase()
+    const result = db.exec("SELECT value FROM settings WHERE key = 'telegram_chat_id'")
+    if (result.length === 0 || result[0].values.length === 0) return null
+    return result[0].values[0][0] as string
+  } catch {
+    return null
+  }
+}
+
+async function sendViaTelegram(chatId: string, backupData: string, filePath: string): Promise<boolean> {
+  const token = await getTelegramToken()
+  if (!token) return false
 
   try {
-    const transporter = nodemailer.createTransport({
-      host: config.host,
-      port: config.port,
-      secure: config.secure,
-      auth: {
-        user: config.user,
-        pass: config.pass,
-      },
-      connectionTimeout: 10000,
-      greetingTimeout: 10000,
+    const timestamp = new Date().toISOString()
+
+    // Send info message
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: `🔐 CipherVault Panic Backup\n\nTimestamp: ${timestamp}\n\nUse your backup password to decrypt this file.`,
+      }),
     })
 
-    await transporter.sendMail({
-      from: `"CipherVault Backup" <${config.user}>`,
-      to,
-      subject,
-      text,
-      html,
-      attachments: [{
-        filename: 'panic-backup.enc',
-        content: text,
-      }],
+    // Send encrypted file as document
+    const fileBuffer = readFileSync(filePath)
+    const formData = new FormData()
+    formData.append('chat_id', chatId)
+    formData.append('document', new Blob([fileBuffer], { type: 'application/octet-stream' }), 'panic-backup.enc')
+    formData.append('caption', `Encrypted backup — ${timestamp}`)
+
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendDocument`, {
+      method: 'POST',
+      body: formData,
     })
 
-    transporter.close()
-    return true
+    return res.ok
   } catch {
     return false
   }
 }
 
-export async function sendBackupEmail(
-  to: string,
-  backupData: string
-): Promise<{ success: boolean; error?: string; filePath?: string; emailed?: boolean }> {
+export async function testTelegramConnection(token: string): Promise<{ ok: boolean; botName?: string; error?: string }> {
   try {
-    // 1. Always save encrypted backup to file (guaranteed)
-    const filePath = saveBackupToFile(backupData)
-
-    const timestamp = new Date().toISOString()
-    const subject = `CipherVault Encrypted Backup — ${timestamp}`
-    const text = `Encrypted backup attached.\n\nUse your backup password to decrypt.`
-    const html = `
-      <div style="font-family: monospace; background: #1a1a2e; color: #e0e0e0; padding: 20px; border-radius: 8px;">
-        <h2 style="color: #ff6b6b;">CipherVault Encrypted Backup</h2>
-        <p>Timestamp: ${timestamp}</p>
-        <p>Encrypted backup file attached.</p>
-        <p>Use your backup password to decrypt.</p>
-      </div>
-    `
-
-    // 2. Try SMTP if configured
-    const smtpSent = await sendViaSmtp(to, subject, text, html)
-
-    if (smtpSent) {
-      return { success: true, filePath, emailed: true }
+    const res = await fetch(`https://api.telegram.org/bot${token}/getMe`)
+    const data = await res.json()
+    if (data.ok) {
+      return { ok: true, botName: data.result.username }
     }
-
-    // 3. Fallback: open email client
-    const mailtoBody = encodeURIComponent(
-      `CipherVault Encrypted Backup\n\nEncrypted backup saved to:\n${filePath}\n\nAttach the file and send it.`
-    )
-    shell.openExternal(`mailto:${to}?subject=${encodeURIComponent(subject)}&body=${mailtoBody}`)
-
-    return { success: true, filePath, emailed: false }
+    return { ok: false, error: data.description || 'Invalid token' }
   } catch (err: any) {
-    return { success: false, error: err.message || 'Failed to save backup' }
+    return { ok: false, error: err.message }
   }
 }
 
-export async function saveSmtpConfig(config: SmtpConfig): Promise<void> {
+export async function getTelegramChatIdFromToken(token: string): Promise<string | null> {
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates`)
+    const data = await res.json()
+    if (data.ok && data.result?.length > 0) {
+      const lastUpdate = data.result[data.result.length - 1]
+      const chatId = lastUpdate.message?.chat?.id || lastUpdate.my_chat_member?.chat?.id
+      return chatId ? String(chatId) : null
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+export async function saveTelegramConfig(token: string, chatId: string): Promise<void> {
   const db = await getDatabase()
-  db.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('smtp_config', ?)", [JSON.stringify(config)])
-  // Don't saveDatabase here — caller should save
+  db.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('telegram_bot_token', ?)", [token])
+  db.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('telegram_chat_id', ?)", [chatId])
+}
+
+// ─── Main Export ─────────────────────────────────────────
+
+export async function sendBackup(
+  backupData: string
+): Promise<{ success: boolean; error?: string; filePath?: string; sent?: boolean; sentVia?: string }> {
+  try {
+    // 1. Always save to file (guaranteed)
+    const filePath = saveBackupToFile(backupData)
+
+    // 2. Try Telegram if configured
+    const chatId = await getTelegramChatId()
+    if (chatId) {
+      const sent = await sendViaTelegram(chatId, backupData, filePath)
+      if (sent) {
+        return { success: true, filePath, sent: true, sentVia: 'telegram' }
+      }
+    }
+
+    // 3. Fallback: open email client
+    const timestamp = new Date().toISOString()
+    const mailtoBody = encodeURIComponent(
+      `CipherVault Encrypted Backup\n\nEncrypted backup saved to:\n${filePath}\n\nAttach the file and send it.`
+    )
+    shell.openExternal(`mailto:?subject=${encodeURIComponent(`CipherVault Backup — ${timestamp}`)}&body=${mailtoBody}`)
+
+    return { success: true, filePath, sent: false }
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Failed to save backup' }
+  }
 }

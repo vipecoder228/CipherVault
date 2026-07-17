@@ -587,26 +587,20 @@ function completePanic(): void {
 }
 
 // Save backup as downloadable file (web version)
-async function sendBackupEmailWeb(to: string, backupData: string): Promise<{ success: boolean; error?: string }> {
+async function sendBackupWeb(backupData: string): Promise<{ success: boolean; error?: string; filePath?: string; sent?: boolean }> {
   try {
-    // Save backup as downloadable file
-    const blob = new Blob([backupData], { type: 'application/json' })
+    const blob = new Blob([backupData], { type: 'application/octet-stream' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
     a.href = url
-    a.download = `panic-backup-${timestamp}.json`
+    a.download = `panic-backup-${timestamp}.enc`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
 
-    // Also open email client
-    const subject = encodeURIComponent('CipherVault Panic Backup')
-    const body = encodeURIComponent('Backup file downloaded. Please attach it to this email.')
-    window.open(`mailto:${to}?subject=${subject}&body=${body}`, '_blank')
-
-    return { success: true }
+    return { success: true, sent: false }
   } catch (err: any) {
     return { success: false, error: err.message }
   }
@@ -1516,7 +1510,10 @@ export const webHandlers: HandlerMap = {
   'entries:complete-panic': () => completePanic(),
 
   // Email
-  'email:send-backup': (_: any, to: string, backupData: string) => sendBackupEmailWeb(to, backupData),
+  'email:send-backup': (_: any, backupData: string) => sendBackupWeb(backupData),
+  'email:test-telegram': async () => ({ ok: false, error: 'Not available in web version' }),
+  'email:get-chat-id': async () => null,
+  'email:save-telegram': async () => {},
 
   // Password
   'password:generate': (_: any, options: PasswordOptions) => Promise.resolve(generatePasswordLocal(options)),

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useI18n } from '../../i18n'
 import { invoke } from '../../lib/ipc'
-import { AlertTriangle, Trash2, Shield, Copy, Check, Mail } from 'lucide-react'
+import { AlertTriangle, Trash2, Shield, Mail } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { useToastStore } from '../ui/Toast'
 
@@ -12,8 +12,7 @@ interface Props {
 export function PanicChoiceScreen({ onChoice }: Props) {
   const { t } = useI18n()
   const [loading, setLoading] = useState(false)
-  const [copied, setCopied] = useState(false)
-  const [backupResult, setBackupResult] = useState<{ emailed?: boolean; filePath?: string; tempEmail?: string } | null>(null)
+  const [backupResult, setBackupResult] = useState<{ emailed?: boolean; filePath?: string } | null>(null)
   const addToast = useToastStore((s) => s.addToast)
 
   const handleWipeAndBackup = async () => {
@@ -27,17 +26,7 @@ export function PanicChoiceScreen({ onChoice }: Props) {
         return
       }
 
-      // 2. Get backup email
-      const backupEmail = await invoke('settings:get', 'alarm_backup_email')
-
-      // 3. Create temp email on mail.tm (always, as backup mailbox)
-      let tempEmailAddr: string | null = null
-      try {
-        const tempEmailResult = await invoke('disposable:create')
-        tempEmailAddr = tempEmailResult?.address || null
-      } catch {}
-
-      // 4. Get entries with decryption
+      // 2. Get entries with decryption
       const entries = await invoke('entries:panic-backup')
 
       if (!entries || entries.length === 0) {
@@ -63,22 +52,10 @@ export function PanicChoiceScreen({ onChoice }: Props) {
       // 6. Encrypt backup with password
       const encrypted = await encryptText(backupJson, backupPassword)
 
-      // 7. Send to email (or save to file)
-      const targetEmail = backupEmail || tempEmailAddr
-      let emailed = false
-      let filePath: string | undefined
+      // 7. Send via Telegram or save to file
+      const sendResult = await invoke('email:send-backup', encrypted)
 
-      if (targetEmail) {
-        const sendResult = await invoke('email:send-backup', targetEmail, encrypted)
-        emailed = sendResult?.emailed || false
-        filePath = sendResult?.filePath
-      } else {
-        // No email configured — just save to file
-        const sendResult = await invoke('email:send-backup', 'backup@ciphervault.local', encrypted)
-        filePath = sendResult?.filePath
-      }
-
-      setBackupResult({ emailed, filePath, tempEmail: tempEmailAddr || undefined })
+      setBackupResult({ emailed: sendResult?.sent || false, filePath: sendResult?.filePath })
 
       // 8. Delete all entries
       for (const entry of entries) {
@@ -88,9 +65,9 @@ export function PanicChoiceScreen({ onChoice }: Props) {
       // 9. Clear panic key
       await invoke('entries:complete-panic')
 
-      const msg = emailed
-        ? `Encrypted backup sent to ${targetEmail}`
-        : `Encrypted backup saved${filePath ? ` (${filePath})` : ''}`
+      const msg = sendResult?.sent
+        ? `Encrypted backup sent to Telegram`
+        : `Encrypted backup saved${sendResult?.filePath ? '' : ''}`
       addToast(msg + '. All data wiped.', 'success')
     } catch (err: any) {
       console.error('Panic backup failed:', err)
@@ -106,14 +83,6 @@ export function PanicChoiceScreen({ onChoice }: Props) {
       } catch {}
     } finally {
       setLoading(false)
-    }
-  }
-
-  const copyEmail = async () => {
-    if (backupResult?.tempEmail) {
-      await navigator.clipboard.writeText(backupResult.tempEmail)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
     }
   }
 
@@ -168,7 +137,7 @@ export function PanicChoiceScreen({ onChoice }: Props) {
             {backupResult.emailed ? (
               <div className="flex items-center gap-2 text-green-400">
                 <Mail size={16} />
-                <p className="text-xs font-medium">Encrypted backup sent to your email</p>
+                <p className="text-xs font-medium">Encrypted backup sent to Telegram</p>
               </div>
             ) : (
               <>
@@ -177,17 +146,6 @@ export function PanicChoiceScreen({ onChoice }: Props) {
                   <p className="text-[10px] text-vault-text-secondary break-all">{backupResult.filePath}</p>
                 )}
               </>
-            )}
-            {backupResult.tempEmail && (
-              <div className="space-y-2">
-                <p className="text-[10px] text-vault-text-secondary">Temp email (check Disposable Emails panel):</p>
-                <div className="flex items-center gap-2 bg-vault-bg rounded-lg px-3 py-2">
-                  <code className="text-sm text-vault-accent flex-1 break-all">{backupResult.tempEmail}</code>
-                  <button onClick={copyEmail} className="text-vault-text-secondary hover:text-vault-text">
-                    {copied ? <Check size={16} /> : <Copy size={16} />}
-                  </button>
-                </div>
-              </div>
             )}
           </div>
         )}

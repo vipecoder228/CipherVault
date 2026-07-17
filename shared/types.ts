@@ -274,10 +274,11 @@ export interface IPCChannels {
   'entries:panic-backup': () => Promise<Array<EncryptedEntry & { decrypted?: Record<string, string> }>>
   'entries:complete-panic': () => Promise<void>
 
-  // Email
-  'email:send-backup': (to: string, backupData: string) => Promise<{ success: boolean; error?: string; filePath?: string; emailed?: boolean }>
-  'email:set-smtp': (config: { host: string; port: number; secure: boolean; user: string; pass: string }) => Promise<{ success: boolean }>
-  'email:get-smtp': () => Promise<{ host: string; port: number; secure: boolean; user: string; pass: string } | null>
+  // Email / Telegram
+  'email:send-backup': (backupData: string) => Promise<{ success: boolean; error?: string; filePath?: string; sent?: boolean; sentVia?: string }>
+  'email:test-telegram': (token: string) => Promise<{ ok: boolean; botName?: string; error?: string }>
+  'email:get-chat-id': (token: string) => Promise<string | null>
+  'email:save-telegram': (token: string, chatId: string) => Promise<void>
 }
 
 export type IPCChannel = keyof IPCChannels
