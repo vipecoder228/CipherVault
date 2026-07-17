@@ -230,12 +230,6 @@ const handlers: Record<string, (...args: any[]) => any> = {
       if (currentLine.trim()) {
         lines.push(currentLine)
       }
-      const header = lines[0].toLowerCase()
-      let imported = 0
-      let skipped = 0
-      const errors: string[] = []
-      const vaultId = getActiveVaultId()
-
       // Parse CSV header — universal mapper supports all password managers
       const headerLine = lines[0]
       const colMap = mapColumns(headerLine)
