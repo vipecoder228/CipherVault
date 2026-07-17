@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useI18n } from '../../i18n'
 import { invoke } from '../../lib/ipc'
-import { AlertTriangle, Trash2, Shield } from 'lucide-react'
+import { AlertTriangle, Trash2, Shield, Copy, Check } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { useToastStore } from '../ui/Toast'
 
@@ -12,30 +12,44 @@ interface Props {
 export function PanicChoiceScreen({ onChoice }: Props) {
   const { t } = useI18n()
   const [loading, setLoading] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [tempEmail, setTempEmail] = useState<string | null>(null)
+  const [backupPath, setBackupPath] = useState<string | null>(null)
   const addToast = useToastStore((s) => s.addToast)
 
   const handleWipeAndBackup = async () => {
     setLoading(true)
     try {
-      // 1. Get backup email
-      const email = await invoke('settings:get', 'alarm_backup_email')
-      if (!email) {
-        addToast('Backup email not configured', 'error')
+      // 1. Get backup password
+      const backupPassword = await invoke('settings:get', 'panic_backup_password')
+      if (!backupPassword) {
+        addToast('Backup password not configured', 'error')
         setLoading(false)
         return
       }
 
-      // 2. Get entries with decryption (panic key is available)
+      // 2. Create temporary email on mail.tm
+      const tempEmailResult = await invoke('disposable:create')
+      const emailAddr = tempEmailResult?.address
+      if (!emailAddr) {
+        addToast('Failed to create temp email', 'error')
+        setLoading(false)
+        return
+      }
+      setTempEmail(emailAddr)
+
+      // 3. Get entries with decryption
       const entries = await invoke('entries:panic-backup')
 
       if (!entries || entries.length === 0) {
         addToast('No entries found to wipe', 'warning')
+        setTempEmail(null)
         onChoice('wipe')
         return
       }
 
-      // 3. Create backup JSON with DECRYPTED entries
-      const backupData = JSON.stringify({
+      // 4. Create backup JSON with decrypted entries
+      const backupJson = JSON.stringify({
         format: 'ciphervault-panic-backup',
         version: '1.0',
         timestamp: new Date().toISOString(),
@@ -48,23 +62,22 @@ export function PanicChoiceScreen({ onChoice }: Props) {
         })),
       }, null, 2)
 
-      // 4. Save backup + open email client
-      const sendResult = await invoke('email:send-backup', email, backupData)
-      if (!sendResult?.success) {
-        addToast('Backup save failed: ' + (sendResult?.error || 'Unknown error'), 'error')
-      }
+      // 5. Encrypt backup with password (using Web Crypto API)
+      const encrypted = await encryptText(backupJson, backupPassword)
 
-      // 5. Delete all entries
+      // 6. Save encrypted backup to file
+      const sendResult = await invoke('email:send-backup', emailAddr, encrypted)
+      setBackupPath(sendResult?.filePath || null)
+
+      // 7. Delete all entries
       for (const entry of entries) {
         await invoke('entries:force-delete', entry.id)
       }
 
-      // 6. Clear panic key
+      // 8. Clear panic key
       await invoke('entries:complete-panic')
 
-      const pathInfo = sendResult?.filePath ? ` (${sendResult.filePath})` : ''
-      addToast(`Backup saved${pathInfo}. Email client opened. All data wiped.`, 'success')
-      onChoice('wipe')
+      addToast(`Backup encrypted and saved. Temp email: ${emailAddr}`, 'success')
     } catch (err: any) {
       console.error('Panic backup failed:', err)
       addToast('Backup failed: ' + (err.message || 'Unknown error'), 'error')
@@ -79,6 +92,14 @@ export function PanicChoiceScreen({ onChoice }: Props) {
       } catch {}
     } finally {
       setLoading(false)
+    }
+  }
+
+  const copyEmail = async () => {
+    if (tempEmail) {
+      await navigator.clipboard.writeText(tempEmail)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
     }
   }
 
@@ -126,7 +147,58 @@ export function PanicChoiceScreen({ onChoice }: Props) {
             )}
           </Button>
         </div>
+
+        {/* Show temp email after backup */}
+        {tempEmail && (
+          <div className="bg-vault-surface border border-vault-border rounded-xl p-4 space-y-3 text-left">
+            <p className="text-xs font-medium text-vault-text-secondary">Backup encrypted and saved. Check this temp email:</p>
+            <div className="flex items-center gap-2 bg-vault-bg rounded-lg px-3 py-2">
+              <code className="text-sm text-vault-accent flex-1 break-all">{tempEmail}</code>
+              <button onClick={copyEmail} className="text-vault-text-secondary hover:text-vault-text">
+                {copied ? <Check size={16} /> : <Copy size={16} />}
+              </button>
+            </div>
+            <p className="text-[10px] text-vault-text-secondary">Open Disposable Emails in the app to read it. Use your backup password to decrypt.</p>
+          </div>
+        )}
       </div>
     </div>
   )
+}
+
+// Simple AES-GCM encryption using Web Crypto API
+async function encryptText(text: string, password: string): Promise<string> {
+  const enc = new TextEncoder()
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(password),
+    'PBKDF2',
+    false,
+    ['deriveKey']
+  )
+
+  const salt = crypto.getRandomValues(new Uint8Array(16))
+  const iv = crypto.getRandomValues(new Uint8Array(12))
+
+  const key = await crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt']
+  )
+
+  const encrypted = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    enc.encode(text)
+  )
+
+  // Combine salt + iv + ciphertext into one base64 string
+  const combined = new Uint8Array(salt.length + iv.length + encrypted.byteLength)
+  combined.set(salt, 0)
+  combined.set(iv, salt.length)
+  combined.set(new Uint8Array(encrypted), salt.length + iv.length)
+
+  return btoa(String.fromCharCode(...combined))
 }

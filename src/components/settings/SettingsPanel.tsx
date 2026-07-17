@@ -488,11 +488,8 @@ function DisableTOTPModal({ onClose, onStatusChange }: { onClose: () => void; on
 function AlarmSetupModal({ onClose, onStatusChange }: { onClose: () => void; onStatusChange?: (enabled: boolean) => void }) {
   const [alarmPassword, setAlarmPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [backupEmail, setBackupEmail] = useState('')
-  const [smtpHost, setSmtpHost] = useState('')
-  const [smtpPort, setSmtpPort] = useState('587')
-  const [smtpUser, setSmtpUser] = useState('')
-  const [smtpPass, setSmtpPass] = useState('')
+  const [backupPassword, setBackupPassword] = useState('')
+  const [confirmBackup, setConfirmBackup] = useState('')
   const [loading, setLoading] = useState(false)
   const addToast = useToastStore((s) => s.addToast)
   const { t } = useI18n()
@@ -501,21 +498,14 @@ function AlarmSetupModal({ onClose, onStatusChange }: { onClose: () => void; onS
     if (!alarmPassword) { addToast('Password is required', 'warning'); return }
     if (alarmPassword !== confirmPassword) { addToast('Passwords do not match', 'warning'); return }
     if (alarmPassword.length < 4) { addToast('Password must be at least 4 characters', 'warning'); return }
-    if (!backupEmail || !backupEmail.includes('@')) { addToast('Valid email is required for panic backup', 'warning'); return }
+    if (!backupPassword) { addToast('Backup password is required', 'warning'); return }
+    if (backupPassword !== confirmBackup) { addToast('Backup passwords do not match', 'warning'); return }
     setLoading(true)
     try {
-      // Save SMTP config if provided
-      if (smtpHost && smtpUser && smtpPass) {
-        await invoke('email:set-smtp', {
-          host: smtpHost,
-          port: parseInt(smtpPort) || 587,
-          secure: parseInt(smtpPort) === 465,
-          user: smtpUser,
-          pass: smtpPass,
-        })
-      }
+      // Save backup password (will be used to encrypt panic backup)
+      await invoke('settings:set', 'panic_backup_password', backupPassword)
 
-      const result = await invoke('vault:setup-alarm', alarmPassword, backupEmail)
+      const result = await invoke('vault:setup-alarm', alarmPassword)
       if (result.success) {
         addToast('Duress code set up', 'success')
         onStatusChange?.(true)
@@ -537,19 +527,12 @@ function AlarmSetupModal({ onClose, onStatusChange }: { onClose: () => void; onS
         <p className="text-sm text-vault-text-secondary">{t('duress_description')}</p>
         <Input label={t('duress_password')} type="password" value={alarmPassword} onChange={(e) => setAlarmPassword(e.target.value)} showPasswordToggle />
         <Input label={t('confirm_password')} type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} showPasswordToggle />
-        <div>
-          <Input label={t('panic_backup_email')} type="email" value={backupEmail} onChange={(e) => setBackupEmail(e.target.value)} placeholder="your@email.com" />
-          <p className="text-[10px] text-vault-text-secondary mt-1">{t('panic_backup_email_hint')}</p>
-        </div>
 
-        {/* SMTP Settings */}
         <div className="border-t border-vault-border pt-4 space-y-3">
-          <p className="text-xs font-medium text-vault-text-secondary">SMTP for auto-send (optional)</p>
-          <Input label="SMTP Host" value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} placeholder="smtp.gmail.com" />
-          <Input label="Port" value={smtpPort} onChange={(e) => setSmtpPort(e.target.value)} placeholder="587" />
-          <Input label="Email / Login" value={smtpUser} onChange={(e) => setSmtpUser(e.target.value)} placeholder="you@gmail.com" />
-          <Input label="Password / App Password" type="password" value={smtpPass} onChange={(e) => setSmtpPass(e.target.value)} showPasswordToggle />
-          <p className="text-[10px] text-vault-text-secondary">For Gmail: generate an App Password in Google Account settings</p>
+          <p className="text-xs font-medium text-vault-text-secondary">Backup encryption password</p>
+          <p className="text-[10px] text-vault-text-secondary">This password encrypts your backup. You'll need it to decrypt later.</p>
+          <Input label="Backup password" type="password" value={backupPassword} onChange={(e) => setBackupPassword(e.target.value)} showPasswordToggle />
+          <Input label="Confirm backup password" type="password" value={confirmBackup} onChange={(e) => setConfirmBackup(e.target.value)} showPasswordToggle />
         </div>
 
         <div className="flex justify-end gap-3">
