@@ -90,14 +90,6 @@ export function MobileAppShell() {
         </div>
       </div>
 
-      {/* Alarm mode banner */}
-      {alarmMode && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-vault-warning/10 border-b border-vault-warning/30 text-vault-warning text-xs font-medium">
-          <AlertTriangle size={14} />
-          <span>Режим дуressа — просматриваете запасной сейф.</span>
-        </div>
-      )}
-
       {/* Type filter tabs */}
       <div className="px-4 py-3 overflow-x-auto">
         <div className="flex items-center gap-2 min-w-max">
