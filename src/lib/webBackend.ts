@@ -1021,6 +1021,17 @@ async function analyzePasswordHealthLocal(): Promise<PasswordHealth> {
     [activeVaultId]
   )
 
+  // Common weak passwords list (top 100)
+  const COMMON_PASSWORDS = new Set([
+    'password', '123456', '12345678', 'qwerty', 'abc123', 'monkey', '1234567',
+    'letmein', 'trustno1', 'dragon', 'baseball', 'iloveyou', 'master', 'sunshine',
+    'ashley', 'bailey', 'passw0rd', 'shadow', '123123', '654321', 'superman',
+    'qazwsx', 'michael', 'football', 'password1', 'password123', 'admin',
+    'welcome', 'login', 'princess', 'starwars', 'hello', 'charlie', 'donald',
+    'access', 'hottie', 'loveme', 'zaq1zaq1', 'qwerty123', '1q2w3e4r',
+    '1234qwer', 'password!', 'p@ssword', 'p@ssw0rd', 'passpass',
+  ])
+
   const details: PasswordHealthItem[] = []
   const passwordMap = new Map<string, number[]>()
   let weak = 0
@@ -1041,12 +1052,56 @@ async function analyzePasswordHealthLocal(): Promise<PasswordHealth> {
       const title = decrypted.title || entry.display_title
       const issues: string[] = []
 
-      if (!/[A-Z]/.test(pwd)) issues.push('missing_uppercase')
-      if (!/[a-z]/.test(pwd)) issues.push('missing_lowercase')
-      if (!/[0-9]/.test(pwd)) issues.push('missing_numbers')
-      if (!/[^a-zA-Z0-9]/.test(pwd)) issues.push('missing_special')
+      // Length check
+      if (pwd.length < 8) {
+        issues.push('too_short')
+      }
+
+      // Complexity checks
+      const hasUpper = /[A-Z]/.test(pwd)
+      const hasLower = /[a-z]/.test(pwd)
+      const hasNumber = /[0-9]/.test(pwd)
+      const hasSpecial = /[^a-zA-Z0-9]/.test(pwd)
+
+      if (!hasUpper) issues.push('missing_uppercase')
+      if (!hasLower) issues.push('missing_lowercase')
+      if (!hasNumber) issues.push('missing_numbers')
+      if (!hasSpecial) issues.push('missing_special')
+
+      // All same case
+      if (hasUpper && !hasLower) issues.push('all_uppercase')
+      if (hasLower && !hasUpper) issues.push('all_lowercase')
+
+      // Common password check
+      const pwdLower = pwd.toLowerCase()
+      if (COMMON_PASSWORDS.has(pwdLower)) {
+        issues.push('too_common')
+      }
+
+      // Sequential characters (abc, 123, cba, 321)
+      if (/(.)\1{2,}/.test(pwd)) {
+        issues.push('repeated')
+      }
+      if (/abc|bcd|cde|def|efg|fgh|ghi|hij|ijk|jkl|klm|lmn|mno|nop|opq|pqr|qrs|rst|stu|tuv|uvw|vwx|wxy|xyz/i.test(pwd)) {
+        issues.push('sequential')
+      }
+      if (/012|123|234|345|456|567|678|789|890/i.test(pwd)) {
+        issues.push('sequential')
+      }
+
+      // Keyboard patterns
+      if (/qwert|asdf|zxcv|qazws|wasd|qwerty|asdfgh|zxcvbn/i.test(pwdLower)) {
+        issues.push('keyboard_pattern')
+      }
+
+      // Year pattern
+      if (/19[5-9]\d|20[0-2]\d/.test(pwd)) {
+        issues.push('contains_year')
+      }
+
       if (issues.length > 0) weak++
 
+      // Breach check
       try {
         const breachResult = await checkBreachLocal(pwd)
         if (breachResult.breached) {
@@ -1055,10 +1110,12 @@ async function analyzePasswordHealthLocal(): Promise<PasswordHealth> {
         }
       } catch {}
 
+      // Track for reuse detection
       const existing = passwordMap.get(pwd) || []
       existing.push(entry.id)
       passwordMap.set(pwd, existing)
 
+      // Age check
       const updated = new Date(entry.updated_at)
       const daysSinceUpdate = (Date.now() - updated.getTime()) / (1000 * 60 * 60 * 24)
       if (daysSinceUpdate > 180) {
@@ -1072,13 +1129,14 @@ async function analyzePasswordHealthLocal(): Promise<PasswordHealth> {
     } catch {}
   }
 
+  // Find reused passwords
   for (const [pwd, ids] of passwordMap) {
     if (ids.length > 1) {
       reused += ids.length
       for (const id of ids) {
         const item = details.find(d => d.entryId === id)
         if (item) {
-          item.issues.push('reused')
+          if (!item.issues.includes('reused')) item.issues.push('reused')
         } else {
           const entry = entries.find(e => e.id === id)
           if (entry) {

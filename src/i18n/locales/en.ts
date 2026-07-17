@@ -21,6 +21,14 @@ export default {
   breached: 'Found in data breaches',
   old_password: 'Password is older than 180 days',
   reused: 'Reused in multiple entries',
+  too_short: 'Password is shorter than 8 characters',
+  too_common: 'Password is a common/weak password',
+  sequential: 'Contains sequential characters (abc, 123)',
+  repeated: 'Contains repeated characters (aaa, 111)',
+  keyboard_pattern: 'Contains keyboard pattern (qwerty, asdf)',
+  contains_year: 'Contains a year (2024, 1990)',
+  all_uppercase: 'All characters are uppercase',
+  all_lowercase: 'All characters are lowercase',
 
   // Settings
   settings_title: 'Settings',
