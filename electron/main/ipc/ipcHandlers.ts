@@ -85,6 +85,24 @@ const handlers: Record<string, (...args: any[]) => any> = {
   'vault:change-alarm': (_: unknown, oldAlarm: string, newAlarm: string) => vaultService.changeAlarmPassword(oldAlarm, newAlarm),
   'vault:remove-alarm': () => vaultService.removeAlarmPassword(),
 
+  'vault:verify-password': async (_: unknown, password: string) => {
+    try {
+      const db = await getDatabase()
+      const vault = vaultService.getVaultStatus()
+      if (!vault.initialized) return false
+      // Use the unlock logic to verify
+      const result = await vaultService.unlockVault(password)
+      if (result.success) {
+        // Re-lock immediately
+        vaultService.lockVault()
+        return true
+      }
+      return false
+    } catch {
+      return false
+    }
+  },
+
   // Entries
   'entries:list': (_: unknown, filters?: any) => entriesService.listEntries(filters),
   'entries:get': (_: unknown, id: number) => entriesService.getEntry(id),

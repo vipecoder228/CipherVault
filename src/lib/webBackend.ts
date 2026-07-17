@@ -1340,6 +1340,21 @@ export const webHandlers: HandlerMap = {
     return { success: true }
   },
 
+  'vault:verify-password': async (_: any, password: string) => {
+    await getWebDatabase()
+    const vault = webQueryOne<any>('SELECT * FROM vault WHERE id = ?', [activeVaultId])
+    if (!vault) return false
+    try {
+      const salt = hexToArray(vault.kdf_salt)
+      const key = await deriveKey(password, salt)
+      const { encryptionKey } = splitDerivedKey(key)
+      const computedHash = await computeVerificationHash(encryptionKey)
+      return timingSafeStringEqual(computedHash, vault.master_hash)
+    } catch {
+      return false
+    }
+  },
+
   // Entries
   'entries:list': (_: any, filters?: EntryFilters) => listEntries(filters),
   'entries:get': (_: any, id: number) => getEntry(id),

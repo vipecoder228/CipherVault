@@ -161,6 +161,9 @@ export default {
   type_login: 'Login',
   type_card: 'Card',
   type_note: 'Note',
+  secure_note_protected: 'Secure Note',
+  enter_master_password_to_view: 'Enter your master password to view this note',
+  invalid_password: 'Invalid password',
   type_identity: 'Identity',
 
   // Create/Edit entry

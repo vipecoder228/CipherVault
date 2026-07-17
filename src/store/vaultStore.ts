@@ -17,6 +17,7 @@ interface VaultState {
   alarmMode: boolean
   activeVaultId: number
   vaults: VaultInfo[]
+  verifiedSecureNotes: Set<number>
 
   checkStatus: () => Promise<void>
   setup: (masterPassword: string, alarmPassword?: string, displayName?: string) => Promise<boolean>
@@ -25,6 +26,8 @@ interface VaultState {
   switchVault: (vaultId: number) => void
   clearError: () => void
   resetTotpState: () => void
+  verifySecureNote: (noteId: number, password: string) => Promise<boolean>
+  isSecureNoteVerified: (noteId: number) => boolean
 }
 
 export const useVaultStore = create<VaultState>((set, get) => ({
@@ -37,6 +40,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   alarmMode: false,
   activeVaultId: 1,
   vaults: [],
+  verifiedSecureNotes: new Set(),
 
   checkStatus: async () => {
     try {
@@ -128,6 +132,27 @@ export const useVaultStore = create<VaultState>((set, get) => ({
 
   clearError: () => set({ error: null }),
   resetTotpState: () => set({ requiresTotp: false, pendingPassword: null }),
+
+  verifySecureNote: async (noteId: number, password: string) => {
+    try {
+      const result = await invoke('vault:verify-password' as any, password)
+      if (result) {
+        set((state) => {
+          const next = new Set(state.verifiedSecureNotes)
+          next.add(noteId)
+          return { verifiedSecureNotes: next }
+        })
+        return true
+      }
+      return false
+    } catch {
+      return false
+    }
+  },
+
+  isSecureNoteVerified: (noteId: number) => {
+    return get().verifiedSecureNotes.has(noteId)
+  },
 }))
 
 // Listen for vault:locked event from main process

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useEntriesStore } from '../../store/entriesStore'
+import { useVaultStore } from '../../store/vaultStore'
 import { invoke } from '../../lib/ipc'
 import { useToastStore } from '../ui/Toast'
 import { HistoryViewer } from './HistoryViewer'
@@ -7,17 +8,21 @@ import { EditEntryModal } from './EditEntryModal'
 import { useI18n } from '../../i18n'
 import {
   X, Copy, ExternalLink, Star, Trash2, Clock, Shield, Pencil,
-  Eye, EyeOff
+  Eye, EyeOff, Lock
 } from 'lucide-react'
 
 export function EntryDetail() {
   const { selectedEntry: entry, selectEntry, deleteEntry, toggleFavorite } = useEntriesStore()
+  const { verifySecureNote, isSecureNoteVerified } = useVaultStore()
   const addToast = useToastStore((s) => s.addToast)
   const { t } = useI18n()
   const [showPassword, setShowPassword] = useState(false)
   const [copiedField, setCopiedField] = useState<string | null>(null)
   const [showHistory, setShowHistory] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
+  const [viewPassword, setViewPassword] = useState('')
+  const [viewPasswordError, setViewPasswordError] = useState(false)
+  const [verifying, setVerifying] = useState(false)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -27,6 +32,66 @@ export function EntryDetail() {
   }, [])
 
   if (!entry || typeof entry !== 'object') return null
+
+  // Secure note password verification gate
+  if (entry.entry_type === 'secure_note' && !isSecureNoteVerified(entry.id)) {
+    const handleVerify = async () => {
+      if (!viewPassword) return
+      setVerifying(true)
+      setViewPasswordError(false)
+      const ok = await verifySecureNote(entry.id, viewPassword)
+      setVerifying(false)
+      if (!ok) {
+        setViewPasswordError(true)
+        setViewPassword('')
+      }
+    }
+
+    return (
+      <div className="h-full flex flex-col bg-vault-bg">
+        <div className="flex items-center justify-between p-4 border-b border-vault-border">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-vault-surface border border-vault-border flex items-center justify-center text-lg">📝</div>
+            <div>
+              <h3 className="text-sm font-semibold text-vault-text">{entry.title || 'Заметка'}</h3>
+              <p className="text-xs text-vault-text-secondary">{t('type_note')}</p>
+            </div>
+          </div>
+          <button onClick={() => selectEntry(null)} className="p-1.5 rounded-lg text-vault-text-secondary hover:text-vault-text transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="w-full max-w-sm space-y-4 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-vault-accent/10 border border-vault-accent/30 flex items-center justify-center mx-auto">
+              <Lock size={32} className="text-vault-accent" />
+            </div>
+            <h3 className="text-lg font-semibold text-vault-text">{t('secure_note_protected')}</h3>
+            <p className="text-sm text-vault-text-secondary">{t('enter_master_password_to_view')}</p>
+            <input
+              type="password"
+              placeholder={t('master_password_placeholder')}
+              value={viewPassword}
+              onChange={(e) => { setViewPassword(e.target.value); setViewPasswordError(false) }}
+              onKeyDown={(e) => e.key === 'Enter' && handleVerify()}
+              className="w-full h-10 px-3 rounded-lg bg-vault-surface border border-vault-border text-sm text-vault-text text-center font-mono placeholder:text-vault-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-vault-accent/50 focus:border-vault-accent transition-colors"
+              autoFocus
+            />
+            {viewPasswordError && (
+              <p className="text-xs text-vault-danger">{t('invalid_password')}</p>
+            )}
+            <button
+              onClick={handleVerify}
+              disabled={verifying || !viewPassword}
+              className="w-full h-10 bg-vault-accent text-white rounded-lg font-medium hover:bg-vault-accent-hover transition-colors disabled:opacity-50"
+            >
+              {verifying ? '...' : t('unlock')}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const handleCopy = async (text: string, field: string) => {
     try {

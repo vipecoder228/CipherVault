@@ -161,6 +161,9 @@ export default {
   type_login: 'Логин',
   type_card: 'Карта',
   type_note: 'Заметка',
+  secure_note_protected: 'Защищённая заметка',
+  enter_master_password_to_view: 'Введите мастер-пароль для просмотра заметки',
+  invalid_password: 'Неверный пароль',
   type_identity: 'Личность',
 
   // Create/Edit entry
