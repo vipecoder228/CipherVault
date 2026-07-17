@@ -5,11 +5,12 @@ import { useUIStore } from '../../store/uiStore'
 import { useVaultStore } from '../../store/vaultStore'
 import { CategoryForm } from '../categories/CategoryForm'
 import { SettingsPanel } from '../settings/SettingsPanel'
+import { ImportDialog } from '../import-export/ImportDialog'
 import { VaultSwitcher } from '../vault/VaultSwitcher'
 import type { Category } from '@shared/types'
 import {
   Shield, Star, LayoutGrid, Settings, Lock, Mail,
-  Plus, ChevronLeft, ChevronRight, Folder, Pencil, Trash2
+  Plus, ChevronLeft, ChevronRight, Folder, Pencil, Trash2, Download
 } from 'lucide-react'
 import { useI18n } from '../../i18n'
 
@@ -18,6 +19,7 @@ export function Sidebar() {
   const [categories, setCategories] = useState<Category[]>([])
   const [showCategoryForm, setShowCategoryForm] = useState(false)
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
+  const [showImport, setShowImport] = useState(false)
   const { activeCategoryId, setActiveCategory, sidebarCollapsed, toggleSidebar, showSettings, setShowSettings, showDisposableEmail, setShowDisposableEmail, showTrash, setShowTrash } = useUIStore()
   const { setFilters } = useEntriesStore()
   const { lock, activeVaultId, vaults } = useVaultStore()
@@ -164,6 +166,12 @@ export function Sidebar() {
         {/* Footer */}
         <div className="p-2 border-t border-vault-border space-y-1">
           <NavItem
+            icon={<Download size={18} />}
+            label={t('import')}
+            collapsed={sidebarCollapsed}
+            onClick={() => setShowImport(true)}
+          />
+          <NavItem
             icon={<Settings size={18} />}
             label={t('settings')}
             collapsed={sidebarCollapsed}
@@ -192,6 +200,10 @@ export function Sidebar() {
       <SettingsPanel
         open={showSettings}
         onClose={() => setShowSettings(false)}
+      />
+      <ImportDialog
+        open={showImport}
+        onClose={() => setShowImport(false)}
       />
     </>
   )
