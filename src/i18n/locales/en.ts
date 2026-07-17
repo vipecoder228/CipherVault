@@ -32,6 +32,47 @@ export default {
   dark: 'Dark',
   light: 'Light',
 
+  // Settings — Security groups
+  settings_group_vault: 'Vault',
+  settings_group_auth: 'Authentication',
+  settings_group_data: 'Data & Backup',
+  settings_group_misc: 'Other',
+
+  // Settings — Security items
+  settings_security_health_desc: 'Check for weak, reused, or old passwords across your vault.',
+  settings_analyze_passwords: 'Analyze Passwords',
+  settings_auto_lock_desc: 'Automatically lock the vault after a period of inactivity.',
+  settings_1min: '1 minute',
+  settings_5min: '5 minutes',
+  settings_15min: '15 minutes',
+  settings_30min: '30 minutes',
+  settings_1hour: '1 hour',
+  settings_global_shortcut_desc: 'Keyboard shortcut to open CipherVault from anywhere.',
+  settings_record: 'Record',
+  settings_cancel: 'Cancel',
+  settings_press_keys: 'Press your desired key combination...',
+  settings_release_keys: 'Release all keys when done',
+  settings_master_password_desc: 'Your master password unlocks the vault. Choose something strong and memorable.',
+  settings_change_master_password: 'Change Master Password',
+  settings_totp_desc: 'Add an extra layer of security with two-factor authentication.',
+  settings_enable_2fa: 'Enable 2FA',
+  settings_manage_2fa: 'Manage 2FA',
+  settings_disable_2fa: 'Disable 2FA',
+  settings_duress_desc: 'A secondary password that opens an empty vault. Use it under duress to protect your real data.',
+  settings_set_duress: 'Set Up Duress Code',
+  settings_change_duress: 'Change Duress Code',
+  settings_remove_duress: 'Remove Duress Code',
+  settings_clipboard_desc: 'Clear clipboard contents immediately. Copies auto-clear after 30 seconds.',
+  settings_clear_clipboard: 'Clear Clipboard',
+  settings_backup_desc: 'Export your vault as an encrypted .ciphervault file. Store it safely as a backup.',
+  settings_export_backup: 'Export Backup',
+  settings_import_backup: 'Import Backup',
+  settings_sync_desc: 'Sync your vault between devices via cloud storage. The file is encrypted.',
+  settings_emergency_desc: 'Create an encrypted backup for your trusted contact.',
+  settings_setup_emergency: 'Set Up Emergency Access',
+  cloud_sync: 'Cloud Sync',
+  settings_security_health: 'Security Health',
+
   // Security settings
   change_master_password: 'Change Master Password',
   current_password: 'Current Password',
@@ -364,9 +405,7 @@ export default {
 
   // Header
   search_placeholder: 'Search entries... (Ctrl+K)',
-  password_generator: 'Password Generator',
   import: 'Import',
-  export: 'Export',
   add: 'Add',
 
   // Vault Switcher
@@ -374,7 +413,6 @@ export default {
   create_new_vault: 'Create New Vault',
   vault_name: 'Vault Name',
   vault_name_placeholder: 'e.g., Work, Personal',
-  creating: 'Creating...',
 
   // AppShell
   duress_mode: 'Duress mode — viewing decoy vault. Real data is hidden.',
@@ -382,7 +420,6 @@ export default {
   duress_hidden: 'You are in duress mode. Real data is hidden.',
   no_entries: 'No entries yet',
   no_entries_hint: 'Add your first password or import from another manager',
-  generate_password: 'Generate Password',
   all: 'All',
   version: 'Version',
 } as const

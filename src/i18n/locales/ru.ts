@@ -32,6 +32,47 @@ export default {
   dark: 'Тёмная',
   light: 'Светлая',
 
+  // Settings — Security groups
+  settings_group_vault: 'Хранилище',
+  settings_group_auth: 'Аутентификация',
+  settings_group_data: 'Данные и резервные копии',
+  settings_group_misc: 'Прочее',
+
+  // Settings — Security items
+  settings_security_health_desc: 'Проверка слабых, повторяющихся или устаревших паролей.',
+  settings_analyze_passwords: 'Анализ паролей',
+  settings_auto_lock_desc: 'Автоматическая блокировка хранилища после бездействия.',
+  settings_1min: '1 минута',
+  settings_5min: '5 минут',
+  settings_15min: '15 минут',
+  settings_30min: '30 минут',
+  settings_1hour: '1 час',
+  settings_global_shortcut_desc: 'Горячая клавиша для быстрого открытия CipherVault.',
+  settings_record: 'Записать',
+  settings_cancel: 'Отмена',
+  settings_press_keys: 'Нажмите нужную комбинацию клавиш...',
+  settings_release_keys: 'Отпустите все клавиши когда закончите',
+  settings_master_password_desc: 'Мастер-пароль открывает хранилище. Выберите что-то надёжное.',
+  settings_change_master_password: 'Изменить мастер-пароль',
+  settings_totp_desc: 'Дополнительный уровень безопасности — двухфакторная аутентификация.',
+  settings_enable_2fa: 'Включить 2FA',
+  settings_manage_2fa: 'Управление 2FA',
+  settings_disable_2fa: 'Отключить 2FA',
+  settings_duress_desc: 'Второй пароль, открывающий пустое хранилище. Используйте в экстренных случаях.',
+  settings_set_duress: 'Настроить код под принуждением',
+  settings_change_duress: 'Изменить код под принуждением',
+  settings_remove_duress: 'Удалить код под принуждением',
+  settings_clipboard_desc: 'Очистить буфер обмена. Автоочистка через 30 секунд.',
+  settings_clear_clipboard: 'Очистить буфер',
+  settings_backup_desc: 'Экспорт хранилища в зашифрованный файл .ciphervault.',
+  settings_export_backup: 'Экспорт резервной копии',
+  settings_import_backup: 'Импорт резервной копии',
+  settings_sync_desc: 'Синхронизация хранилища между устройствами через облако.',
+  settings_emergency_desc: 'Создайте зашифрованную копию для доверенного контакта.',
+  settings_setup_emergency: 'Настроить экстренный доступ',
+  cloud_sync: 'Облачная синхронизация',
+  settings_security_health: 'Безопасность паролей',
+
   // Security settings
   change_master_password: 'Изменить мастер-пароль',
   current_password: 'Текущий пароль',
@@ -364,9 +405,7 @@ export default {
 
   // Header
   search_placeholder: 'Поиск записей... (Ctrl+K)',
-  password_generator: 'Генератор паролей',
   import: 'Импорт',
-  export: 'Экспорт',
   add: 'Добавить',
 
   // Vault Switcher
@@ -374,7 +413,6 @@ export default {
   create_new_vault: 'Создать новое хранилище',
   vault_name: 'Название хранилища',
   vault_name_placeholder: 'напр. Работа, Личное',
-  creating: 'Создание...',
 
   // AppShell
   duress_mode: 'Режим принуждения — отображается запасное хранилище. Реальные данные скрыты.',
@@ -382,7 +420,6 @@ export default {
   duress_hidden: 'Вы в режиме принуждения. Реальные данные скрыты.',
   no_entries: 'Записей пока нет',
   no_entries_hint: 'Добавьте первый пароль или импортируйте из другого менеджера',
-  generate_password: 'Сгенерировать пароль',
   all: 'Все',
   version: 'Версия',
 } as const

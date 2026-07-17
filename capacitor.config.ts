@@ -25,7 +25,6 @@ const config: CapacitorConfig = {
     webContentsDebuggingEnabled: false,
     overrideUserAgent: undefined,
     appendUserAgent: undefined,
-    backgroundColor: '#0f0f14',
     buildOptions: {
       keystorePath: undefined,
       keystoreAlias: undefined,

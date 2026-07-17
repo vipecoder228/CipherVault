@@ -6,9 +6,37 @@ declare global {
   }
 }
 
+const isElectron = typeof window !== 'undefined' && typeof window.electronAPI !== 'undefined'
+
+// Lazy-load the web backend only on non-Electron platforms
+let webHandlers: Record<string, (...args: any[]) => any> | null = null
+
+async function getWebHandlers() {
+  if (!webHandlers) {
+    const mod = await import('./webBackend')
+    webHandlers = mod.webHandlers as Record<string, (...args: any[]) => any>
+  }
+  return webHandlers
+}
+
 export function invoke<K extends keyof IPCChannels>(
   channel: K,
   ...args: Parameters<IPCChannels[K]>
 ): ReturnType<IPCChannels[K]> {
-  return window.electronAPI[channel](...args) as ReturnType<IPCChannels[K]>
+  if (isElectron) {
+    return window.electronAPI[channel](...args) as ReturnType<IPCChannels[K]>
+  }
+
+  // Web/Capacitor backend — resolve lazily and dispatch
+  return (async () => {
+    const handlers = await getWebHandlers()
+    const handler = handlers[channel]
+
+    if (!handler) {
+      console.warn(`[WebBackend] Unhandled channel: ${channel}`)
+      throw new Error(`Channel not supported on this platform: ${channel}`)
+    }
+
+    return handler(undefined, ...args)
+  })() as ReturnType<IPCChannels[K]>
 }
