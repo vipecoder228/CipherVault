@@ -15,6 +15,7 @@ import { getCategories, createCategory, updateCategory, deleteCategory, reorderC
 import { checkIntegrity } from '../integrity'
 import { getActiveVaultId } from '../services/vault.service'
 import { getWindow, toggleWindow } from '../utils/window'
+import { mapColumns, mapEntryType, detectCSVSource } from '../../../shared/importMapper'
 
 type IPCChannel = keyof IPCChannels
 
@@ -235,46 +236,49 @@ const handlers: Record<string, (...args: any[]) => any> = {
       const errors: string[] = []
       const vaultId = getActiveVaultId()
 
-      // Parse CSV header — supports Bitwarden, Chrome, 1Password, generic
-      const cols = header.split(',').map(c => c.trim().replace(/"/g, ''))
-      const nameIdx = cols.findIndex(c => c === 'name' || c === 'title' || c === 'item_name')
-      const urlIdx = cols.findIndex(c => c === 'url' || c === 'login_uri' || c === 'website' || c === 'web_address')
-      const userIdx = cols.findIndex(c => c === 'username' || c === 'login' || c === 'email' || c === 'login_username' || c === 'user')
-      const passIdx = cols.findIndex(c => c === 'password' || c === 'login_password')
-      const typeIdx = cols.findIndex(c => c === 'type' || c === 'item_type')
-      const cardNumIdx = cols.findIndex(c => c === 'card_number' || c === 'cc_number' || c === 'cardnumber')
-      const cardHolderIdx = cols.findIndex(c => c === 'card_holder' || c === 'cc_holder' || c === 'cardholder')
-      const cardExpiryIdx = cols.findIndex(c => c === 'card_expiry' || c === 'cc_expiry' || c === 'card_expiryDate')
-      const cardCvvIdx = cols.findIndex(c => c === 'card_cvv' || c === 'cc_cvv' || c === 'card_cvp2')
-      const notesIdx = cols.findIndex(c => c === 'notes' || c === 'note' || c === 'extra')
+      // Parse CSV header — universal mapper supports all password managers
+      const headerLine = lines[0]
+      const colMap = mapColumns(headerLine)
+      const source = detectCSVSource(headerLine)
+      let imported = 0
+      let skipped = 0
+      const errors: string[] = []
+      const vaultId = getActiveVaultId()
 
       for (let i = 1; i < lines.length; i++) {
         try {
           const values = parseCSVLine(lines[i])
-          const title = nameIdx >= 0 ? values[nameIdx] : `Import ${i}`
+          const title = colMap.nameIdx >= 0 ? stripQuotes(values[colMap.nameIdx]) : `Import ${i}`
           if (!title) { skipped++; continue }
 
-          // Strip surrounding quotes from values
-          const cleanTitle = title.replace(/^"(.*)"$/, '$1')
-          const entryType = typeIdx >= 0 ? (values[typeIdx] || 'login') : 'login'
+          const entryType = mapEntryType(
+            colMap.typeIdx >= 0 ? values[colMap.typeIdx] : '',
+            source
+          )
 
           // Skip duplicates
-          if (await isDuplicateEntry(cleanTitle, userIdx >= 0 ? values[userIdx] : '', vaultId)) {
+          if (await isDuplicateEntry(title, colMap.userIdx >= 0 ? values[colMap.userIdx] : '', vaultId)) {
             skipped++
             continue
           }
 
           await entriesService.createEntry({
             entry_type: entryType as any,
-            title: cleanTitle,
-            username: userIdx >= 0 ? (values[userIdx] || '').replace(/^"(.*)"$/, '$1') : '',
-            password: passIdx >= 0 ? (values[passIdx] || '').replace(/^"(.*)"$/, '$1') : '',
-            url: urlIdx >= 0 ? (values[urlIdx] || '').replace(/^"(.*)"$/, '$1') : '',
-            notes: notesIdx >= 0 ? (values[notesIdx] || '').replace(/^"(.*)"$/, '$1') : '',
-            card_number: cardNumIdx >= 0 ? (values[cardNumIdx] || '').replace(/^"(.*)"$/, '$1') : undefined,
-            card_holder: cardHolderIdx >= 0 ? (values[cardHolderIdx] || '').replace(/^"(.*)"$/, '$1') : undefined,
-            card_expiry: cardExpiryIdx >= 0 ? (values[cardExpiryIdx] || '').replace(/^"(.*)"$/, '$1') : undefined,
-            card_cvv: cardCvvIdx >= 0 ? (values[cardCvvIdx] || '').replace(/^"(.*)"$/, '$1') : undefined,
+            title,
+            username: stripQuotes(colMap.userIdx >= 0 ? values[colMap.userIdx] : ''),
+            password: stripQuotes(colMap.passIdx >= 0 ? values[colMap.passIdx] : ''),
+            url: stripQuotes(colMap.urlIdx >= 0 ? values[colMap.urlIdx] : ''),
+            notes: stripQuotes(colMap.notesIdx >= 0 ? values[colMap.notesIdx] : ''),
+            totp_secret: stripQuotes(colMap.totpIdx >= 0 ? values[colMap.totpIdx] : ''),
+            card_number: colMap.cardNumIdx >= 0 ? stripQuotes(values[colMap.cardNumIdx]) : undefined,
+            card_holder: colMap.cardHolderIdx >= 0 ? stripQuotes(values[colMap.cardHolderIdx]) : undefined,
+            card_expiry: colMap.cardExpiryIdx >= 0 ? stripQuotes(values[colMap.cardExpiryIdx]) : undefined,
+            card_cvv: colMap.cardCvvIdx >= 0 ? stripQuotes(values[colMap.cardCvvIdx]) : undefined,
+            identity_first_name: colMap.firstNameIdx >= 0 ? stripQuotes(values[colMap.firstNameIdx]) : undefined,
+            identity_last_name: colMap.lastNameIdx >= 0 ? stripQuotes(values[colMap.lastNameIdx]) : undefined,
+            identity_phone: colMap.phoneIdx >= 0 ? stripQuotes(values[colMap.phoneIdx]) : undefined,
+            identity_email: colMap.emailIdx >= 0 ? stripQuotes(values[colMap.emailIdx]) : undefined,
+            identity_address: colMap.addressIdx >= 0 ? stripQuotes(values[colMap.addressIdx]) : undefined,
           })
           imported++
         } catch (e: any) {
@@ -420,6 +424,10 @@ const handlers: Record<string, (...args: any[]) => any> = {
     writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8')
     return { success: true }
   },
+}
+
+function stripQuotes(s: string): string {
+  return (s || '').replace(/^"(.*)"$/, '$1')
 }
 
 function escapeCSV(value: string): string {

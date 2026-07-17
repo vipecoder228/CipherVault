@@ -17,6 +17,7 @@ import {
 } from '../../shared/crypto/keyderivation'
 import { RATE_LIMIT } from '../../shared/crypto/constants'
 import { isElectron } from '../../shared/bridge'
+import { mapColumns, mapEntryType, detectCSVSource } from '../../shared/importMapper'
 import type {
   IPCChannels,
   VaultStatus,
@@ -1480,18 +1481,8 @@ async function importCSV(): Promise<ImportResult> {
 
   if (lines.length < 2) return { imported: 0, skipped: 0, errors: ['CSV file is empty or has no data rows'] }
 
-  const header = lines[0].toLowerCase()
-  const cols = header.split(',').map(c => c.trim().replace(/"/g, ''))
-  const nameIdx = cols.findIndex(c => c === 'name' || c === 'title' || c === 'item_name')
-  const urlIdx = cols.findIndex(c => c === 'url' || c === 'login_uri' || c === 'website' || c === 'web_address')
-  const userIdx = cols.findIndex(c => c === 'username' || c === 'login' || c === 'email' || c === 'login_username' || c === 'user')
-  const passIdx = cols.findIndex(c => c === 'password' || c === 'login_password')
-  const typeIdx = cols.findIndex(c => c === 'type' || c === 'item_type')
-  const cardNumIdx = cols.findIndex(c => c === 'card_number' || c === 'cc_number' || c === 'cardnumber')
-  const cardHolderIdx = cols.findIndex(c => c === 'card_holder' || c === 'cc_holder' || c === 'cardholder')
-  const cardExpiryIdx = cols.findIndex(c => c === 'card_expiry' || c === 'cc_expiry' || c === 'card_expiryDate')
-  const cardCvvIdx = cols.findIndex(c => c === 'card_cvv' || c === 'cc_cvv' || c === 'card_cvp2')
-  const notesIdx = cols.findIndex(c => c === 'notes' || c === 'note' || c === 'extra')
+  const header = lines[0]
+  const colMap = mapColumns(header)
 
   let imported = 0
   let skipped = 0
@@ -1500,22 +1491,31 @@ async function importCSV(): Promise<ImportResult> {
   for (let i = 1; i < lines.length; i++) {
     try {
       const values = parseCSVLine(lines[i])
-      const title = nameIdx >= 0 ? stripQuotes(values[nameIdx]) : `Import ${i}`
+      const title = colMap.nameIdx >= 0 ? stripQuotes(values[colMap.nameIdx]) : `Import ${i}`
       if (!title) { skipped++; continue }
 
-      const entryType = typeIdx >= 0 ? (stripQuotes(values[typeIdx]) || 'login') : 'login'
+      const entryType = mapEntryType(
+        colMap.typeIdx >= 0 ? values[colMap.typeIdx] : '',
+        'generic'
+      )
 
       await createEntry({
         entry_type: entryType as any,
         title,
-        username: stripQuotes(userIdx >= 0 ? values[userIdx] : ''),
-        password: stripQuotes(passIdx >= 0 ? values[passIdx] : ''),
-        url: stripQuotes(urlIdx >= 0 ? values[urlIdx] : ''),
-        notes: stripQuotes(notesIdx >= 0 ? values[notesIdx] : ''),
-        card_number: cardNumIdx >= 0 ? stripQuotes(values[cardNumIdx]) : undefined,
-        card_holder: cardHolderIdx >= 0 ? stripQuotes(values[cardHolderIdx]) : undefined,
-        card_expiry: cardExpiryIdx >= 0 ? stripQuotes(values[cardExpiryIdx]) : undefined,
-        card_cvv: cardCvvIdx >= 0 ? stripQuotes(values[cardCvvIdx]) : undefined,
+        username: stripQuotes(colMap.userIdx >= 0 ? values[colMap.userIdx] : ''),
+        password: stripQuotes(colMap.passIdx >= 0 ? values[colMap.passIdx] : ''),
+        url: stripQuotes(colMap.urlIdx >= 0 ? values[colMap.urlIdx] : ''),
+        notes: stripQuotes(colMap.notesIdx >= 0 ? values[colMap.notesIdx] : ''),
+        totp_secret: stripQuotes(colMap.totpIdx >= 0 ? values[colMap.totpIdx] : '') || undefined,
+        card_number: colMap.cardNumIdx >= 0 ? stripQuotes(values[colMap.cardNumIdx]) : undefined,
+        card_holder: colMap.cardHolderIdx >= 0 ? stripQuotes(values[colMap.cardHolderIdx]) : undefined,
+        card_expiry: colMap.cardExpiryIdx >= 0 ? stripQuotes(values[colMap.cardExpiryIdx]) : undefined,
+        card_cvv: colMap.cardCvvIdx >= 0 ? stripQuotes(values[colMap.cardCvvIdx]) : undefined,
+        identity_first_name: colMap.firstNameIdx >= 0 ? stripQuotes(values[colMap.firstNameIdx]) : undefined,
+        identity_last_name: colMap.lastNameIdx >= 0 ? stripQuotes(values[colMap.lastNameIdx]) : undefined,
+        identity_phone: colMap.phoneIdx >= 0 ? stripQuotes(values[colMap.phoneIdx]) : undefined,
+        identity_email: colMap.emailIdx >= 0 ? stripQuotes(values[colMap.emailIdx]) : undefined,
+        identity_address: colMap.addressIdx >= 0 ? stripQuotes(values[colMap.addressIdx]) : undefined,
       })
       imported++
     } catch (e: any) {
