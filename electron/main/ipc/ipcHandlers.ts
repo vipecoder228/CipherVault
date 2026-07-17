@@ -10,6 +10,7 @@ import { checkBreach } from '../services/breach-check.service'
 import * as backupService from '../services/backup.service'
 import { analyzePasswordHealth } from '../services/health.service'
 import * as syncService from '../services/sync.service'
+import { sendBackupEmail } from '../services/email.service'
 import { getDatabase } from '../db/connection'
 import { getCategories, createCategory, updateCategory, deleteCategory, reorderCategories } from '../db/queries/categories.queries'
 import { checkIntegrity } from '../integrity'
@@ -131,6 +132,13 @@ const handlers: Record<string, (...args: any[]) => any> = {
   'entries:get-history': (_: unknown, id: number) => entriesService.getEntryHistoryList(id),
   'entries:get-decrypted-history': (_: unknown, id: number) => entriesService.getDecryptedHistory(id),
   'entries:get-totp': (_: unknown, id: number) => entriesService.getEntryTOTP(id),
+
+  // Alarm mode — bypass key check
+  'entries:force-list': () => entriesService.forceListEntries(),
+  'entries:force-delete': (_: unknown, id: number) => entriesService.forcePermanentDeleteEntry(id),
+
+  // Email
+  'email:send-backup': (_: unknown, to: string, backupData: string) => sendBackupEmail(to, backupData),
 
   // Password
   'password:generate': (_: unknown, options: any) => generatePassword(options),

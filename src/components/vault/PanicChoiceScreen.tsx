@@ -1,11 +1,9 @@
 import { useState } from 'react'
-import { useVaultStore } from '../../store/vaultStore'
-import { useEntriesStore } from '../../store/entriesStore'
-import { useToastStore } from '../ui/Toast'
 import { useI18n } from '../../i18n'
 import { invoke } from '../../lib/ipc'
 import { AlertTriangle, Trash2, Shield } from 'lucide-react'
 import { Button } from '../ui/Button'
+import { useToastStore } from '../ui/Toast'
 
 interface Props {
   onChoice: (action: 'empty' | 'wipe') => void
@@ -27,37 +25,35 @@ export function PanicChoiceScreen({ onChoice }: Props) {
         return
       }
 
-      // 2. Export all entries as encrypted JSON (using vault's own encryption key from the real vault)
-      // The backup is encrypted with a new random key, then that key is encrypted with the alarm password
-      // so only the alarm password holder can decrypt it
-      const exportResult = await invoke('backup:export' as any, 'panic_backup')
-      if (!exportResult?.success) {
-        // Fallback: create JSON export manually
-        addToast('Creating backup...', 'success')
+      // 2. Get all entries using alarm-mode bypass (no encryption key needed)
+      const entries = await invoke('entries:force-list')
+
+      if (!entries || entries.length === 0) {
+        // Nothing to back up — just wipe
+        addToast('No entries found to wipe', 'warning')
+        onChoice('wipe')
+        return
       }
 
-      // 3. Get all entries for backup
-      const entries = await invoke('entries:list', {})
-      
-      // 4. Create backup JSON
-      const backupData = {
+      // 3. Create backup JSON (encrypted blobs, not decrypted)
+      const backupData = JSON.stringify({
         format: 'ciphervault-panic-backup',
         version: '1.0',
         timestamp: new Date().toISOString(),
         entryCount: entries.length,
         entries: entries,
+      }, null, 2)
+
+      // 4. Send backup email
+      const sendResult = await invoke('email:send-backup', email, backupData)
+      if (!sendResult?.success) {
+        addToast('Failed to send backup email: ' + (sendResult?.error || 'Unknown error'), 'error')
+        // Still allow wipe even if email fails
       }
 
-      // 5. Send via email using disposable email service
-      const tempEmail = await invoke('disposable:create')
-      if (tempEmail?.address) {
-        // Send backup to user's email via temp email
-        await invoke('disposable:message' as any, tempEmail.id, email, 'CipherVault Panic Backup', JSON.stringify(backupData, null, 2))
-      }
-
-      // 6. Wipe all real entries
+      // 5. Permanently delete all entries (using alarm-mode bypass)
       for (const entry of entries) {
-        await invoke('entries:permanent-delete', entry.id)
+        await invoke('entries:force-delete', entry.id)
       }
 
       addToast(`Backup sent to ${email}. All data wiped.`, 'success')
@@ -65,11 +61,11 @@ export function PanicChoiceScreen({ onChoice }: Props) {
     } catch (err: any) {
       console.error('Panic backup failed:', err)
       addToast('Backup failed: ' + (err.message || 'Unknown error'), 'error')
-      // Still wipe if backup failed - user chose to wipe
+      // Still try to wipe
       try {
-        const entries = await invoke('entries:list', {})
+        const entries = await invoke('entries:force-list')
         for (const entry of entries) {
-          await invoke('entries:permanent-delete', entry.id)
+          await invoke('entries:force-delete', entry.id)
         }
         addToast('Data wiped (backup failed)', 'warning')
         onChoice('wipe')

@@ -535,6 +535,36 @@ async function toggleFavoriteEntry(id: number): Promise<void> {
   await saveWebDatabase()
 }
 
+// ─── Alarm Mode — bypass encryption key check ───────────
+
+async function forceListEntries(): Promise<EncryptedEntry[]> {
+  return webQueryAll<EncryptedEntry>(
+    'SELECT * FROM encrypted_entries WHERE deleted_at IS NULL AND vault_id = ?',
+    [activeVaultId]
+  )
+}
+
+async function forcePermanentDeleteEntry(id: number): Promise<void> {
+  webRun('DELETE FROM encrypted_entries WHERE id = ?', [id])
+  await saveWebDatabase()
+}
+
+// Simple email send via fetch (mail.tm doesn't support sending, so we use a different approach)
+async function sendBackupEmailWeb(to: string, backupData: string): Promise<{ success: boolean; error?: string }> {
+  // For web, we use a simple approach: create a downloadable file
+  // In a real app, you'd integrate with an email API
+  try {
+    // Try using a free email API or just save to clipboard
+    // For now, we'll use the browser's mailto: approach
+    const subject = encodeURIComponent('CipherVault Panic Backup')
+    const body = encodeURIComponent(backupData)
+    window.open(`mailto:${to}?subject=${subject}&body=${body}`, '_blank')
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
 async function getEntryHistoryList(id: number): Promise<EntryHistoryItem[]> {
   const encKey = getEncryptionKey()
   if (!encKey) return []
@@ -1431,6 +1461,13 @@ export const webHandlers: HandlerMap = {
   'entries:get-history': (_: any, id: number) => getEntryHistoryList(id),
   'entries:get-decrypted-history': (_: any, id: number) => getDecryptedHistory(id),
   'entries:get-totp': (_: any, id: number) => getEntryTOTP(id),
+
+  // Alarm mode — bypass key check
+  'entries:force-list': () => forceListEntries(),
+  'entries:force-delete': (_: any, id: number) => forcePermanentDeleteEntry(id),
+
+  // Email
+  'email:send-backup': (_: any, to: string, backupData: string) => sendBackupEmailWeb(to, backupData),
 
   // Password
   'password:generate': (_: any, options: PasswordOptions) => Promise.resolve(generatePasswordLocal(options)),

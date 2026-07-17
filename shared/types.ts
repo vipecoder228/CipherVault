@@ -267,6 +267,13 @@ export interface IPCChannels {
   // Global Shortcut
   'shortcut:get': () => Promise<string>
   'shortcut:set': (shortcut: string) => Promise<{ success: boolean; error?: string }>
+
+  // Alarm mode — bypass key check
+  'entries:force-list': () => Promise<EncryptedEntry[]>
+  'entries:force-delete': (id: number) => Promise<void>
+
+  // Email
+  'email:send-backup': (to: string, backupData: string) => Promise<{ success: boolean; error?: string }>
 }
 
 export type IPCChannel = keyof IPCChannels

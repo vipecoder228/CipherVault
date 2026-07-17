@@ -193,6 +193,20 @@ export async function toggleFavoriteEntry(id: number): Promise<void> {
   saveDatabase()
 }
 
+// ─── Alarm Mode — bypass encryption key check ───────────
+
+export async function forceListEntries(): Promise<EncryptedEntry[]> {
+  const db = await getDatabase()
+  const vaultId = getActiveVaultId()
+  return getEntries(db, {}, vaultId)
+}
+
+export async function forcePermanentDeleteEntry(id: number): Promise<void> {
+  const db = await getDatabase()
+  dbPermanentDeleteEntry(db, id)
+  saveDatabase()
+}
+
 export async function getEntryHistoryList(id: number): Promise<EntryHistoryItem[]> {
   const encKey = getEncryptionKey()
   if (!encKey) return [] // Alarm mode — return empty
