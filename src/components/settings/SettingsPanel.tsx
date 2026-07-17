@@ -488,32 +488,47 @@ function DisableTOTPModal({ onClose, onStatusChange }: { onClose: () => void; on
 function AlarmSetupModal({ onClose, onStatusChange }: { onClose: () => void; onStatusChange?: (enabled: boolean) => void }) {
   const [alarmPassword, setAlarmPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [backupEmail, setBackupEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const addToast = useToastStore((s) => s.addToast)
+  const { t } = useI18n()
 
   const handleSubmit = async () => {
     if (!alarmPassword) { addToast('Password is required', 'warning'); return }
     if (alarmPassword !== confirmPassword) { addToast('Passwords do not match', 'warning'); return }
     if (alarmPassword.length < 4) { addToast('Password must be at least 4 characters', 'warning'); return }
+    if (!backupEmail || !backupEmail.includes('@')) { addToast('Valid email is required for panic backup', 'warning'); return }
     setLoading(true)
     try {
-      const result = await invoke('vault:setup-alarm', alarmPassword)
-      if (result.success) { addToast('Duress code set up', 'success'); onStatusChange?.(true); onClose() }
-      else addToast(result.error || 'Failed', 'error')
-    } catch { addToast('Failed to set up duress code', 'error') }
-    finally { setLoading(false) }
+      const result = await invoke('vault:setup-alarm', alarmPassword, backupEmail)
+      if (result.success) {
+        addToast('Duress code set up', 'success')
+        onStatusChange?.(true)
+        onClose()
+      } else {
+        addToast(result.error || 'Failed', 'error')
+      }
+    } catch {
+      addToast('Failed to set up duress code', 'error')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-sm mx-4 bg-vault-surface border border-vault-border rounded-2xl p-6 space-y-4">
-        <h3 className="text-lg font-semibold text-vault-text">Set Up Duress Code</h3>
-        <p className="text-sm text-vault-text-secondary">This password will open an empty vault. Use it when forced to reveal your password.</p>
-        <Input label="Duress Password" type="password" value={alarmPassword} onChange={(e) => setAlarmPassword(e.target.value)} showPasswordToggle />
-        <Input label="Confirm Password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} showPasswordToggle />
+        <h3 className="text-lg font-semibold text-vault-text">{t('setup_duress')}</h3>
+        <p className="text-sm text-vault-text-secondary">{t('duress_description')}</p>
+        <Input label={t('duress_password')} type="password" value={alarmPassword} onChange={(e) => setAlarmPassword(e.target.value)} showPasswordToggle />
+        <Input label={t('confirm_password')} type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} showPasswordToggle />
+        <div>
+          <Input label={t('panic_backup_email')} type="email" value={backupEmail} onChange={(e) => setBackupEmail(e.target.value)} placeholder="your@email.com" />
+          <p className="text-[10px] text-vault-text-secondary mt-1">{t('panic_backup_email_hint')}</p>
+        </div>
         <div className="flex justify-end gap-3">
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={loading}>{loading ? '...' : 'Set Up'}</Button>
+          <Button variant="secondary" onClick={onClose}>{t('settings_cancel')}</Button>
+          <Button onClick={handleSubmit} disabled={loading}>{loading ? '...' : t('settings_set_duress')}</Button>
         </div>
       </div>
     </div>

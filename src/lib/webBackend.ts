@@ -1361,7 +1361,7 @@ export const webHandlers: HandlerMap = {
     await saveWebDatabase()
     return true
   },
-  'vault:setup-alarm': async (_: any, alarmPassword: string) => {
+  'vault:setup-alarm': async (_: any, alarmPassword: string, backupEmail?: string) => {
     const encKey = getEncryptionKey()
     if (!encKey) return { success: false, error: 'Vault is locked' }
     const salt = generateSalt()
@@ -1370,6 +1370,9 @@ export const webHandlers: HandlerMap = {
     const alarmHash = await computeVerificationHash(encryptionKey)
     webRun(`UPDATE vault SET alarm_hash = ?, alarm_salt = ?, updated_at = datetime('now') WHERE id = ?`, [alarmHash, arrayToHex(salt), activeVaultId])
     webRun("INSERT OR REPLACE INTO settings (key, value) VALUES ('alarm_enabled', 'true')")
+    if (backupEmail) {
+      webRun("INSERT OR REPLACE INTO settings (key, value) VALUES ('alarm_backup_email', ?)", [backupEmail])
+    }
     await saveWebDatabase()
     return { success: true }
   },

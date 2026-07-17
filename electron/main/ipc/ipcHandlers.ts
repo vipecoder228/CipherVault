@@ -81,7 +81,14 @@ const handlers: Record<string, (...args: any[]) => any> = {
   },
   'vault:verify-totp': (_: unknown, code: string) => vaultService.verifyAndSaveTOTP(code),
   'vault:disable-totp': (_: unknown, totpCode: string) => vaultService.disableTOTP(totpCode),
-  'vault:setup-alarm': (_: unknown, alarmPassword: string) => vaultService.setupAlarmPassword(alarmPassword),
+  'vault:setup-alarm': async (_: unknown, alarmPassword: string, backupEmail?: string) => {
+    const result = await vaultService.setupAlarmPassword(alarmPassword)
+    if (result.success && backupEmail) {
+      const db = await getDatabase()
+      db.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('alarm_backup_email', ?)", [backupEmail])
+    }
+    return result
+  },
   'vault:change-alarm': (_: unknown, oldAlarm: string, newAlarm: string) => vaultService.changeAlarmPassword(oldAlarm, newAlarm),
   'vault:remove-alarm': () => vaultService.removeAlarmPassword(),
 

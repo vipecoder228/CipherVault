@@ -4,6 +4,7 @@ import { useUIStore } from './store/uiStore'
 import { useEntriesStore } from './store/entriesStore'
 import { SplashScreen } from './components/vault/SplashScreen'
 import { UnlockScreen } from './components/vault/UnlockScreen'
+import { PanicChoiceScreen } from './components/vault/PanicChoiceScreen'
 import { AppShell } from './components/layout/AppShell'
 import { MobileAppShell } from './components/mobile/MobileAppShell'
 import { ToastContainer } from './components/ui/Toast'
@@ -16,11 +17,12 @@ function isMobileDevice(): boolean {
 }
 
 export function App() {
-  const { locked, initialized, checkStatus } = useVaultStore()
+  const { locked, initialized, checkStatus, alarmMode } = useVaultStore()
   const { theme } = useUIStore()
   const [booting, setBooting] = useState(true)
   const [integrityOk, setIntegrityOk] = useState<boolean | null>(null)
   const [isMobile, setIsMobile] = useState(false)
+  const [panicChoice, setPanicChoice] = useState<'empty' | 'wipe' | null>(null)
   const checkStatusRef = useRef(checkStatus)
   checkStatusRef.current = checkStatus
 
@@ -95,7 +97,13 @@ export function App() {
 
   return (
     <div className={`${theme}`}>
-      {locked ? <UnlockScreen /> : (isMobile ? <MobileAppShell /> : <AppShell />)}
+      {locked ? (
+        <UnlockScreen />
+      ) : alarmMode && panicChoice === null ? (
+        <PanicChoiceScreen onChoice={(choice) => setPanicChoice(choice)} />
+      ) : (
+        isMobile ? <MobileAppShell /> : <AppShell />
+      )}
       <ToastContainer />
     </div>
   )
