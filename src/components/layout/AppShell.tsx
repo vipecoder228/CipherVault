@@ -17,7 +17,6 @@ export function AppShell() {
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed)
   const showDisposableEmail = useUIStore((s) => s.showDisposableEmail)
   const showTrash = useUIStore((s) => s.showTrash)
-  const alarmMode = useVaultStore((s) => s.alarmMode)
   const loadEntries = useEntriesStore((s) => s.loadEntries)
 
   useEffect(() => {
@@ -33,12 +32,6 @@ export function AppShell() {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
-        {alarmMode && (
-          <div className="flex items-center gap-2 px-4 py-2 bg-vault-warning/10 border-b border-vault-warning/30 text-vault-warning text-xs font-medium">
-            <AlertTriangle size={14} />
-            <span>{t('duress_mode')}</span>
-          </div>
-        )}
         <Header />
         <div className="flex-1 flex overflow-hidden">
           {/* Entry list / grid */}
