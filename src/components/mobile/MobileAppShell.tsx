@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react'
 import { MobileNav } from './MobileNav'
 import { MobileEntryDetail } from './MobileEntryDetail'
+import { PasswordGenerator } from '../password-gen/PasswordGenerator'
+import { SettingsPanel } from '../settings/SettingsPanel'
+import { Modal } from '../ui/Modal'
 import { useEntriesStore } from '../../store/entriesStore'
 import { useUIStore } from '../../store/uiStore'
 import { useVaultStore } from '../../store/vaultStore'
+import { useI18n } from '../../i18n'
 import { AlertTriangle, Search, Plus, Menu, X } from 'lucide-react'
 import type { EntryType } from '@shared/types'
 
@@ -16,8 +20,9 @@ const TYPE_LABELS: Record<EntryType, string> = {
 
 export function MobileAppShell() {
   const { entries, loading, selectEntry, selectedEntry, toggleFavorite, filters, setFilters, loadEntries } = useEntriesStore()
-  const { setShowPasswordGenerator, showSettings, setShowSettings } = useUIStore()
+  const { setShowPasswordGenerator, showPasswordGenerator, showSettings, setShowSettings } = useUIStore()
   const { alarmMode } = useVaultStore()
+  const { t } = useI18n()
   const [searchQuery, setSearchQuery] = useState('')
   const [showMenu, setShowMenu] = useState(false)
 
@@ -170,6 +175,17 @@ export function MobileAppShell() {
 
       {/* Entry detail (full screen) */}
       {selectedEntry && <MobileEntryDetail />}
+
+      {/* Password Generator */}
+      <Modal open={showPasswordGenerator} onClose={() => setShowPasswordGenerator(false)} title={t('password_generator')}>
+        <PasswordGenerator onUsePassword={() => setShowPasswordGenerator(false)} />
+      </Modal>
+
+      {/* Settings */}
+      <SettingsPanel
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+      />
     </div>
   )
 }
