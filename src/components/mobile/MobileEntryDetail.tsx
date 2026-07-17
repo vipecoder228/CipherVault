@@ -1,12 +1,15 @@
 import { ArrowLeft, Copy, ExternalLink, Star, Trash2, Edit2 } from 'lucide-react'
 import { useEntriesStore } from '../../store/entriesStore'
-import { useUIStore } from '../../store/uiStore'
+import { useToastStore } from '../ui/Toast'
+import { useI18n } from '../../i18n'
+import { invoke } from '../../lib/ipc'
 import { EditEntryModal } from '../entries/EditEntryModal'
 import { useState } from 'react'
 
 export function MobileEntryDetail() {
   const { selectedEntry, selectEntry, toggleFavorite, deleteEntry } = useEntriesStore()
-  const { setShowPasswordGenerator } = useUIStore()
+  const { t } = useI18n()
+  const addToast = useToastStore((s) => s.addToast)
   const [showPassword, setShowPassword] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
 
@@ -17,8 +20,12 @@ export function MobileEntryDetail() {
   }
 
   const handleCopy = async (text: string) => {
-    await navigator.clipboard.writeText(text)
-    // TODO: Show toast
+    try {
+      await invoke('clipboard:copy', text, 30000)
+      addToast(t('copied_to_clipboard'), 'success')
+    } catch {
+      addToast(t('failed_to_copy'), 'error')
+    }
   }
 
   const handleDelete = () => {

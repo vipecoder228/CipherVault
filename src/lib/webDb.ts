@@ -231,21 +231,26 @@ export async function getWebDatabase(): Promise<Database> {
 
   if (!dbPromise) {
     dbPromise = (async () => {
-      const SQL = await initSql()
+      try {
+        const SQL = await initSql()
 
-      const existing = await loadDbFromDisk()
+        const existing = await loadDbFromDisk()
 
-      if (existing) {
-        db = new SQL.Database(existing)
-      } else {
-        db = new SQL.Database()
+        if (existing) {
+          db = new SQL.Database(existing)
+        } else {
+          db = new SQL.Database()
+        }
+
+        db.run('PRAGMA foreign_keys = ON')
+        runMigrations(db)
+        await saveDbToDisk(db)
+
+        return db!
+      } catch (err) {
+        dbPromise = null
+        throw err
       }
-
-      db.run('PRAGMA foreign_keys = ON')
-      runMigrations(db)
-      await saveDbToDisk(db)
-
-      return db!
     })()
   }
 

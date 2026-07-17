@@ -11,11 +11,13 @@ import { useI18n } from '../../i18n'
 import { AlertTriangle, Search, Plus, Menu, X } from 'lucide-react'
 import type { EntryType } from '@shared/types'
 
-const TYPE_LABELS: Record<EntryType, string> = {
-  login: 'Логин',
-  card: 'Карта',
-  secure_note: 'Заметка',
-  identity: 'Личность',
+function getTypeLabels(t: (key: string) => string): Record<EntryType, string> {
+  return {
+    login: t('type_login'),
+    card: t('type_card'),
+    secure_note: t('type_note'),
+    identity: t('type_identity'),
+  }
 }
 
 export function MobileAppShell() {
@@ -23,6 +25,7 @@ export function MobileAppShell() {
   const { setShowPasswordGenerator, showPasswordGenerator, showSettings, setShowSettings } = useUIStore()
   const { alarmMode } = useVaultStore()
   const { t } = useI18n()
+  const TYPE_LABELS = getTypeLabels(t)
   const [searchQuery, setSearchQuery] = useState('')
   const [showMenu, setShowMenu] = useState(false)
 
