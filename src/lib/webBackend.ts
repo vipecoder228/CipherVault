@@ -1407,8 +1407,167 @@ export const webHandlers: HandlerMap = {
   'disposable:message': () => Promise.resolve({ id: '', from: '', subject: '', text: '', html: '', createdAt: '' }),
   'disposable:delete-message': () => Promise.resolve(),
   'disposable:delete-account': () => Promise.resolve(),
-  'import:csv': () => Promise.resolve({ imported: 0, skipped: 0, errors: ['Not supported on mobile'] }),
-  'import:json': () => Promise.resolve({ imported: 0, skipped: 0, errors: ['Not supported on mobile'] }),
+  'import:csv': () => importCSV(),
+  'import:json': () => importJSON(),
   'export:csv': () => Promise.resolve({ success: false }),
   'export:json': () => Promise.resolve({ success: false }),
+}
+
+// ─── Import/Export (Web) ────────────────────────────────
+
+function pickFile(accept: string): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = accept
+    input.onchange = () => resolve(input.files?.[0] || null)
+    input.click()
+  })
+}
+
+function parseCSVLine(line: string): string[] {
+  const result: string[] = []
+  let current = ''
+  let inQuotes = false
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i]
+    if (char === '"') {
+      if (inQuotes && i + 1 < line.length && line[i + 1] === '"') {
+        current += '"'
+        i++
+      } else {
+        inQuotes = !inQuotes
+      }
+    } else if (char === ',' && !inQuotes) {
+      result.push(current.trim())
+      current = ''
+    } else {
+      if (char !== '\r') current += char
+    }
+  }
+  result.push(current.trim())
+  return result
+}
+
+function stripQuotes(s: string): string {
+  return (s || '').replace(/^"(.*)"$/, '$1')
+}
+
+async function importCSV(): Promise<ImportResult> {
+  const file = await pickFile('.csv')
+  if (!file) return { imported: 0, skipped: 0, errors: ['Cancelled'] }
+
+  const encKey = getEncryptionKey()
+  if (!encKey) return { imported: 0, skipped: 0, errors: ['Vault is locked'] }
+
+  let content = await file.text()
+  // Strip BOM
+  if (content.charCodeAt(0) === 0xFEFF) content = content.slice(1)
+
+  // Parse lines (handle quoted fields with newlines)
+  const lines: string[] = []
+  let currentLine = ''
+  let inQuotes = false
+  for (const char of content) {
+    if (char === '"') { inQuotes = !inQuotes; currentLine += char }
+    else if (char === '\r') { /* skip */ }
+    else if (char === '\n' && !inQuotes) {
+      if (currentLine.trim()) lines.push(currentLine)
+      currentLine = ''
+    } else { currentLine += char }
+  }
+  if (currentLine.trim()) lines.push(currentLine)
+
+  if (lines.length < 2) return { imported: 0, skipped: 0, errors: ['CSV file is empty or has no data rows'] }
+
+  const header = lines[0].toLowerCase()
+  const cols = header.split(',').map(c => c.trim().replace(/"/g, ''))
+  const nameIdx = cols.findIndex(c => c === 'name' || c === 'title' || c === 'item_name')
+  const urlIdx = cols.findIndex(c => c === 'url' || c === 'login_uri' || c === 'website' || c === 'web_address')
+  const userIdx = cols.findIndex(c => c === 'username' || c === 'login' || c === 'email' || c === 'login_username' || c === 'user')
+  const passIdx = cols.findIndex(c => c === 'password' || c === 'login_password')
+  const typeIdx = cols.findIndex(c => c === 'type' || c === 'item_type')
+  const cardNumIdx = cols.findIndex(c => c === 'card_number' || c === 'cc_number' || c === 'cardnumber')
+  const cardHolderIdx = cols.findIndex(c => c === 'card_holder' || c === 'cc_holder' || c === 'cardholder')
+  const cardExpiryIdx = cols.findIndex(c => c === 'card_expiry' || c === 'cc_expiry' || c === 'card_expiryDate')
+  const cardCvvIdx = cols.findIndex(c => c === 'card_cvv' || c === 'cc_cvv' || c === 'card_cvp2')
+  const notesIdx = cols.findIndex(c => c === 'notes' || c === 'note' || c === 'extra')
+
+  let imported = 0
+  let skipped = 0
+  const errors: string[] = []
+
+  for (let i = 1; i < lines.length; i++) {
+    try {
+      const values = parseCSVLine(lines[i])
+      const title = nameIdx >= 0 ? stripQuotes(values[nameIdx]) : `Import ${i}`
+      if (!title) { skipped++; continue }
+
+      const entryType = typeIdx >= 0 ? (stripQuotes(values[typeIdx]) || 'login') : 'login'
+
+      await createEntry({
+        entry_type: entryType as any,
+        title,
+        username: stripQuotes(userIdx >= 0 ? values[userIdx] : ''),
+        password: stripQuotes(passIdx >= 0 ? values[passIdx] : ''),
+        url: stripQuotes(urlIdx >= 0 ? values[urlIdx] : ''),
+        notes: stripQuotes(notesIdx >= 0 ? values[notesIdx] : ''),
+        card_number: cardNumIdx >= 0 ? stripQuotes(values[cardNumIdx]) : undefined,
+        card_holder: cardHolderIdx >= 0 ? stripQuotes(values[cardHolderIdx]) : undefined,
+        card_expiry: cardExpiryIdx >= 0 ? stripQuotes(values[cardExpiryIdx]) : undefined,
+        card_cvv: cardCvvIdx >= 0 ? stripQuotes(values[cardCvvIdx]) : undefined,
+      })
+      imported++
+    } catch (e: any) {
+      errors.push(`Row ${i}: ${e.message}`)
+      skipped++
+    }
+  }
+
+  if (imported > 0) await saveWebDatabase()
+  return { imported, skipped, errors }
+}
+
+async function importJSON(): Promise<ImportResult> {
+  const file = await pickFile('.json')
+  if (!file) return { imported: 0, skipped: 0, errors: ['Cancelled'] }
+
+  const encKey = getEncryptionKey()
+  if (!encKey) return { imported: 0, skipped: 0, errors: ['Vault is locked'] }
+
+  try {
+    const content = await file.text()
+    const data = JSON.parse(content)
+    const items = Array.isArray(data) ? data : data.items || data.entries || []
+    let imported = 0
+    let skipped = 0
+    const errors: string[] = []
+
+    for (const item of items) {
+      try {
+        const title = item.title || item.name || item.Login?.Name || ''
+        if (!title) { skipped++; continue }
+
+        const username = item.username || item.login || item.Login?.Username || ''
+
+        await createEntry({
+          entry_type: item.type || 'login',
+          title,
+          username,
+          password: item.password || item.Login?.Password || '',
+          url: item.url || item.Login?.Url || '',
+          notes: item.notes || item.Notes || '',
+        })
+        imported++
+      } catch (e: any) {
+        errors.push(`Item: ${e.message}`)
+        skipped++
+      }
+    }
+
+    if (imported > 0) await saveWebDatabase()
+    return { imported, skipped, errors }
+  } catch (e: any) {
+    return { imported: 0, skipped: 0, errors: [e.message] }
+  }
 }

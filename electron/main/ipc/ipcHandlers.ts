@@ -235,18 +235,18 @@ const handlers: Record<string, (...args: any[]) => any> = {
       const errors: string[] = []
       const vaultId = getActiveVaultId()
 
-      // Parse CSV header
+      // Parse CSV header — supports Bitwarden, Chrome, 1Password, generic
       const cols = header.split(',').map(c => c.trim().replace(/"/g, ''))
-      const nameIdx = cols.findIndex(c => c === 'name' || c === 'title')
-      const urlIdx = cols.findIndex(c => c === 'url')
-      const userIdx = cols.findIndex(c => c === 'username' || c === 'login' || c === 'email')
-      const passIdx = cols.findIndex(c => c === 'password')
-      const typeIdx = cols.findIndex(c => c === 'type')
-      const cardNumIdx = cols.findIndex(c => c === 'card_number')
-      const cardHolderIdx = cols.findIndex(c => c === 'card_holder')
-      const cardExpiryIdx = cols.findIndex(c => c === 'card_expiry')
-      const cardCvvIdx = cols.findIndex(c => c === 'card_cvv')
-      const notesIdx = cols.findIndex(c => c === 'notes')
+      const nameIdx = cols.findIndex(c => c === 'name' || c === 'title' || c === 'item_name')
+      const urlIdx = cols.findIndex(c => c === 'url' || c === 'login_uri' || c === 'website' || c === 'web_address')
+      const userIdx = cols.findIndex(c => c === 'username' || c === 'login' || c === 'email' || c === 'login_username' || c === 'user')
+      const passIdx = cols.findIndex(c => c === 'password' || c === 'login_password')
+      const typeIdx = cols.findIndex(c => c === 'type' || c === 'item_type')
+      const cardNumIdx = cols.findIndex(c => c === 'card_number' || c === 'cc_number' || c === 'cardnumber')
+      const cardHolderIdx = cols.findIndex(c => c === 'card_holder' || c === 'cc_holder' || c === 'cardholder')
+      const cardExpiryIdx = cols.findIndex(c => c === 'card_expiry' || c === 'cc_expiry' || c === 'card_expiryDate')
+      const cardCvvIdx = cols.findIndex(c => c === 'card_cvv' || c === 'cc_cvv' || c === 'card_cvp2')
+      const notesIdx = cols.findIndex(c => c === 'notes' || c === 'note' || c === 'extra')
 
       for (let i = 1; i < lines.length; i++) {
         try {
