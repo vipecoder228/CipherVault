@@ -12,6 +12,7 @@ let autoLockTimer: ReturnType<typeof setTimeout> | null = null
 let alarmMode = false
 let activeVaultId: number = 1
 let operationCount = 0
+let panicKey: Buffer | null = null // Temporary key for panic backup decryption
 
 export function acquireOperation(): void { operationCount++ }
 export function releaseOperation(): void { operationCount-- }
@@ -54,6 +55,18 @@ export function getEncryptionKey(): Buffer | null {
 
 export function getActiveVaultId(): number {
   return activeVaultId
+}
+
+export function getPanicEncryptionKey(): Buffer | null {
+  if (!panicKey) return null
+  return splitDerivedKey(panicKey).encryptionKey
+}
+
+export function clearPanicKey(): void {
+  if (panicKey) {
+    panicKey.fill(0)
+  }
+  panicKey = null
 }
 
 // ─── Rate Limiting ──────────────────────────────────────
@@ -251,6 +264,7 @@ export async function unlockVault(
     }
 
     derivedKey = isAlarm ? null : key // In alarm mode, don't store real key
+    panicKey = isAlarm ? key : null // Keep key temporarily for panic backup
     alarmMode = isAlarm
     activeVaultId = targetVaultId
     recordAttempt(db, true)
@@ -275,6 +289,7 @@ export function lockVault(): void {
     derivedKey.fill(0)
   }
   derivedKey = null
+  clearPanicKey()
   alarmMode = false
   pendingTotpSecret = null
   // Don't reset activeVaultId — keep it for re-unlock

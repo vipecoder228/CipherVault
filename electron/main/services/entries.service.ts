@@ -14,7 +14,7 @@ import {
 } from '../db/queries/entries.queries'
 import { addHistoryEntry, getEntryHistory, getFullEntryHistory } from '../db/queries/history.queries'
 import { encryptJSON, decryptJSON } from '../crypto/encryption'
-import { getEncryptionKey, getActiveVaultId } from './vault.service'
+import { getEncryptionKey, getActiveVaultId, getPanicEncryptionKey, clearPanicKey } from './vault.service'
 import { generateTOTPToken } from '../crypto/totp'
 import type { CreateEntryPayload, UpdateEntryPayload, DecryptedEntry, EncryptedEntry, EntryFilters, EntryHistoryItem } from '../../shared/types'
 
@@ -205,6 +205,33 @@ export async function forcePermanentDeleteEntry(id: number): Promise<void> {
   const db = await getDatabase()
   dbPermanentDeleteEntry(db, id)
   saveDatabase()
+}
+
+export async function getPanicBackupEntries(): Promise<Array<EncryptedEntry & { decrypted?: Record<string, string> }>> {
+  const db = await getDatabase()
+  const vaultId = getActiveVaultId()
+  const entries = getEntries(db, {}, vaultId)
+
+  // Try to decrypt entries with panic key
+  const panicKey = getPanicEncryptionKey()
+  if (!panicKey) return entries
+
+  return entries.map((entry) => {
+    let decrypted: Record<string, string> | undefined
+    try {
+      decrypted = decryptJSON<Record<string, string>>(
+        { iv: entry.iv, ciphertext: entry.encrypted_data, authTag: entry.auth_tag },
+        panicKey
+      )
+    } catch {
+      // Decryption failed — return encrypted entry
+    }
+    return { ...entry, decrypted }
+  })
+}
+
+export function completePanic(): void {
+  clearPanicKey()
 }
 
 export async function getEntryHistoryList(id: number): Promise<EntryHistoryItem[]> {

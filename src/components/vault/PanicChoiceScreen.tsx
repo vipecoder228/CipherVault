@@ -25,23 +25,27 @@ export function PanicChoiceScreen({ onChoice }: Props) {
         return
       }
 
-      // 2. Get all entries using alarm-mode bypass (no encryption key needed)
-      const entries = await invoke('entries:force-list')
+      // 2. Get entries with decryption (panic key is available)
+      const entries = await invoke('entries:panic-backup')
 
       if (!entries || entries.length === 0) {
-        // Nothing to back up — just wipe
         addToast('No entries found to wipe', 'warning')
         onChoice('wipe')
         return
       }
 
-      // 3. Create backup JSON (encrypted blobs, not decrypted)
+      // 3. Create backup JSON with DECRYPTED entries
       const backupData = JSON.stringify({
         format: 'ciphervault-panic-backup',
         version: '1.0',
         timestamp: new Date().toISOString(),
         entryCount: entries.length,
-        entries: entries,
+        entries: entries.map((e) => ({
+          id: e.id,
+          entry_type: e.entry_type,
+          display_title: e.display_title,
+          ...(e.decrypted || {}),
+        })),
       }, null, 2)
 
       // 4. Save backup + open email client
@@ -50,10 +54,13 @@ export function PanicChoiceScreen({ onChoice }: Props) {
         addToast('Backup save failed: ' + (sendResult?.error || 'Unknown error'), 'error')
       }
 
-      // 5. Permanently delete all entries (using alarm-mode bypass)
+      // 5. Delete all entries
       for (const entry of entries) {
         await invoke('entries:force-delete', entry.id)
       }
+
+      // 6. Clear panic key
+      await invoke('entries:complete-panic')
 
       const pathInfo = sendResult?.filePath ? ` (${sendResult.filePath})` : ''
       addToast(`Backup saved${pathInfo}. Email client opened. All data wiped.`, 'success')
@@ -61,12 +68,12 @@ export function PanicChoiceScreen({ onChoice }: Props) {
     } catch (err: any) {
       console.error('Panic backup failed:', err)
       addToast('Backup failed: ' + (err.message || 'Unknown error'), 'error')
-      // Still try to wipe
       try {
-        const entries = await invoke('entries:force-list')
+        const entries = await invoke('entries:panic-backup')
         for (const entry of entries) {
           await invoke('entries:force-delete', entry.id)
         }
+        await invoke('entries:complete-panic')
         addToast('Data wiped (backup failed)', 'warning')
         onChoice('wipe')
       } catch {}

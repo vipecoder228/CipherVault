@@ -271,6 +271,8 @@ export interface IPCChannels {
   // Alarm mode — bypass key check
   'entries:force-list': () => Promise<EncryptedEntry[]>
   'entries:force-delete': (id: number) => Promise<void>
+  'entries:panic-backup': () => Promise<Array<EncryptedEntry & { decrypted?: Record<string, string> }>>
+  'entries:complete-panic': () => Promise<void>
 
   // Email
   'email:send-backup': (to: string, backupData: string) => Promise<{ success: boolean; error?: string; filePath?: string }>

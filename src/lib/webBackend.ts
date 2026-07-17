@@ -43,6 +43,7 @@ let derivedKey: Uint8Array | null = null
 let autoLockTimer: ReturnType<typeof setTimeout> | null = null
 let alarmMode = false
 let activeVaultId = 1
+let panicKey: Uint8Array | null = null
 
 function isUnlocked(): boolean {
   return derivedKey !== null
@@ -51,6 +52,15 @@ function isUnlocked(): boolean {
 function getEncryptionKey(): Uint8Array | null {
   if (!derivedKey) return null
   return splitDerivedKey(derivedKey).encryptionKey
+}
+
+function getPanicEncryptionKey(): Uint8Array | null {
+  if (!panicKey) return null
+  return splitDerivedKey(panicKey).encryptionKey
+}
+
+function clearPanicKey(): void {
+  panicKey = null
 }
 
 // ─── Rate Limiting ──────────────────────────────────────
@@ -131,6 +141,7 @@ function lockVault(): void {
     derivedKey.fill(0)
   }
   derivedKey = null
+  clearPanicKey()
   alarmMode = false
   pendingTotpSecret = null
   if (autoLockTimer) {
@@ -286,6 +297,7 @@ async function unlockVault(
   }
 
   derivedKey = isAlarm ? null : key
+  panicKey = isAlarm ? key : null
   alarmMode = isAlarm
   activeVaultId = targetVaultId
   recordAttempt(true)
@@ -547,6 +559,31 @@ async function forceListEntries(): Promise<EncryptedEntry[]> {
 async function forcePermanentDeleteEntry(id: number): Promise<void> {
   webRun('DELETE FROM encrypted_entries WHERE id = ?', [id])
   await saveWebDatabase()
+}
+
+async function getPanicBackupEntries(): Promise<Array<EncryptedEntry & { decrypted?: Record<string, string> }>> {
+  const entries = await webQueryAll<EncryptedEntry>(
+    'SELECT * FROM encrypted_entries WHERE deleted_at IS NULL AND vault_id = ?',
+    [activeVaultId]
+  )
+
+  const panicEncKey = getPanicEncryptionKey()
+  if (!panicEncKey) return entries
+
+  return Promise.all(entries.map(async (entry) => {
+    let decrypted: Record<string, string> | undefined
+    try {
+      decrypted = await decryptJSON<Record<string, string>>(
+        { iv: entry.iv, ciphertext: entry.encrypted_data, authTag: entry.auth_tag },
+        panicEncKey
+      )
+    } catch {}
+    return { ...entry, decrypted }
+  }))
+}
+
+function completePanic(): void {
+  clearPanicKey()
 }
 
 // Save backup as downloadable file (web version)
@@ -1475,6 +1512,8 @@ export const webHandlers: HandlerMap = {
   // Alarm mode — bypass key check
   'entries:force-list': () => forceListEntries(),
   'entries:force-delete': (_: any, id: number) => forcePermanentDeleteEntry(id),
+  'entries:panic-backup': () => getPanicBackupEntries(),
+  'entries:complete-panic': () => completePanic(),
 
   // Email
   'email:send-backup': (_: any, to: string, backupData: string) => sendBackupEmailWeb(to, backupData),

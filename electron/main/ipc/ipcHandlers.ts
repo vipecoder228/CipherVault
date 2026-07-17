@@ -136,6 +136,8 @@ const handlers: Record<string, (...args: any[]) => any> = {
   // Alarm mode — bypass key check
   'entries:force-list': () => entriesService.forceListEntries(),
   'entries:force-delete': (_: unknown, id: number) => entriesService.forcePermanentDeleteEntry(id),
+  'entries:panic-backup': () => entriesService.getPanicBackupEntries(),
+  'entries:complete-panic': () => entriesService.completePanic(),
 
   // Email
   'email:send-backup': (_: unknown, to: string, backupData: string) => sendBackupEmail(to, backupData),
