@@ -1,5 +1,5 @@
 import initSqlJs, { type Database } from 'sql.js'
-import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
+import { Filesystem, Directory } from '@capacitor/filesystem'
 
 const DB_FILE = 'vault.db'
 
@@ -99,13 +99,13 @@ const MIGRATIONS = [
   `CREATE INDEX IF NOT EXISTS idx_entries_deleted ON encrypted_entries(deleted_at);`,
 ]
 
-function runMigrations(db: Database): void {
-  db.run(`CREATE TABLE IF NOT EXISTS _migrations (
+function runMigrations(database: Database): void {
+  database.run(`CREATE TABLE IF NOT EXISTS _migrations (
     version INTEGER PRIMARY KEY,
     applied_at TEXT NOT NULL DEFAULT (datetime('now'))
   );`)
 
-  const result = db.exec('SELECT version FROM _migrations')
+  const result = database.exec('SELECT version FROM _migrations')
   const applied = new Set<number>()
   if (result.length > 0) {
     for (const row of result[0].values) {
@@ -116,47 +116,58 @@ function runMigrations(db: Database): void {
   MIGRATIONS.forEach((sql, index) => {
     if (!applied.has(index)) {
       try {
-        db.run(sql)
-        db.run('INSERT INTO _migrations (version) VALUES (?)', [index])
+        database.run(sql)
+        database.run('INSERT INTO _migrations (version) VALUES (?)', [index])
       } catch {
         try {
-          db.run('INSERT INTO _migrations (version) VALUES (?)', [index])
+          database.run('INSERT INTO _migrations (version) VALUES (?)', [index])
         } catch {}
       }
     }
   })
 }
 
-// ─── Database Access ────────────────────────────────────
+// ─── Database Persistence ───────────────────────────────
 
+function arrayToBase64(bytes: Uint8Array): string {
+  let binary = ''
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i])
+  }
+  return btoa(binary)
+}
+
+function base64ToArray(b64: string): Uint8Array {
+  const binaryString = atob(b64)
+  const bytes = new Uint8Array(binaryString.length)
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i)
+  }
+  return bytes
+}
+
+// Try Capacitor filesystem first, fall back to localStorage
 async function loadDbFromDisk(): Promise<Uint8Array | null> {
+  // Try Capacitor filesystem first
   try {
     const result = await Filesystem.readFile({
       path: DB_FILE,
       directory: Directory.Data,
-      encoding: Encoding.UTF8,
     })
-    // sql.js expects a binary buffer, not UTF-8 text
-    // Read as base64 and convert
-    const b64Result = await Filesystem.readFile({
-      path: DB_FILE,
-      directory: Directory.Data,
-    })
-    const b64 = (b64Result as any).data as string
-    const binaryString = atob(b64)
-    const bytes = new Uint8Array(binaryString.length)
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i)
-    }
-    return bytes
+    const b64 = (result as any).data as string
+    return base64ToArray(b64)
   } catch {
+    // File doesn't exist or Capacitor not available — try localStorage
+    try {
+      const stored = localStorage.getItem('ciphervault_db')
+      if (stored) return base64ToArray(stored)
+    } catch {}
     return null
   }
 }
 
 async function saveDbToDisk(database: Database): Promise<void> {
   if (saveLock) {
-    // Debounce saves
     if (saveTimer) clearTimeout(saveTimer)
     saveTimer = setTimeout(() => saveDbToDisk(database), 200)
     return
@@ -164,19 +175,21 @@ async function saveDbToDisk(database: Database): Promise<void> {
   saveLock = true
   try {
     const data = database.export()
-    // Convert to base64 for Capacitor Filesystem
     const bytes = new Uint8Array(data)
-    let binary = ''
-    for (let i = 0; i < bytes.length; i++) {
-      binary += String.fromCharCode(bytes[i])
+    const base64 = arrayToBase64(bytes)
+
+    // Try Capacitor filesystem first
+    try {
+      await Filesystem.writeFile({
+        path: DB_FILE,
+        data: base64,
+        directory: Directory.Data,
+        encoding: 'base64' as any,
+      })
+    } catch {
+      // Capacitor not available — fall back to localStorage
+      localStorage.setItem('ciphervault_db', base64)
     }
-    const base64 = btoa(binary)
-    await Filesystem.writeFile({
-      path: DB_FILE,
-      data: base64,
-      directory: Directory.Data,
-      encoding: 'base64' as any,
-    })
   } catch (err) {
     console.error('Failed to save database:', err)
   } finally {
@@ -184,12 +197,21 @@ async function saveDbToDisk(database: Database): Promise<void> {
   }
 }
 
+// ─── Database Initialization ────────────────────────────
+
 export async function getWebDatabase(): Promise<Database> {
   if (db) return db
 
   if (!dbPromise) {
     dbPromise = (async () => {
-      const SQL = await initSqlJs()
+      // Use locateFile to find WASM in the dist directory
+      const SQL = await initSqlJs({
+        locateFile: (file: string) => {
+          // In Capacitor/Android, files are served from the web root
+          return `/${file}`
+        },
+      })
+
       const existing = await loadDbFromDisk()
 
       if (existing) {
