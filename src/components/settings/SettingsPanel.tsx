@@ -527,7 +527,7 @@ function AlarmSetupModal({ onClose, onStatusChange }: { onClose: () => void; onS
     if (backupPassword !== confirmBackup) { addToast('Backup passwords do not match', 'warning'); return }
     setLoading(true)
     try {
-      await invoke('settings:set', 'panic_backup_password', backupPassword)
+      await invoke('settings:set-secure', 'panic_backup_password', backupPassword)
 
       // Save Telegram config if provided
       if (telegramToken && chatId) {

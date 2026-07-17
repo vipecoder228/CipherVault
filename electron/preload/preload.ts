@@ -51,6 +51,8 @@ const channels: (keyof IPCChannels)[] = [
   'clipboard:clear',
   'settings:get',
   'settings:set',
+  'settings:set-secure',
+  'settings:get-secure',
   'disposable:create',
   'disposable:list',
   'disposable:messages',

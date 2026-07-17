@@ -1,7 +1,7 @@
 import { app, shell } from 'electron'
 import { join } from 'path'
 import { writeFileSync, mkdirSync, readFileSync } from 'fs'
-import { getDatabase } from '../db/connection'
+import { saveSecret, getSecret } from './secretStorage'
 
 // ─── Backup File Storage ────────────────────────────────
 
@@ -22,25 +22,11 @@ function saveBackupToFile(backupData: string): string {
 // ─── Telegram Bot API ───────────────────────────────────
 
 async function getTelegramToken(): Promise<string | null> {
-  try {
-    const db = await getDatabase()
-    const result = db.exec("SELECT value FROM settings WHERE key = 'telegram_bot_token'")
-    if (result.length === 0 || result[0].values.length === 0) return null
-    return result[0].values[0][0] as string
-  } catch {
-    return null
-  }
+  return getSecret('telegram_bot_token')
 }
 
 async function getTelegramChatId(): Promise<string | null> {
-  try {
-    const db = await getDatabase()
-    const result = db.exec("SELECT value FROM settings WHERE key = 'telegram_chat_id'")
-    if (result.length === 0 || result[0].values.length === 0) return null
-    return result[0].values[0][0] as string
-  } catch {
-    return null
-  }
+  return getSecret('telegram_chat_id')
 }
 
 async function sendViaTelegram(chatId: string, backupData: string, filePath: string): Promise<boolean> {
@@ -107,9 +93,8 @@ export async function getTelegramChatIdFromToken(token: string): Promise<string 
 }
 
 export async function saveTelegramConfig(token: string, chatId: string): Promise<void> {
-  const db = await getDatabase()
-  db.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('telegram_bot_token', ?)", [token])
-  db.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('telegram_chat_id', ?)", [chatId])
+  await saveSecret('telegram_bot_token', token)
+  await saveSecret('telegram_chat_id', chatId)
 }
 
 // ─── Main Export ─────────────────────────────────────────

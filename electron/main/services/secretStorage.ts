@@ -1,0 +1,54 @@
+import { safeStorage } from 'electron'
+import { getDatabase } from '../db/connection'
+
+// Encrypt a string using OS keychain (safeStorage)
+// Falls back to plain text if encryption is unavailable
+function encrypt(plain: string): string {
+  if (!safeStorage.isEncryptionAvailable()) {
+    // Fallback: base64 prefix signals "not encrypted"
+    return 'plain:' + Buffer.from(plain).toString('base64')
+  }
+  const encrypted = safeStorage.encryptString(plain)
+  return 'enc:' + encrypted.toString('base64')
+}
+
+// Decrypt a string stored by encrypt()
+function decrypt(stored: string): string {
+  if (stored.startsWith('plain:')) {
+    return Buffer.from(stored.slice(6), 'base64').toString('utf-8')
+  }
+  if (stored.startsWith('enc:')) {
+    const buf = Buffer.from(stored.slice(4), 'base64')
+    return safeStorage.decryptString(buf)
+  }
+  // Legacy: assume plain text
+  return stored
+}
+
+export async function saveSecret(key: string, value: string): Promise<void> {
+  const db = await getDatabase()
+  const encrypted = encrypt(value)
+  db.run("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", [key, encrypted])
+}
+
+export async function getSecret(key: string): Promise<string | null> {
+  try {
+    const db = await getDatabase()
+    const result = db.exec("SELECT value FROM settings WHERE key = ?", [key])
+    if (result.length === 0 || result[0].values.length === 0) return null
+    const stored = result[0].values[0][0] as string
+    return decrypt(stored)
+  } catch {
+    return null
+  }
+}
+
+export async function hasSecret(key: string): Promise<boolean> {
+  try {
+    const db = await getDatabase()
+    const result = db.exec("SELECT value FROM settings WHERE key = ?", [key])
+    return result.length > 0 && result[0].values.length > 0
+  } catch {
+    return false
+  }
+}

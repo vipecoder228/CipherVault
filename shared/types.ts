@@ -227,6 +227,8 @@ export interface IPCChannels {
   // Settings
   'settings:get': (key: string) => Promise<string | null>
   'settings:set': (key: string, value: string) => Promise<void>
+  'settings:set-secure': (key: string, value: string) => Promise<void>
+  'settings:get-secure': (key: string) => Promise<string | null>
 
   // Disposable Emails
   'disposable:create': () => Promise<{ id: number; address: string }>

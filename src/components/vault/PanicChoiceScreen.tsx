@@ -19,7 +19,7 @@ export function PanicChoiceScreen({ onChoice }: Props) {
     setLoading(true)
     try {
       // 1. Get backup password
-      const backupPassword = await invoke('settings:get', 'panic_backup_password')
+      const backupPassword = await invoke('settings:get-secure', 'panic_backup_password')
       if (!backupPassword) {
         addToast('Backup password not configured', 'error')
         setLoading(false)

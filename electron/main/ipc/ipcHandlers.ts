@@ -11,6 +11,7 @@ import * as backupService from '../services/backup.service'
 import { analyzePasswordHealth } from '../services/health.service'
 import * as syncService from '../services/sync.service'
 import { sendBackup, testTelegramConnection, getTelegramChatIdFromToken, saveTelegramConfig } from '../services/email.service'
+import { saveSecret, getSecret } from '../services/secretStorage'
 import { getDatabase, saveDatabase } from '../db/connection'
 import { getCategories, createCategory, updateCategory, deleteCategory, reorderCategories } from '../db/queries/categories.queries'
 import { checkIntegrity } from '../integrity'
@@ -185,6 +186,12 @@ const handlers: Record<string, (...args: any[]) => any> = {
   'settings:set': async (_: unknown, key: string, value: string) => {
     const db = await getDatabase()
     db.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, value])
+  },
+  'settings:set-secure': async (_: unknown, key: string, value: string) => {
+    await saveSecret(key, value)
+  },
+  'settings:get-secure': async (_: unknown, key: string) => {
+    return getSecret(key)
   },
 
   // Disposable Emails
