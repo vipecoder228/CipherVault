@@ -108,8 +108,9 @@ export const useVaultStore = create<VaultState>((set, get) => ({
         }))
         return false
       }
-    } catch (err) {
-      set({ error: 'An unexpected error occurred', loading: false })
+    } catch (err: any) {
+      console.error('Vault unlock error:', err)
+      set({ error: err?.message || 'An unexpected error occurred', loading: false })
       return false
     }
   },
