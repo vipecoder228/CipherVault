@@ -164,6 +164,9 @@ export default {
   secure_note_protected: 'Защищённая заметка',
   enter_master_password_to_view: 'Введите мастер-пароль для просмотра заметки',
   invalid_password: 'Неверный пароль',
+  use_biometric: 'Использовать биометрию',
+  or_enter_password: 'или введите пароль',
+  biometric_reason: 'Подтвердите вход для просмотра заметки',
   type_identity: 'Личность',
 
   // Create/Edit entry

@@ -1,11 +1,12 @@
-import { ArrowLeft, Copy, ExternalLink, Star, Trash2, Edit2, Lock } from 'lucide-react'
+import { ArrowLeft, Copy, ExternalLink, Star, Trash2, Edit2, Lock, Fingerprint } from 'lucide-react'
 import { useEntriesStore } from '../../store/entriesStore'
 import { useVaultStore } from '../../store/vaultStore'
+import { getBiometric } from '../../services/biometricService'
 import { useToastStore } from '../ui/Toast'
 import { useI18n } from '../../i18n'
 import { invoke } from '../../lib/ipc'
 import { EditEntryModal } from '../entries/EditEntryModal'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 export function MobileEntryDetail() {
   const { selectedEntry, selectEntry, toggleFavorite, deleteEntry } = useEntriesStore()
@@ -17,6 +18,11 @@ export function MobileEntryDetail() {
   const [viewPassword, setViewPassword] = useState('')
   const [viewPasswordError, setViewPasswordError] = useState(false)
   const [verifying, setVerifying] = useState(false)
+  const [biometricAvailable, setBiometricAvailable] = useState(false)
+
+  useEffect(() => {
+    getBiometric().isAvailable().then(setBiometricAvailable)
+  }, [])
 
   if (!selectedEntry) return null
 
@@ -31,6 +37,23 @@ export function MobileEntryDetail() {
       if (!ok) {
         setViewPasswordError(true)
         setViewPassword('')
+      }
+    }
+
+    const handleBiometric = async () => {
+      setVerifying(true)
+      setViewPasswordError(false)
+      const bio = getBiometric()
+      const result = await bio.authenticate(
+        t('secure_note_protected'),
+        selectedEntry.title || 'Заметка',
+        t('biometric_reason')
+      )
+      setVerifying(false)
+      if (result.success) {
+        verifySecureNote(selectedEntry.id, '__biometric__')
+      } else {
+        setViewPasswordError(true)
       }
     }
 
@@ -50,6 +73,21 @@ export function MobileEntryDetail() {
             </div>
             <h3 className="text-lg font-semibold text-vault-text">{selectedEntry.title || 'Заметка'}</h3>
             <p className="text-sm text-vault-text-secondary">{t('enter_master_password_to_view')}</p>
+
+            {/* Biometric button */}
+            {biometricAvailable && (
+              <button
+                onClick={handleBiometric}
+                disabled={verifying}
+                className="w-full h-12 bg-vault-surface border border-vault-border rounded-xl font-medium hover:bg-vault-surface-hover transition-colors flex items-center justify-center gap-2"
+              >
+                <Fingerprint size={20} className="text-vault-accent" />
+                {t('use_biometric')}
+              </button>
+            )}
+
+            <div className="text-xs text-vault-text-secondary">{t('or_enter_password')}</div>
+
             <input
               type="password"
               placeholder={t('master_password_placeholder')}

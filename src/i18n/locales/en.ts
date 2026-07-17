@@ -164,6 +164,9 @@ export default {
   secure_note_protected: 'Secure Note',
   enter_master_password_to_view: 'Enter your master password to view this note',
   invalid_password: 'Invalid password',
+  use_biometric: 'Use Biometric',
+  or_enter_password: 'or enter password',
+  biometric_reason: 'Authenticate to view secure note',
   type_identity: 'Identity',
 
   // Create/Edit entry

@@ -134,6 +134,15 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   resetTotpState: () => set({ requiresTotp: false, pendingPassword: null }),
 
   verifySecureNote: async (noteId: number, password: string) => {
+    // Biometric bypass — if password is sentinel, trust biometric auth
+    if (password === '__biometric__') {
+      set((state) => {
+        const next = new Set(state.verifiedSecureNotes)
+        next.add(noteId)
+        return { verifiedSecureNotes: next }
+      })
+      return true
+    }
     try {
       const result = await invoke('vault:verify-password' as any, password)
       if (result) {

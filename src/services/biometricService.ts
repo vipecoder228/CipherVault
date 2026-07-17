@@ -16,18 +16,12 @@ export interface BiometricService {
   isEnabled(): Promise<boolean>
 }
 
-// Check if Capacitor is available
-const capacitor = typeof window !== 'undefined' ? (window as any).Capacitor : null
-
-// Capacitor biometric implementation
+// Capacitor biometric implementation using @capgo/capacitor-native-biometric
 const capacitorBiometric: BiometricService = {
   async isAvailable(): Promise<boolean> {
-    if (!capacitor) return false
-
     try {
-      // Check if Biometric plugin is available
-      const { Biometric } = await import('@capacitor-community/biometric')
-      const result = await Biometric.isAvailable()
+      const { NativeBiometric } = await import('@capgo/capacitor-native-biometric')
+      const result = await NativeBiometric.isAvailable({ useFallback: true })
       return result.isAvailable
     } catch {
       return false
@@ -35,27 +29,22 @@ const capacitorBiometric: BiometricService = {
   },
 
   async authenticate(title: string, subtitle: string, reason: string): Promise<BiometricResult> {
-    if (!capacitor) {
-      return { success: false, error: 'Capacitor not available' }
-    }
-
     try {
-      const { Biometric } = await import('@capacitor-community/biometric')
-      const result = await Biometric.authenticate({
+      const { NativeBiometric } = await import('@capgo/capacitor-native-biometric')
+      await NativeBiometric.verifyIdentity({
         title,
         subtitle,
         reason,
-        cancelTitle: 'Отмена',
+        negativeButtonText: 'Отмена',
+        useFallback: true,
       })
-
-      return { success: result.success }
+      return { success: true }
     } catch (error: any) {
       return { success: false, error: error.message || 'Authentication failed' }
     }
   },
 
   async enable(): Promise<void> {
-    // Store preference
     localStorage.setItem('biometric_enabled', 'true')
   },
 
@@ -71,12 +60,10 @@ const capacitorBiometric: BiometricService = {
 // Electron biometric implementation (placeholder)
 const electronBiometric: BiometricService = {
   async isAvailable(): Promise<boolean> {
-    // TODO: Implement with native keychain integration
     return false
   },
 
   async authenticate(title: string, subtitle: string, reason: string): Promise<BiometricResult> {
-    // TODO: Implement with native keychain integration
     return { success: true }
   },
 
@@ -103,31 +90,18 @@ const webBiometric: BiometricService = {
     return { success: true }
   },
 
-  async enable(): Promise<void> {
-    // No-op on web
-  },
-
-  async disable(): Promise<void> {
-    // No-op on web
-  },
-
-  async isEnabled(): Promise<boolean> {
-    return false
-  },
+  async enable(): Promise<void> {},
+  async disable(): Promise<void> {},
+  async isEnabled(): Promise<boolean> { return false },
 }
 
 // Get the appropriate biometric service based on platform
 export function getBiometricService(): BiometricService {
-  if (isCapacitor) {
-    return capacitorBiometric
-  }
-  if (isElectron) {
-    return electronBiometric
-  }
+  if (isCapacitor) return capacitorBiometric
+  if (isElectron) return electronBiometric
   return webBiometric
 }
 
-// Singleton instance
 let biometricService: BiometricService | null = null
 
 export function getBiometric(): BiometricService {
