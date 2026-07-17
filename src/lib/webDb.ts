@@ -1,4 +1,4 @@
-import initSqlJs, { type Database } from 'sql.js'
+import initSqlJsWasm, { type Database } from 'sql.js'
 import { Filesystem, Directory } from '@capacitor/filesystem'
 
 const DB_FILE = 'vault.db'
@@ -199,18 +199,39 @@ async function saveDbToDisk(database: Database): Promise<void> {
 
 // ─── Database Initialization ────────────────────────────
 
+async function initSql(): Promise<any> {
+  // Try WASM first
+  try {
+    console.log('[DB] Trying sql.js WASM...')
+    const SQL = await initSqlJsWasm({
+      locateFile: (file: string) => `/${file}`,
+    })
+    console.log('[DB] WASM loaded successfully')
+    return SQL
+  } catch (wasmErr) {
+    console.warn('[DB] WASM failed, trying asm.js fallback:', wasmErr)
+  }
+
+  // Fallback: pure JS asm.js (no WASM needed)
+  try {
+    const mod = await import('sql.js/dist/sql-asm.js')
+    const initAsm = mod.default
+    console.log('[DB] Loading asm.js...')
+    const SQL = await initAsm()
+    console.log('[DB] asm.js loaded successfully')
+    return SQL
+  } catch (asmErr) {
+    console.error('[DB] asm.js also failed:', asmErr)
+    throw asmErr
+  }
+}
+
 export async function getWebDatabase(): Promise<Database> {
   if (db) return db
 
   if (!dbPromise) {
     dbPromise = (async () => {
-      // Use locateFile to find WASM in the dist directory
-      const SQL = await initSqlJs({
-        locateFile: (file: string) => {
-          // In Capacitor/Android, files are served from the web root
-          return `/${file}`
-        },
-      })
+      const SQL = await initSql()
 
       const existing = await loadDbFromDisk()
 
