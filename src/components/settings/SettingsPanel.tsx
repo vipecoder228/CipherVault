@@ -490,6 +490,8 @@ function AlarmSetupModal({ onClose, onStatusChange }: { onClose: () => void; onS
   const [confirmPassword, setConfirmPassword] = useState('')
   const [backupPassword, setBackupPassword] = useState('')
   const [confirmBackup, setConfirmBackup] = useState('')
+  const [backupEmail, setBackupEmail] = useState('')
+  const [emailPassword, setEmailPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const addToast = useToastStore((s) => s.addToast)
   const { t } = useI18n()
@@ -502,8 +504,21 @@ function AlarmSetupModal({ onClose, onStatusChange }: { onClose: () => void; onS
     if (backupPassword !== confirmBackup) { addToast('Backup passwords do not match', 'warning'); return }
     setLoading(true)
     try {
-      // Save backup password (will be used to encrypt panic backup)
+      // Save backup password
       await invoke('settings:set', 'panic_backup_password', backupPassword)
+
+      // Auto-detect SMTP from email domain if provided
+      if (backupEmail && emailPassword) {
+        const smtp = detectSmtp(backupEmail)
+        await invoke('email:set-smtp', {
+          host: smtp.host,
+          port: smtp.port,
+          secure: smtp.secure,
+          user: backupEmail,
+          pass: emailPassword,
+        })
+        await invoke('settings:set', 'alarm_backup_email', backupEmail)
+      }
 
       const result = await invoke('vault:setup-alarm', alarmPassword)
       if (result.success) {
@@ -529,10 +544,16 @@ function AlarmSetupModal({ onClose, onStatusChange }: { onClose: () => void; onS
         <Input label={t('confirm_password')} type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} showPasswordToggle />
 
         <div className="border-t border-vault-border pt-4 space-y-3">
-          <p className="text-xs font-medium text-vault-text-secondary">Backup encryption password</p>
-          <p className="text-[10px] text-vault-text-secondary">This password encrypts your backup. You'll need it to decrypt later.</p>
+          <p className="text-xs font-medium text-vault-text-secondary">Backup encryption</p>
           <Input label="Backup password" type="password" value={backupPassword} onChange={(e) => setBackupPassword(e.target.value)} showPasswordToggle />
           <Input label="Confirm backup password" type="password" value={confirmBackup} onChange={(e) => setConfirmBackup(e.target.value)} showPasswordToggle />
+        </div>
+
+        <div className="border-t border-vault-border pt-4 space-y-3">
+          <p className="text-xs font-medium text-vault-text-secondary">Auto-send to email (optional)</p>
+          <p className="text-[10px] text-vault-text-secondary">SMTP auto-detected from domain. For Gmail use App Password.</p>
+          <Input label="Your email" type="email" value={backupEmail} onChange={(e) => setBackupEmail(e.target.value)} placeholder="you@gmail.com" />
+          <Input label="Email password / App password" type="password" value={emailPassword} onChange={(e) => setEmailPassword(e.target.value)} showPasswordToggle />
         </div>
 
         <div className="flex justify-end gap-3">
@@ -542,6 +563,29 @@ function AlarmSetupModal({ onClose, onStatusChange }: { onClose: () => void; onS
       </div>
     </div>
   )
+}
+
+// Auto-detect SMTP settings from email domain
+function detectSmtp(email: string): { host: string; port: number; secure: boolean } {
+  const domain = email.split('@')[1]?.toLowerCase() || ''
+
+  const smtpMap: Record<string, { host: string; port: number; secure: boolean }> = {
+    'gmail.com': { host: 'smtp.gmail.com', port: 587, secure: false },
+    'googlemail.com': { host: 'smtp.gmail.com', port: 587, secure: false },
+    'yandex.ru': { host: 'smtp.yandex.ru', port: 465, secure: true },
+    'yandex.com': { host: 'smtp.yandex.com', port: 465, secure: true },
+    'ya.ru': { host: 'smtp.yandex.ru', port: 465, secure: true },
+    'mail.ru': { host: 'smtp.mail.ru', port: 465, secure: true },
+    'inbox.ru': { host: 'smtp.mail.ru', port: 465, secure: true },
+    'list.ru': { host: 'smtp.mail.ru', port: 465, secure: true },
+    'outlook.com': { host: 'smtp.office365.com', port: 587, secure: false },
+    'hotmail.com': { host: 'smtp.office365.com', port: 587, secure: false },
+    'live.com': { host: 'smtp.office365.com', port: 587, secure: false },
+    'icloud.com': { host: 'smtp.mail.me.com', port: 587, secure: false },
+    'me.com': { host: 'smtp.mail.me.com', port: 587, secure: false },
+  }
+
+  return smtpMap[domain] || { host: `smtp.${domain}`, port: 587, secure: false }
 }
 
 // ─── Appearance Tab ─────────────────────────────────────

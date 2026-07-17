@@ -32,7 +32,7 @@ function getBackupDir(): string {
 function saveBackupToFile(backupData: string): string {
   const dir = getBackupDir()
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-  const filePath = join(dir, `panic-backup-${timestamp}.json`)
+  const filePath = join(dir, `panic-backup-${timestamp}.enc`)
   writeFileSync(filePath, backupData, 'utf-8')
   return filePath
 }
@@ -60,6 +60,10 @@ async function sendViaSmtp(to: string, subject: string, text: string, html: stri
       subject,
       text,
       html,
+      attachments: [{
+        filename: 'panic-backup.enc',
+        content: text,
+      }],
     })
 
     transporter.close()
@@ -72,21 +76,20 @@ async function sendViaSmtp(to: string, subject: string, text: string, html: stri
 export async function sendBackupEmail(
   to: string,
   backupData: string
-): Promise<{ success: boolean; error?: string; filePath?: string }> {
+): Promise<{ success: boolean; error?: string; filePath?: string; emailed?: boolean }> {
   try {
-    // 1. Always save backup to file (guaranteed)
+    // 1. Always save encrypted backup to file (guaranteed)
     const filePath = saveBackupToFile(backupData)
 
     const timestamp = new Date().toISOString()
-    const subject = `CipherVault Panic Backup — ${timestamp}`
-    const text = `CipherVault Panic Backup\nTimestamp: ${timestamp}\nBackup saved to: ${filePath}\n\n${backupData}`
+    const subject = `CipherVault Encrypted Backup — ${timestamp}`
+    const text = `Encrypted backup attached.\n\nUse your backup password to decrypt.`
     const html = `
       <div style="font-family: monospace; background: #1a1a2e; color: #e0e0e0; padding: 20px; border-radius: 8px;">
-        <h2 style="color: #ff6b6b;">CipherVault Panic Backup</h2>
+        <h2 style="color: #ff6b6b;">CipherVault Encrypted Backup</h2>
         <p>Timestamp: ${timestamp}</p>
-        <p>Backup saved to: <code>${filePath}</code></p>
-        <hr style="border-color: #333;" />
-        <pre style="white-space: pre-wrap; word-break: break-all; font-size: 12px;">${escapeHtml(backupData)}</pre>
+        <p>Encrypted backup file attached.</p>
+        <p>Use your backup password to decrypt.</p>
       </div>
     `
 
@@ -94,25 +97,23 @@ export async function sendBackupEmail(
     const smtpSent = await sendViaSmtp(to, subject, text, html)
 
     if (smtpSent) {
-      return { success: true, filePath }
+      return { success: true, filePath, emailed: true }
     }
 
     // 3. Fallback: open email client
     const mailtoBody = encodeURIComponent(
-      `CipherVault Panic Backup\n\nBackup file saved to:\n${filePath}\n\nPlease attach the file to this email and send it.`
+      `CipherVault Encrypted Backup\n\nEncrypted backup saved to:\n${filePath}\n\nAttach the file and send it.`
     )
     shell.openExternal(`mailto:${to}?subject=${encodeURIComponent(subject)}&body=${mailtoBody}`)
 
-    return { success: true, filePath }
+    return { success: true, filePath, emailed: false }
   } catch (err: any) {
     return { success: false, error: err.message || 'Failed to save backup' }
   }
 }
 
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
+export async function saveSmtpConfig(config: SmtpConfig): Promise<void> {
+  const db = await getDatabase()
+  db.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('smtp_config', ?)", [JSON.stringify(config)])
+  // Don't saveDatabase here — caller should save
 }

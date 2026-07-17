@@ -275,7 +275,7 @@ export interface IPCChannels {
   'entries:complete-panic': () => Promise<void>
 
   // Email
-  'email:send-backup': (to: string, backupData: string) => Promise<{ success: boolean; error?: string; filePath?: string }>
+  'email:send-backup': (to: string, backupData: string) => Promise<{ success: boolean; error?: string; filePath?: string; emailed?: boolean }>
   'email:set-smtp': (config: { host: string; port: number; secure: boolean; user: string; pass: string }) => Promise<{ success: boolean }>
   'email:get-smtp': () => Promise<{ host: string; port: number; secure: boolean; user: string; pass: string } | null>
 }
