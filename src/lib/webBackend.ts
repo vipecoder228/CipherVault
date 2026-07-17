@@ -1543,20 +1543,93 @@ async function importJSON(): Promise<ImportResult> {
     let skipped = 0
     const errors: string[] = []
 
+    // Bitwarden type numbers → our type strings
+    const bwTypeMap: Record<number, string> = {
+      1: 'login', 2: 'secure_note', 3: 'card', 4: 'identity',
+      5: 'login', 6: 'login', 7: 'login',
+    }
+
     for (const item of items) {
       try {
-        const title = item.title || item.name || item.Login?.Name || ''
+        // Title: supports Bitwarden, 1Password, LastPass, generic
+        const title = item.title || item.name || item.Name || ''
         if (!title) { skipped++; continue }
 
-        const username = item.username || item.login || item.Login?.Username || ''
+        // Username: Bitwarden uses item.login.username, 1Password uses item.login.Username
+        const login = item.login || item.Login || {}
+        const username = item.username || item.user || login.username || login.Username || ''
+
+        // Password: same nested structure
+        const password = item.password || item.Password || login.password || login.Password || ''
+
+        // URL: Bitwarden uses login.uris[].uri, others use item.url
+        let url = ''
+        if (item.url) {
+          url = item.url
+        } else if (item.Url) {
+          url = item.Url
+        } else if (login.uris && Array.isArray(login.uris) && login.uris.length > 0) {
+          url = login.uris[0].uri || login.uris[0].Uri || ''
+        } else if (login.Uri) {
+          url = login.Uri
+        }
+
+        // TOTP: Bitwarden stores in login.totp
+        const totp = login.totp || login.TOTP || item.totp || ''
+
+        // Type: Bitwarden uses numbers, others use strings
+        let entryType = 'login'
+        if (typeof item.type === 'number') {
+          entryType = bwTypeMap[item.type] || 'login'
+        } else if (typeof item.Type === 'number') {
+          entryType = bwTypeMap[item.Type] || 'login'
+        } else {
+          entryType = item.type || item.Type || 'login'
+        }
+
+        // Notes
+        const notes = item.notes || item.Notes || item.note || ''
+
+        // Card fields (Bitwarden nested)
+        const card = item.card || item.Card || {}
+        const cardNumber = card.number || card.Number || card.cardNumber || ''
+        const cardHolder = card.cardholderName || card.CardholderName || card.holder || ''
+        const cardExpiry = (card.expMonth && card.expYear)
+          ? `${card.expMonth}/${card.expYear}`
+          : (card.expirationDate || card.Expiry || '')
+        const cardCvv = card.code || card.CVV || ''
+
+        // Identity fields (Bitwarden nested)
+        const identity = item.identity || item.Identity || {}
+        const firstName = identity.firstName || identity.FirstName || ''
+        const lastName = identity.lastName || identity.LastName || ''
+        const phone = identity.phone || identity.Phone || ''
+        const email = identity.email || identity.Email || ''
+        const address = identity.address1 || identity.Address1 || ''
+        const ssn = identity.ssn || identity.SSN || ''
+        const passport = identity.passportNumber || identity.PassportNumber || ''
+        const birthdate = identity.birthDate || identity.BirthDate || ''
 
         await createEntry({
-          entry_type: item.type || 'login',
+          entry_type: entryType as any,
           title,
-          username,
-          password: item.password || item.Login?.Password || '',
-          url: item.url || item.Login?.Url || '',
-          notes: item.notes || item.Notes || '',
+          username: String(username),
+          password: String(password),
+          url: String(url),
+          notes: String(notes),
+          totp_secret: totp ? String(totp) : undefined,
+          card_number: cardNumber ? String(cardNumber) : undefined,
+          card_holder: cardHolder ? String(cardHolder) : undefined,
+          card_expiry: cardExpiry ? String(cardExpiry) : undefined,
+          card_cvv: cardCvv ? String(cardCvv) : undefined,
+          identity_first_name: firstName ? String(firstName) : undefined,
+          identity_last_name: lastName ? String(lastName) : undefined,
+          identity_phone: phone ? String(phone) : undefined,
+          identity_email: email ? String(email) : undefined,
+          identity_address: address ? String(address) : undefined,
+          identity_ssn: ssn ? String(ssn) : undefined,
+          identity_passport: passport ? String(passport) : undefined,
+          identity_birthdate: birthdate ? String(birthdate) : undefined,
         })
         imported++
       } catch (e: any) {

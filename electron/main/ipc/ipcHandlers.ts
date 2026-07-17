@@ -310,27 +310,69 @@ const handlers: Record<string, (...args: any[]) => any> = {
       let imported = 0
       let skipped = 0
       const errors: string[] = []
+      const vaultId = getActiveVaultId()
+
+      // Bitwarden type numbers → our type strings
+      const bwTypeMap: Record<number, string> = {
+        1: 'login', 2: 'secure_note', 3: 'card', 4: 'identity',
+        5: 'login', 6: 'login', 7: 'login',
+      }
 
       for (const item of items) {
         try {
-          const title = item.title || item.name || item.Login?.Name || ''
+          const title = item.title || item.name || item.Name || ''
           if (!title) { skipped++; continue }
 
-          const username = item.username || item.login || item.Login?.Username || ''
+          const login = item.login || item.Login || {}
+          const username = item.username || item.user || login.username || login.Username || ''
+          const password = item.password || item.Password || login.password || login.Password || ''
+
+          // URL: Bitwarden uses login.uris[].uri
+          let url = ''
+          if (item.url) url = item.url
+          else if (item.Url) url = item.Url
+          else if (login.uris && Array.isArray(login.uris) && login.uris.length > 0)
+            url = login.uris[0].uri || login.uris[0].Uri || ''
+          else if (login.Uri) url = login.Uri
+
+          const totp = login.totp || login.TOTP || item.totp || ''
+
+          let entryType = 'login'
+          if (typeof item.type === 'number') entryType = bwTypeMap[item.type] || 'login'
+          else if (typeof item.Type === 'number') entryType = bwTypeMap[item.Type] || 'login'
+          else entryType = item.type || item.Type || 'login'
+
+          const notes = item.notes || item.Notes || item.note || ''
+
+          const card = item.card || item.Card || {}
+          const identity = item.identity || item.Identity || {}
 
           // Skip duplicates
-          if (await isDuplicateEntry(title, username)) {
+          if (await isDuplicateEntry(title, username, vaultId)) {
             skipped++
             continue
           }
 
           await entriesService.createEntry({
-            entry_type: item.type || 'login',
+            entry_type: entryType as any,
             title,
-            username,
-            password: item.password || item.Login?.Password || '',
-            url: item.url || item.Login?.Url || '',
-            notes: item.notes || item.Notes || '',
+            username: String(username),
+            password: String(password),
+            url: String(url),
+            notes: String(notes),
+            totp_secret: totp ? String(totp) : undefined,
+            card_number: card.number || card.Number ? String(card.number || card.Number) : undefined,
+            card_holder: card.cardholderName || card.CardholderName ? String(card.cardholderName || card.CardholderName) : undefined,
+            card_expiry: (card.expMonth && card.expYear) ? `${card.expMonth}/${card.expYear}` : (card.expirationDate || ''),
+            card_cvv: card.code || card.CVV ? String(card.code || card.CVV) : undefined,
+            identity_first_name: identity.firstName || identity.FirstName ? String(identity.firstName || identity.FirstName) : undefined,
+            identity_last_name: identity.lastName || identity.LastName ? String(identity.lastName || identity.LastName) : undefined,
+            identity_phone: identity.phone || identity.Phone ? String(identity.phone || identity.Phone) : undefined,
+            identity_email: identity.email || identity.Email ? String(identity.email || identity.Email) : undefined,
+            identity_address: identity.address1 || identity.Address1 ? String(identity.address1 || identity.Address1) : undefined,
+            identity_ssn: identity.ssn || identity.SSN ? String(identity.ssn || identity.SSN) : undefined,
+            identity_passport: identity.passportNumber || identity.PassportNumber ? String(identity.passportNumber || identity.PassportNumber) : undefined,
+            identity_birthdate: identity.birthDate || identity.BirthDate ? String(identity.birthDate || identity.BirthDate) : undefined,
           })
           imported++
         } catch (e: any) {

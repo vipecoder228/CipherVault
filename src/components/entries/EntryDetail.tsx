@@ -26,7 +26,7 @@ export function EntryDetail() {
     }
   }, [])
 
-  if (!entry) return null
+  if (!entry || typeof entry !== 'object') return null
 
   const handleCopy = async (text: string, field: string) => {
     try {
@@ -123,7 +123,7 @@ export function EntryDetail() {
               <div className="flex items-center gap-2">
                 <div className="flex-1 flex items-center h-10 px-3 rounded-lg bg-vault-surface border border-vault-border">
                   <span className="flex-1 text-sm text-vault-text font-mono truncate">
-                    {showPassword ? entry.password : '•'.repeat(Math.min(entry.password.length, 20))}
+                    {showPassword ? entry.password : '•'.repeat(Math.min(entry.password?.length || 0, 20))}
                   </span>
                   <button
                     onClick={() => setShowPassword(!showPassword)}
@@ -314,7 +314,7 @@ function TOTPField({ entryId }: { entryId: number }) {
   const fetchCode = useCallback(async () => {
     try {
       const totpCode = await invoke('entries:get-totp', entryId)
-      setCode(totpCode || '------')
+      setCode(typeof totpCode === 'string' && totpCode ? totpCode : '------')
     } catch {
       setCode('------')
     }
