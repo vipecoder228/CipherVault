@@ -61,6 +61,7 @@ const channels: (keyof IPCChannels)[] = [
   'disposable:delete-account',
   'backup:export',
   'backup:import',
+  'backup:import-panic',
   'health:analyze',
   'password:generate-username',
   'password:generate-passphrase',

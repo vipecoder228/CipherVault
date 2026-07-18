@@ -1561,6 +1561,7 @@ export const webHandlers: HandlerMap = {
   'sync:load-settings': () => Promise.resolve({ enabled: false, folder: null }),
   'backup:export': () => Promise.resolve({ success: false, error: 'Not supported on mobile' }),
   'backup:import': () => Promise.resolve({ success: false, error: 'Not supported on mobile' }),
+  'backup:import-panic': () => importPanicBackup(),
   'disposable:create': () => Promise.resolve({ id: 0, address: '' }),
   'disposable:list': () => Promise.resolve([]),
   'disposable:messages': () => Promise.resolve([]),
@@ -1801,5 +1802,95 @@ async function importJSON(): Promise<ImportResult> {
     return { imported, skipped, errors }
   } catch (e: any) {
     return { imported: 0, skipped: 0, errors: [e.message] }
+  }
+}
+
+async function importPanicBackup(): Promise<{ success: boolean; error?: string; imported?: number; skipped?: number; errors?: string[] }> {
+  const file = await pickFile('.enc')
+  if (!file) return { success: false, error: 'Cancelled' }
+
+  const encKey = getEncryptionKey()
+  if (!encKey) return { success: false, error: 'Vault is locked' }
+
+  // Ask for password via prompt
+  const backupPassword = prompt('Enter backup password:')
+  if (!backupPassword) return { success: false, error: 'Cancelled' }
+
+  try {
+    const fileContent = await file.text()
+    const combined = Uint8Array.from(atob(fileContent.trim()), c => c.charCodeAt(0))
+
+    // salt(16) + iv(12) + ciphertext+authTag
+    const salt = combined.slice(0, 16)
+    const iv = combined.slice(16, 28)
+    const encryptedData = combined.slice(28)
+
+    // Derive key via PBKDF2
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(backupPassword),
+      'PBKDF2',
+      false,
+      ['deriveKey']
+    )
+
+    const key = await crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['decrypt']
+    )
+
+    const decrypted = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      encryptedData
+    )
+
+    const backup = JSON.parse(new TextDecoder().decode(decrypted))
+    if (backup.format !== 'ciphervault-panic-backup') {
+      return { success: false, error: 'Invalid panic backup format' }
+    }
+
+    let imported = 0
+    let skipped = 0
+    const errors: string[] = []
+
+    for (const entry of backup.entries) {
+      try {
+        const entryType = entry.entry_type || 'login'
+        const title = entry.display_title || entry.title || ''
+        if (!title) { skipped++; continue }
+
+        await createEntry({
+          entry_type: entryType,
+          title,
+          username: entry.username || '',
+          password: entry.password || '',
+          url: entry.url || '',
+          notes: entry.notes || '',
+          totp_secret: entry.totp_secret || '',
+          card_number: entry.card_number || undefined,
+          card_holder: entry.card_holder || undefined,
+          card_expiry: entry.card_expiry || undefined,
+          card_cvv: entry.card_cvv || undefined,
+          identity_first_name: entry.identity_first_name || undefined,
+          identity_last_name: entry.identity_last_name || undefined,
+          identity_phone: entry.identity_phone || undefined,
+          identity_email: entry.identity_email || undefined,
+          identity_address: entry.identity_address || undefined,
+        })
+        imported++
+      } catch (e: any) {
+        errors.push(`Entry: ${e.message}`)
+        skipped++
+      }
+    }
+
+    if (imported > 0) await saveWebDatabase()
+    return { success: true, imported, skipped, errors }
+  } catch (e: any) {
+    return { success: false, error: e.message || 'Failed to decrypt panic backup' }
   }
 }

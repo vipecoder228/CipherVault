@@ -9,6 +9,7 @@ import { useUIStore } from '../../store/uiStore'
 import { useToastStore } from '../ui/Toast'
 import { useI18n } from '../../i18n'
 import { BackupDialog } from '../import-export/BackupDialog'
+import { PanicBackupImportDialog } from '../import-export/PanicBackupImportDialog'
 import { SecurityHealth } from '../health/SecurityHealth'
 import { SyncSettings } from './SyncSettings'
 import { EmergencyAccess } from '../health/EmergencyAccess'
@@ -124,6 +125,7 @@ function SecurityTab() {
   const [showAlarmSetup, setShowAlarmSetup] = useState(false)
   const [showBackupExport, setShowBackupExport] = useState(false)
   const [showBackupImport, setShowBackupImport] = useState(false)
+  const [showPanicBackupImport, setShowPanicBackupImport] = useState(false)
   const [showSecurityHealth, setShowSecurityHealth] = useState(false)
   const [showEmergencyAccess, setShowEmergencyAccess] = useState(false)
   const [totpEnabled, setTotpEnabled] = useState(false)
@@ -276,6 +278,9 @@ function SecurityTab() {
               <Button variant="secondary" size="sm" onClick={() => setShowBackupImport(true)}>
                 {t('settings_import_backup')}
               </Button>
+              <Button variant="secondary" size="sm" onClick={() => setShowPanicBackupImport(true)}>
+                Panic Backup
+              </Button>
             </div>
           </SettingsRow>
 
@@ -358,6 +363,7 @@ function SecurityTab() {
       {showDisableTOTP && <DisableTOTPModal onClose={() => setShowDisableTOTP(false)} onStatusChange={setTotpEnabled} />}
       {showBackupExport && <BackupDialog mode="export" open={showBackupExport} onClose={() => setShowBackupExport(false)} />}
       {showBackupImport && <BackupDialog mode="import" open={showBackupImport} onClose={() => setShowBackupImport(false)} />}
+      {showPanicBackupImport && <PanicBackupImportDialog open={showPanicBackupImport} onClose={() => setShowPanicBackupImport(false)} />}
       {showSecurityHealth && <SecurityHealth open={showSecurityHealth} onClose={() => setShowSecurityHealth(false)} />}
       {showEmergencyAccess && <EmergencyAccess open={showEmergencyAccess} onClose={() => setShowEmergencyAccess(false)} />}
     </div>

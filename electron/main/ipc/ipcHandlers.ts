@@ -205,6 +205,86 @@ const handlers: Record<string, (...args: any[]) => any> = {
   // Backup
   'backup:export': (_: unknown, backupPassword: string) => backupService.exportEncryptedBackup(backupPassword),
   'backup:import': (_: unknown, backupPassword: string, filePath?: string) => backupService.importEncryptedBackup(backupPassword, filePath),
+  'backup:import-panic': async (_: unknown, backupPassword: string, filePath?: string) => {
+    const win = getWindow()
+    if (!win) return { success: false, error: 'No window available' }
+
+    if (!filePath) {
+      const result = await dialog.showOpenDialog(win, {
+        title: 'Import Panic Backup',
+        filters: [{ name: 'Encrypted Backup', extensions: ['enc'] }],
+        properties: ['openFile'],
+      })
+      if (result.canceled || !result.filePaths[0]) {
+        return { success: false, error: 'Cancelled' }
+      }
+      filePath = result.filePaths[0]
+    }
+
+    try {
+      const { pbkdf2Sync, createDecipheriv } = await import('crypto')
+
+      const fileContent = readFileSync(filePath, 'utf-8').trim()
+      const combined = Buffer.from(fileContent, 'base64')
+
+      // salt(16) + iv(12) + ciphertext+authTag
+      const salt = combined.subarray(0, 16)
+      const iv = combined.subarray(16, 28)
+      const encryptedData = combined.subarray(28)
+
+      const key = pbkdf2Sync(backupPassword, salt, 100000, 32, 'sha256')
+      const decipher = createDecipheriv('aes-256-gcm', key, iv, { authTagLength: 16 })
+      decipher.setAuthTag(encryptedData.subarray(encryptedData.length - 16))
+      const decrypted = Buffer.concat([
+        decipher.update(encryptedData.subarray(0, encryptedData.length - 16)),
+        decipher.final(),
+      ]).toString('utf-8')
+
+      const backup = JSON.parse(decrypted)
+      if (backup.format !== 'ciphervault-panic-backup') {
+        return { success: false, error: 'Invalid panic backup format' }
+      }
+
+      let imported = 0
+      let skipped = 0
+      const errors: string[] = []
+
+      for (const entry of backup.entries) {
+        try {
+          const entryType = entry.entry_type || 'login'
+          const title = entry.display_title || entry.title || ''
+          if (!title) { skipped++; continue }
+
+          await entriesService.createEntry({
+            entry_type: entryType,
+            title,
+            username: entry.username || '',
+            password: entry.password || '',
+            url: entry.url || '',
+            notes: entry.notes || '',
+            totp_secret: entry.totp_secret || '',
+            card_number: entry.card_number || undefined,
+            card_holder: entry.card_holder || undefined,
+            card_expiry: entry.card_expiry || undefined,
+            card_cvv: entry.card_cvv || undefined,
+            identity_first_name: entry.identity_first_name || undefined,
+            identity_last_name: entry.identity_last_name || undefined,
+            identity_phone: entry.identity_phone || undefined,
+            identity_email: entry.identity_email || undefined,
+            identity_address: entry.identity_address || undefined,
+          })
+          imported++
+        } catch (e: any) {
+          errors.push(`Entry: ${e.message}`)
+          skipped++
+        }
+      }
+
+      return { success: true, imported, skipped, errors }
+    } catch (e: any) {
+      return { success: false, error: e.message || 'Failed to decrypt panic backup' }
+    }
+  },
 
   // Health
   'health:analyze': () => analyzePasswordHealth(),
