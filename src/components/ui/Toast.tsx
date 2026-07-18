@@ -20,6 +20,10 @@ export const useToastStore = create<ToastState>((set, get) => ({
   toasts: [],
 
   addToast: (message, type = 'info', duration = 3000) => {
+    // Deduplicate: don't add same message within 2 seconds
+    const existing = get().toasts.find(t => t.message === message)
+    if (existing) return
+
     const id = Math.random().toString(36).slice(2)
     set((state) => ({
       toasts: [...state.toasts, { id, message, type }],

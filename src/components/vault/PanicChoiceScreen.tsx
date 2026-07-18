@@ -16,6 +16,7 @@ export function PanicChoiceScreen({ onChoice }: Props) {
   const addToast = useToastStore((s) => s.addToast)
 
   const handleWipeAndBackup = async () => {
+    if (loading) return
     setLoading(true)
     try {
       // 1. Get backup password
@@ -38,7 +39,7 @@ export function PanicChoiceScreen({ onChoice }: Props) {
       // Check that entries are actually decrypted
       const hasDecrypted = entries.some((e: any) => e.decrypted && e.decrypted.password)
       if (!hasDecrypted) {
-        addToast('Entries are not decrypted. Panic key may have expired. Please try again.', 'error')
+        addToast('Panic key expired. Re-enter alarm password and try again quickly.', 'error')
         setLoading(false)
         return
       }
