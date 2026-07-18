@@ -162,7 +162,7 @@ export function searchEntries(
   vaultId?: number,
   filters?: EntryFilters
 ): EncryptedEntry[] {
-  const escapedQuery = query.replace(/[%_]/g, '\\$&')
+  const escapedQuery = query.replace(/\\/g, '\\\\').replace(/[%_]/g, '\\$&')
   let sql = `SELECT * FROM encrypted_entries WHERE deleted_at IS NULL AND vault_id = ? AND (display_title LIKE ? ESCAPE '\\' OR entry_type LIKE ? ESCAPE '\\')`
   const params: any[] = [vaultId ?? 1, `%${escapedQuery}%`, `%${escapedQuery}%`]
 

@@ -33,6 +33,8 @@ const channels: (keyof IPCChannels)[] = [
   'entries:get-history',
   'entries:get-decrypted-history',
   'entries:get-totp',
+  'entries:force-list',
+  'entries:force-delete',
   'entries:panic-backup',
   'entries:complete-panic',
   'email:send-backup',

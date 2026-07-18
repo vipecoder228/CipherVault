@@ -36,17 +36,27 @@ function getStoredHash(): string | null {
 }
 
 export function checkIntegrity(): { ok: boolean; current?: string; expected?: string } {
-  const stored = getStoredHash()
+  try {
+    const stored = getStoredHash()
 
-  // If no hash file exists, skip check (dev mode)
-  if (!stored) {
+    // If no hash file exists, fail check
+    if (!stored) {
+      return { ok: false }
+    }
+
+    const current = getAppHash()
+
+    // Ensure both are 64-char hex (32 bytes)
+    if (current.length !== 64 || stored.length !== 64) {
+      return { ok: false, current, expected: stored }
+    }
+
+    return {
+      ok: timingSafeEqual(Buffer.from(current, 'hex'), Buffer.from(stored, 'hex')),
+      current,
+      expected: stored,
+    }
+  } catch {
     return { ok: false }
-  }
-
-  const current = getAppHash()
-  return {
-    ok: timingSafeEqual(Buffer.from(current, 'hex'), Buffer.from(stored, 'hex')),
-    current,
-    expected: stored,
   }
 }

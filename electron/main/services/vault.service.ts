@@ -273,7 +273,7 @@ export async function unlockVault(
     derivedKey = isAlarm ? null : key // In alarm mode, don't store real key
     if (isAlarm) {
       panicKey = key
-      setTimeout(() => { panicKey = null }, 60000) // Clear after 60 seconds
+      setTimeout(() => { clearPanicKey() }, 60000) // Clear after 60 seconds
     } else {
       panicKey = null
     }

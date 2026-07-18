@@ -96,8 +96,7 @@ const handlers: Record<string, (...args: any[]) => any> = {
 
   'vault:verify-password': async (_: unknown, password: string) => {
     try {
-      const db = await getDatabase()
-      const vault = vaultService.getVaultStatus()
+      const vault = await vaultService.getVaultStatus()
       if (!vault.initialized) return false
       // Use the unlock logic to verify
       const result = await vaultService.unlockVault(password)

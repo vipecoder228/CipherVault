@@ -516,7 +516,7 @@ async function searchEntries(query: string, filters?: EntryFilters): Promise<Enc
   const encKey = getEncryptionKey()
   if (!encKey) return []
 
-  const escapedQuery = query.replace(/[%_]/g, '\\$&')
+  const escapedQuery = query.replace(/\\/g, '\\\\').replace(/[%_]/g, '\\$&')
   let sql = `SELECT * FROM encrypted_entries WHERE deleted_at IS NULL AND vault_id = ? AND (display_title LIKE ? ESCAPE '\\' OR entry_type LIKE ? ESCAPE '\\')`
   const params: any[] = [activeVaultId, `%${escapedQuery}%`, `%${escapedQuery}%`]
 

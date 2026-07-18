@@ -260,10 +260,10 @@ export interface IPCChannels {
   'sync:load-settings': () => Promise<{ enabled: boolean; folder: string | null }>
 
   // Import/Export
-  'import:csv': (filePath?: string) => Promise<ImportResult>
-  'import:json': (filePath?: string) => Promise<ImportResult>
-  'export:csv': (filePath?: string, entryIds?: number[]) => Promise<{ success: boolean } | void>
-  'export:json': (filePath?: string, entryIds?: number[]) => Promise<{ success: boolean } | void>
+  'import:csv': () => Promise<ImportResult>
+  'import:json': () => Promise<ImportResult>
+  'export:csv': (entryIds?: number[]) => Promise<{ success: boolean } | void>
+  'export:json': (entryIds?: number[]) => Promise<{ success: boolean } | void>
 
   // Integrity
   'integrity:check': () => Promise<{ ok: boolean; current?: string; expected?: string }>
