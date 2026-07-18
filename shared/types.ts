@@ -55,6 +55,7 @@ export interface DecryptedEntry {
   id: number
   entry_type: EntryType
   title: string
+  display_title: string
   username: string
   password: string
   url: string

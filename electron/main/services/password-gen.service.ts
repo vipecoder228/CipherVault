@@ -1,5 +1,5 @@
 import { randomBytes, randomInt } from 'crypto'
-import type { PasswordOptions } from '../../shared/types'
+import type { PasswordOptions } from '../../../shared/types'
 
 const UPPERCASE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 const LOWERCASE = 'abcdefghijklmnopqrstuvwxyz'

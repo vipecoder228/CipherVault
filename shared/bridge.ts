@@ -2,7 +2,7 @@
 // Provides a unified interface for platform-specific functionality
 
 // Platform detection
-export const isElectron = typeof window !== 'undefined' && typeof window.electronAPI !== 'undefined'
+export const isElectron = typeof window !== 'undefined' && typeof (window as any).electronAPI !== 'undefined'
 export const isCapacitor = typeof window !== 'undefined' && typeof (window as any).Capacitor !== 'undefined'
 export const isWeb = !isElectron && !isCapacitor
 

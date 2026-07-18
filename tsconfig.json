@@ -3,6 +3,7 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "jsx": "react-jsx",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -20,6 +21,6 @@
       "@main/*": ["electron/main/*"]
     }
   },
-  "include": ["src/**/*", "electron/**/*", "shared/**/*"],
-  "exclude": ["node_modules", "dist", "out"]
+  "include": ["electron/**/*", "shared/**/*"],
+  "exclude": ["node_modules", "dist", "out", "src/**/*"]
 }

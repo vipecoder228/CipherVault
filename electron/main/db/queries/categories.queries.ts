@@ -1,5 +1,5 @@
 import type { Database } from 'sql.js'
-import type { Category } from '../../../shared/types'
+import type { Category } from '../../../../shared/types'
 import { queryAll, queryOne } from '../helpers'
 
 export function getCategories(db: Database): Category[] {

@@ -41,7 +41,7 @@ function randomBytes(size: number): Uint8Array {
 async function importKey(key: Uint8Array): Promise<CryptoKey> {
   return crypto.subtle.importKey(
     'raw',
-    key,
+    key.slice().buffer,
     { name: 'AES-GCM' },
     false,
     ['encrypt', 'decrypt']
@@ -55,9 +55,9 @@ export async function encrypt(plaintext: string, key: Uint8Array): Promise<Encry
   const plaintextBytes = stringToBytes(plaintext)
 
   const encrypted = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
+    { name: 'AES-GCM', iv: iv.slice().buffer },
     cryptoKey,
-    plaintextBytes
+    plaintextBytes.slice().buffer
   )
 
   // Split encrypted data and auth tag
@@ -86,9 +86,9 @@ export async function decrypt(payload: EncryptedPayload, key: Uint8Array): Promi
   const cryptoKey = await importKey(key)
 
   const decrypted = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv },
+    { name: 'AES-GCM', iv: iv.slice().buffer },
     cryptoKey,
-    encryptedData
+    encryptedData.slice().buffer
   )
 
   return bytesToString(new Uint8Array(decrypted))

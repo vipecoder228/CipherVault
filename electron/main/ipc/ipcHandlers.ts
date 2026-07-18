@@ -1,6 +1,6 @@
 import { ipcMain, dialog, globalShortcut } from 'electron'
 import { readFileSync, writeFileSync } from 'fs'
-import type { IPCChannels } from '../../shared/types'
+import type { IPCChannels } from '../../../shared/types'
 import * as vaultService from '../services/vault.service'
 import * as entriesService from '../services/entries.service'
 import * as clipboardService from '../services/clipboard.service'

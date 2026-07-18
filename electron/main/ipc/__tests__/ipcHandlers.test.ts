@@ -106,8 +106,8 @@ describe('IPC Handlers - Security Checks', () => {
   })
 
   it('alarm mode handlers should check isAlarmMode', async () => {
-    const vaultService = await import('../services/vault.service')
-    const entriesService = await import('../services/entries.service')
+    const vaultService = await import('../../services/vault.service')
+    const entriesService = await import('../../services/entries.service')
 
     // When not in alarm mode, force-list should throw
     vi.mocked(vaultService.isAlarmMode).mockReturnValue(false)
@@ -118,12 +118,12 @@ describe('IPC Handlers - Security Checks', () => {
   })
 
   it('vault service should expose isAlarmMode function', async () => {
-    const vaultService = await import('../services/vault.service')
+    const vaultService = await import('../../services/vault.service')
     expect(typeof vaultService.isAlarmMode).toBe('function')
   })
 
   it('secretStorage should throw when encryption unavailable', async () => {
-    const { saveSecret } = await import('../services/secretStorage')
+    const { saveSecret } = await import('../../services/secretStorage')
     // saveSecret is mocked, just verify it exists
     expect(typeof saveSecret).toBe('function')
   })

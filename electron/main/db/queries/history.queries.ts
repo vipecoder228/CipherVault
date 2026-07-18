@@ -4,7 +4,7 @@ import { queryAll } from '../helpers'
 export interface HistoryRow {
   id: number
   entry_id: number
-  change_type: string
+  change_type: 'create' | 'update' | 'delete'
   changed_at: string
 }
 

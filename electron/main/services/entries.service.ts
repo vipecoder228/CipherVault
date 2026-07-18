@@ -16,7 +16,7 @@ import { addHistoryEntry, getEntryHistory, getFullEntryHistory } from '../db/que
 import { encryptJSON, decryptJSON } from '../crypto/encryption'
 import { getEncryptionKey, getActiveVaultId, getPanicEncryptionKey, clearPanicKey } from './vault.service'
 import { generateTOTPToken } from '../crypto/totp'
-import type { CreateEntryPayload, UpdateEntryPayload, DecryptedEntry, EncryptedEntry, EntryFilters, EntryHistoryItem } from '../../shared/types'
+import type { CreateEntryPayload, UpdateEntryPayload, DecryptedEntry, EncryptedEntry, EntryFilters, EntryHistoryItem } from '../../../shared/types'
 
 export async function listEntries(filters?: EntryFilters): Promise<EncryptedEntry[]> {
   const encKey = getEncryptionKey()

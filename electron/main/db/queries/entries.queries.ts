@@ -1,5 +1,5 @@
 import type { Database } from 'sql.js'
-import type { EncryptedEntry, EntryFilters } from '../../../shared/types'
+import type { EncryptedEntry, EntryFilters } from '../../../../shared/types'
 import { queryAll, queryOne } from '../helpers'
 
 export function getEntries(
