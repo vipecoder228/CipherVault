@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, Tray, Menu, nativeImage, globalShortcut, screen, ipcMain } from 'electron'
+import { app, BrowserWindow, shell, Tray, Menu, nativeImage, globalShortcut, screen, ipcMain, session } from 'electron'
 import { join } from 'path'
 import { readFileSync } from 'fs'
 import AutoLaunch from 'auto-launch'
@@ -28,7 +28,7 @@ function createWindow(): void {
     skipTaskbar: true,
     webPreferences: {
       preload: join(__dirname, '../preload/preload.js'),
-      sandbox: false,
+      sandbox: true,
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -69,6 +69,15 @@ function createWindow(): void {
       return
     }
     lockVault()
+  })
+
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': ["default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'"]
+      }
+    })
   })
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {

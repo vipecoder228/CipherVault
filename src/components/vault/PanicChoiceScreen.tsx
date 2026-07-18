@@ -165,11 +165,11 @@ async function encryptText(text: string, password: string): Promise<string> {
     ['deriveKey']
   )
 
-  const salt = crypto.getRandomValues(new Uint8Array(16))
+  const salt = crypto.getRandomValues(new Uint8Array(32))
   const iv = crypto.getRandomValues(new Uint8Array(12))
 
   const key = await crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt, iterations: 600000, hash: 'SHA-256' },
     keyMaterial,
     { name: 'AES-GCM', length: 256 },
     false,
@@ -188,5 +188,5 @@ async function encryptText(text: string, password: string): Promise<string> {
   combined.set(iv, salt.length)
   combined.set(new Uint8Array(encrypted), salt.length + iv.length)
 
-  return btoa(String.fromCharCode(...combined))
+  return btoa(Array.from(combined, b => String.fromCharCode(b)).join(''))
 }

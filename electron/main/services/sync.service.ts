@@ -1,4 +1,4 @@
-import { watch, readFileSync, writeFileSync, existsSync } from 'fs'
+import { watch, readFileSync, writeFileSync, renameSync, copyFileSync } from 'fs'
 import { join } from 'path'
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto'
 import { dialog, BrowserWindow } from 'electron'
@@ -45,7 +45,7 @@ async function exportToSync(): Promise<boolean> {
     const dbBuffer = readFileSync(dbPath)
 
     const salt = randomBytes(CRYPTO.SALT_SIZE)
-    const key = deriveKey(syncPassword, salt)
+    const key = await deriveKey(syncPassword, salt)
     const { encryptionKey } = splitDerivedKey(key)
 
     const iv = randomBytes(CRYPTO.IV_SIZE)
@@ -62,7 +62,9 @@ async function exportToSync(): Promise<boolean> {
     ])
 
     const syncPath = join(syncFolder, SYNC_FILENAME)
-    writeFileSync(syncPath, Buffer.concat([header, encrypted]))
+    const tmpPath = syncPath + '.tmp'
+    writeFileSync(tmpPath, Buffer.concat([header, encrypted]))
+    renameSync(tmpPath, syncPath)
     lastSyncTime = Date.now()
     return true
   } catch (err) {
@@ -82,9 +84,13 @@ async function importFromSync(): Promise<boolean> {
 
   try {
     const syncPath = join(syncFolder, SYNC_FILENAME)
-    if (!existsSync(syncPath)) return false
 
-    const fileBuffer = readFileSync(syncPath)
+    let fileBuffer: Buffer
+    try {
+      fileBuffer = readFileSync(syncPath)
+    } catch {
+      return false
+    }
     if (fileBuffer.length < HEADER_SIZE) return false
 
     const magic = fileBuffer.subarray(0, 11).toString('ascii')
@@ -101,7 +107,7 @@ async function importFromSync(): Promise<boolean> {
     )
     const encryptedData = fileBuffer.subarray(HEADER_SIZE)
 
-    const key = deriveKey(syncPassword, salt)
+    const key = await deriveKey(syncPassword, salt)
     const { encryptionKey } = splitDerivedKey(key)
 
     const decipher = createDecipheriv(CRYPTO.ENCRYPTION_ALGO, encryptionKey, iv, {
@@ -114,6 +120,10 @@ async function importFromSync(): Promise<boolean> {
     const dbPath = getDatabasePath()
     const currentBuffer = readFileSync(dbPath)
     if (decrypted.equals(currentBuffer)) return false
+
+    // Backup before overwrite
+    const backupPath = dbPath + '.bak'
+    copyFileSync(dbPath, backupPath)
 
     // Replace local database
     writeFileSync(dbPath, decrypted)

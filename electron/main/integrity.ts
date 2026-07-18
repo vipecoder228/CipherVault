@@ -1,4 +1,4 @@
-import { createHash } from 'crypto'
+import { createHash, timingSafeEqual } from 'crypto'
 import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { app } from 'electron'
@@ -40,12 +40,12 @@ export function checkIntegrity(): { ok: boolean; current?: string; expected?: st
 
   // If no hash file exists, skip check (dev mode)
   if (!stored) {
-    return { ok: true }
+    return { ok: false }
   }
 
   const current = getAppHash()
   return {
-    ok: current === stored,
+    ok: timingSafeEqual(Buffer.from(current, 'hex'), Buffer.from(stored, 'hex')),
     current,
     expected: stored,
   }

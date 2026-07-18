@@ -162,8 +162,9 @@ export function searchEntries(
   vaultId?: number,
   filters?: EntryFilters
 ): EncryptedEntry[] {
-  let sql = `SELECT * FROM encrypted_entries WHERE deleted_at IS NULL AND vault_id = ? AND (display_title LIKE ? OR entry_type LIKE ?)`
-  const params: any[] = [vaultId ?? 1, `%${query}%`, `%${query}%`]
+  const escapedQuery = query.replace(/[%_]/g, '\\$&')
+  let sql = `SELECT * FROM encrypted_entries WHERE deleted_at IS NULL AND vault_id = ? AND (display_title LIKE ? ESCAPE '\\' OR entry_type LIKE ? ESCAPE '\\')`
+  const params: any[] = [vaultId ?? 1, `%${escapedQuery}%`, `%${escapedQuery}%`]
 
   if (filters) {
     if (filters.category_id !== undefined && filters.category_id !== null) {

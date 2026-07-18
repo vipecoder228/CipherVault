@@ -135,7 +135,8 @@ export async function createDisposableEmailAddress(): Promise<{ id: number; addr
   // Get token
   const token = await getToken(address, password)
 
-  // Save to local DB
+  // Save to local DB (password/token are mail.tm service credentials, not user vault data)
+  // TODO: Consider encrypting via saveSecret if higher assurance needed
   const row = createDisposableEmail(db, address, password, token, account.id)
   saveDatabase()
 

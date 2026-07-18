@@ -2,7 +2,7 @@ import { createHash } from 'crypto'
 
 const HIBP_API = 'https://api.pwnedpasswords.com/range'
 
-export async function checkBreach(password: string): Promise<{ breached: boolean; count: number }> {
+export async function checkBreach(password: string): Promise<{ breached: boolean; count: number; rateLimited?: boolean }> {
   const sha1 = createHash('sha1').update(password).digest('hex').toUpperCase()
   const prefix = sha1.slice(0, 5)
   const suffix = sha1.slice(5)
@@ -10,8 +10,12 @@ export async function checkBreach(password: string): Promise<{ breached: boolean
   try {
     const response = await fetch(`${HIBP_API}/${prefix}`)
 
+    if (response.status === 429 || response.status === 403) {
+      return { breached: false, count: 0, rateLimited: true }
+    }
+
     if (!response.ok) {
-      return { breached: false, count: 0 }
+      return { breached: false, count: 0, rateLimited: true }
     }
 
     const text = await response.text()
@@ -27,6 +31,6 @@ export async function checkBreach(password: string): Promise<{ breached: boolean
     return { breached: false, count: 0 }
   } catch {
     // Network error — fail open, don't block user
-    return { breached: false, count: 0 }
+    return { breached: false, count: 0, rateLimited: true }
   }
 }

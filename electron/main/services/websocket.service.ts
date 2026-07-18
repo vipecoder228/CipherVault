@@ -3,6 +3,7 @@ import { randomBytes } from 'crypto'
 import { getDatabase, saveDatabase } from '../db/connection'
 import * as entriesService from './entries.service'
 import { isUnlocked, isAlarmMode } from './vault.service'
+import { saveSecret, getSecret } from './secretStorage'
 
 const PORT = 19823
 const MAX_CONNECTIONS = 3
@@ -17,18 +18,16 @@ function generateToken(): string {
 async function getOrGenerateToken(): Promise<string> {
   if (sessionToken) return sessionToken
 
-  const db = await getDatabase()
   try {
-    const result = db.exec("SELECT value FROM settings WHERE key = 'extension_token'")
-    if (result.length > 0 && result[0].values.length > 0) {
-      sessionToken = result[0].values[0][0] as string
+    const stored = await getSecret('extension_token')
+    if (stored) {
+      sessionToken = stored
       return sessionToken!
     }
   } catch {}
 
   sessionToken = generateToken()
-  db.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('extension_token', ?)", [sessionToken])
-  saveDatabase()
+  await saveSecret('extension_token', sessionToken)
   return sessionToken!
 }
 

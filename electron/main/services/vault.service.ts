@@ -22,12 +22,19 @@ let pendingTotpSecret: string | null = null
 
 // Safely parse an encrypted TOTP secret string into its parts
 function parseTotpSecret(encrypted: string): { iv: string; ciphertext: string; authTag: string } | null {
-  const parts = encrypted.split(':')
-  if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) return null
-  return { iv: parts[0], ciphertext: parts[1], authTag: parts[2] }
+  try {
+    const parsed = JSON.parse(encrypted)
+    if (parsed.iv && parsed.ciphertext && parsed.authTag) {
+      return { iv: parsed.iv, ciphertext: parsed.ciphertext, authTag: parsed.authTag }
+    }
+    return null
+  } catch {
+    return null
+  }
 }
 
 // Constant-time string comparison to prevent timing attacks
+// Note: safeEqual is only used for fixed-length hex hashes
 function safeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false
   const bufA = Buffer.from(a, 'utf8')
@@ -131,18 +138,18 @@ export async function setupVault(masterPassword: string, alarmPassword?: string,
     }
 
     const salt = generateSalt()
-    const key = deriveKey(masterPassword, salt)
+    const key = await deriveKey(masterPassword, salt)
     const { encryptionKey } = splitDerivedKey(key)
-    const masterHash = computeVerificationHash(encryptionKey)
+    const masterHash = await computeVerificationHash(encryptionKey)
 
     // Setup alarm password if provided
     let alarmHash: string | null = null
     let alarmSaltHex: string | null = null
     if (alarmPassword && alarmPassword.length > 0) {
       const aSalt = generateSalt()
-      const aKey = deriveKey(alarmPassword, aSalt)
+      const aKey = await deriveKey(alarmPassword, aSalt)
       const { encryptionKey: aEncKey } = splitDerivedKey(aKey)
-      alarmHash = computeVerificationHash(aEncKey)
+      alarmHash = await computeVerificationHash(aEncKey)
       alarmSaltHex = aSalt.toString('hex')
     }
 
@@ -210,9 +217,9 @@ export async function unlockVault(
 
     // Check master password
     const salt = Buffer.from(vault.kdf_salt, 'hex')
-    const key = deriveKey(masterPassword, salt, vault.kdf_type as 'pbkdf2')
+    const key = await deriveKey(masterPassword, salt)
     const { encryptionKey } = splitDerivedKey(key)
-    const computedHash = computeVerificationHash(encryptionKey)
+    const computedHash = await computeVerificationHash(encryptionKey)
 
     let isAlarm = false
 
@@ -222,9 +229,9 @@ export async function unlockVault(
     } else if (vault.alarm_hash && vault.alarm_salt) {
       // Check alarm password
       const alarmSalt = Buffer.from(vault.alarm_salt, 'hex')
-      const alarmKey = deriveKey(masterPassword, alarmSalt, vault.kdf_type as 'pbkdf2')
+      const alarmKey = await deriveKey(masterPassword, alarmSalt)
       const { encryptionKey: alarmEncKey } = splitDerivedKey(alarmKey)
-      const alarmHash = computeVerificationHash(alarmEncKey)
+      const alarmHash = await computeVerificationHash(alarmEncKey)
 
       if (safeEqual(alarmHash, vault.alarm_hash)) {
         // Alarm password correct — open empty vault
@@ -264,7 +271,12 @@ export async function unlockVault(
     }
 
     derivedKey = isAlarm ? null : key // In alarm mode, don't store real key
-    panicKey = isAlarm ? key : null // Keep key temporarily for panic backup
+    if (isAlarm) {
+      panicKey = key
+      setTimeout(() => { panicKey = null }, 60000) // Clear after 60 seconds
+    } else {
+      panicKey = null
+    }
     alarmMode = isAlarm
     activeVaultId = targetVaultId
     recordAttempt(db, true)
@@ -335,7 +347,7 @@ export async function changeMasterPassword(
         return { success: false, error: 'TOTP code required' }
       }
       const salt = Buffer.from(vault.kdf_salt, 'hex')
-      const key = deriveKey(oldPassword, salt, vault.kdf_type as 'pbkdf2')
+      const key = await deriveKey(oldPassword, salt)
       const { encryptionKey: encKey } = splitDerivedKey(key)
       const parsed = parseTotpSecret(vault.totp_secret)
       if (!parsed) {
@@ -353,9 +365,9 @@ export async function changeMasterPassword(
 
     // Verify old password
     const oldSalt = Buffer.from(vault.kdf_salt, 'hex')
-    const oldKey = deriveKey(oldPassword, oldSalt, vault.kdf_type as 'pbkdf2')
+    const oldKey = await deriveKey(oldPassword, oldSalt)
     const { encryptionKey: oldEncKey } = splitDerivedKey(oldKey)
-    const oldHash = computeVerificationHash(oldEncKey)
+    const oldHash = await computeVerificationHash(oldEncKey)
 
     if (!safeEqual(oldHash, vault.master_hash)) {
       return { success: false, error: 'Current password is incorrect' }
@@ -363,9 +375,9 @@ export async function changeMasterPassword(
 
     // Derive new key
     const newSalt = generateSalt()
-    const newKey = deriveKey(newPassword, newSalt)
+    const newKey = await deriveKey(newPassword, newSalt)
     const { encryptionKey: newEncKey } = splitDerivedKey(newKey)
-    const newHash = computeVerificationHash(newEncKey)
+    const newHash = await computeVerificationHash(newEncKey)
 
     // Re-encrypt TOTP secret if enabled (BEFORE updating master hash)
     if (vault.totp_enabled && vault.totp_secret) {
@@ -376,7 +388,7 @@ export async function changeMasterPassword(
       try {
         const decryptedSecret = decrypt(parsed, oldEncKey)
         const reEncrypted = encrypt(decryptedSecret, newEncKey)
-        const reEncryptedStr = `${reEncrypted.iv}:${reEncrypted.ciphertext}:${reEncrypted.authTag}`
+        const reEncryptedStr = JSON.stringify({ iv: reEncrypted.iv, ciphertext: reEncrypted.ciphertext, authTag: reEncrypted.authTag })
         updateTOTP(db, reEncryptedStr, true, activeVaultId)
       } catch {
         return { success: false, error: 'Failed to re-encrypt TOTP secret' }
@@ -478,7 +490,7 @@ export async function verifyAndSaveTOTP(code: string): Promise<boolean> {
 
     // Code is valid — encrypt and save the secret
     const encrypted = encrypt(pendingTotpSecret, encKey)
-    const encryptedStr = `${encrypted.iv}:${encrypted.ciphertext}:${encrypted.authTag}`
+    const encryptedStr = JSON.stringify({ iv: encrypted.iv, ciphertext: encrypted.ciphertext, authTag: encrypted.authTag })
 
     const db = await getDatabase()
     updateTOTP(db, encryptedStr, true, activeVaultId)
@@ -563,9 +575,9 @@ export async function setupAlarmPassword(alarmPassword: string): Promise<{ succe
     if (!vault) return { success: false, error: 'Vault not initialized' }
 
     const salt = generateSalt()
-    const key = deriveKey(alarmPassword, salt)
+    const key = await deriveKey(alarmPassword, salt)
     const { encryptionKey } = splitDerivedKey(key)
-    const alarmHash = computeVerificationHash(encryptionKey)
+    const alarmHash = await computeVerificationHash(encryptionKey)
 
     updateAlarm(db, alarmHash, salt.toString('hex'), activeVaultId)
 
@@ -592,9 +604,9 @@ export async function changeAlarmPassword(oldAlarmPassword: string, newAlarmPass
 
     // Verify old alarm password
     const oldSalt = Buffer.from(vault.alarm_salt, 'hex')
-    const oldKey = deriveKey(oldAlarmPassword, oldSalt)
+    const oldKey = await deriveKey(oldAlarmPassword, oldSalt)
     const { encryptionKey: oldEncKey } = splitDerivedKey(oldKey)
-    const oldHash = computeVerificationHash(oldEncKey)
+    const oldHash = await computeVerificationHash(oldEncKey)
 
     if (!safeEqual(oldHash, vault.alarm_hash)) {
       return { success: false, error: 'Invalid alarm password' }
@@ -602,9 +614,9 @@ export async function changeAlarmPassword(oldAlarmPassword: string, newAlarmPass
 
     // Set new alarm password
     const newSalt = generateSalt()
-    const newKey = deriveKey(newAlarmPassword, newSalt)
+    const newKey = await deriveKey(newAlarmPassword, newSalt)
     const { encryptionKey: newEncKey } = splitDerivedKey(newKey)
-    const newHash = computeVerificationHash(newEncKey)
+    const newHash = await computeVerificationHash(newEncKey)
 
     updateAlarm(db, newHash, newSalt.toString('hex'), activeVaultId)
     saveDatabase()

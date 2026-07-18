@@ -1,3 +1,6 @@
+// NOTE: shared/crypto/constants.ts has the Web Crypto equivalents
+// (DIGEST: 'sha-256', ENCRYPTION_ALGO: 'AES-GCM')
+// Both files must keep the same numeric values for PBKDF2, SALT_SIZE, IV_SIZE, AUTH_TAG_SIZE, etc.
 export const CRYPTO = {
   PBKDF2: {
     ITERATIONS: 600_000,

@@ -2,14 +2,11 @@ import { safeStorage } from 'electron'
 import { getDatabase } from '../db/connection'
 
 // Encrypt a string using OS keychain (safeStorage)
-// Falls back to plain text if encryption is unavailable
 function encrypt(plain: string): string {
   if (!safeStorage.isEncryptionAvailable()) {
-    // Fallback: base64 prefix signals "not encrypted"
-    return 'plain:' + Buffer.from(plain).toString('base64')
+    throw new Error('OS keychain encryption not available')
   }
-  const encrypted = safeStorage.encryptString(plain)
-  return 'enc:' + encrypted.toString('base64')
+  return 'enc:' + safeStorage.encryptString(plain).toString('base64')
 }
 
 // Decrypt a string stored by encrypt()

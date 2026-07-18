@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto'
-import { readFileSync, writeFileSync } from 'fs'
+import { readFileSync, writeFileSync, copyFileSync, existsSync } from 'fs'
 import { dialog } from 'electron'
 import { getDatabasePath, saveDatabase, resetDatabase } from '../db/connection'
 import { deriveKey, splitDerivedKey } from '../crypto/keyderivation'
@@ -20,7 +20,7 @@ export async function exportEncryptedBackup(
   const dbBuffer = readFileSync(dbPath)
 
   const salt = randomBytes(CRYPTO.SALT_SIZE)
-  const key = deriveKey(backupPassword, salt)
+  const key = await deriveKey(backupPassword, salt)
   const { encryptionKey } = splitDerivedKey(key)
 
   const iv = randomBytes(CRYPTO.IV_SIZE)
@@ -96,7 +96,7 @@ export async function importEncryptedBackup(
   )
   const encryptedData = fileBuffer.subarray(HEADER_SIZE)
 
-  const key = deriveKey(backupPassword, salt)
+  const key = await deriveKey(backupPassword, salt)
   const { encryptionKey } = splitDerivedKey(key)
 
   try {
@@ -107,6 +107,10 @@ export async function importEncryptedBackup(
     const decrypted = Buffer.concat([decipher.update(encryptedData), decipher.final()])
 
     const dbPath = getDatabasePath()
+    if (existsSync(dbPath)) {
+      const backupPath = dbPath + '.bak'
+      copyFileSync(dbPath, backupPath)
+    }
     writeFileSync(dbPath, decrypted)
     resetDatabase()
 

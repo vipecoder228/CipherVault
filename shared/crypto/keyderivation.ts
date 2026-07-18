@@ -25,7 +25,6 @@ export function generateSalt(): Uint8Array {
 export async function deriveKey(
   password: string,
   salt: Uint8Array,
-  _type: 'argon2id' | 'pbkdf2' = 'pbkdf2'
 ): Promise<Uint8Array> {
   // Import password as key material
   const passwordBytes = new TextEncoder().encode(password)

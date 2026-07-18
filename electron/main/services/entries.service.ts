@@ -297,7 +297,9 @@ function matchDomain(storedUrl: string, currentDomain: string): boolean {
     const stored = new URL(storedUrl)
     return stored.hostname === currentDomain || stored.hostname.endsWith('.' + currentDomain)
   } catch {
-    return storedUrl.toLowerCase().includes(currentDomain.toLowerCase())
+    const storedLower = storedUrl.toLowerCase()
+    const domainLower = currentDomain.toLowerCase()
+    return storedLower === domainLower || storedLower.endsWith('.' + domainLower)
   }
 }
 

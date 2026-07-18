@@ -1,3 +1,6 @@
+// NOTE: electron/main/crypto/constants.ts has the Node.js equivalents
+// (DIGEST: 'sha256', ENCRYPTION_ALGO: 'aes-256-gcm')
+// Both files must keep the same numeric values for PBKDF2, SALT_SIZE, IV_SIZE, AUTH_TAG_SIZE, etc.
 export const CRYPTO = {
   PBKDF2: {
     ITERATIONS: 600_000,

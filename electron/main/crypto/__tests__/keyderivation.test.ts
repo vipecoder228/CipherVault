@@ -4,47 +4,47 @@ import { deriveKey, splitDerivedKey, computeVerificationHash, generateSalt } fro
 
 describe('Key Derivation', () => {
   describe('deriveKey', () => {
-    it('should derive a key of correct length (64 bytes)', () => {
+    it('should derive a key of correct length (64 bytes)', async () => {
       const password = 'test-password'
       const salt = randomBytes(32)
-      const key = deriveKey(password, salt)
+      const key = await deriveKey(password, salt)
       expect(key).toBeInstanceOf(Buffer)
       expect(key.length).toBe(64)
     })
 
-    it('should derive the same key for the same password and salt', () => {
+    it('should derive the same key for the same password and salt', async () => {
       const password = 'consistent-password'
       const salt = randomBytes(32)
-      const key1 = deriveKey(password, salt)
-      const key2 = deriveKey(password, salt)
+      const key1 = await deriveKey(password, salt)
+      const key2 = await deriveKey(password, salt)
       expect(key1.equals(key2)).toBe(true)
     })
 
-    it('should derive different keys for different passwords', () => {
+    it('should derive different keys for different passwords', async () => {
       const salt = randomBytes(32)
-      const key1 = deriveKey('password1', salt)
-      const key2 = deriveKey('password2', salt)
+      const key1 = await deriveKey('password1', salt)
+      const key2 = await deriveKey('password2', salt)
       expect(key1.equals(key2)).toBe(false)
     })
 
-    it('should derive different keys for different salts', () => {
+    it('should derive different keys for different salts', async () => {
       const password = 'same-password'
-      const key1 = deriveKey(password, randomBytes(32))
-      const key2 = deriveKey(password, randomBytes(32))
+      const key1 = await deriveKey(password, randomBytes(32))
+      const key2 = await deriveKey(password, randomBytes(32))
       expect(key1.equals(key2)).toBe(false)
     })
 
-    it('should handle empty password', () => {
+    it('should handle empty password', async () => {
       const salt = randomBytes(32)
-      const key = deriveKey('', salt)
+      const key = await deriveKey('', salt)
       expect(key).toBeInstanceOf(Buffer)
       expect(key.length).toBe(64)
     })
 
-    it('should handle long password', () => {
+    it('should handle long password', async () => {
       const password = 'a'.repeat(10000)
       const salt = randomBytes(32)
-      const key = deriveKey(password, salt)
+      const key = await deriveKey(password, salt)
       expect(key).toBeInstanceOf(Buffer)
       expect(key.length).toBe(64)
     })
@@ -74,23 +74,23 @@ describe('Key Derivation', () => {
   })
 
   describe('computeVerificationHash', () => {
-    it('should return a hex string', () => {
+    it('should return a hex string', async () => {
       const encryptionKey = randomBytes(32)
-      const hash = computeVerificationHash(encryptionKey)
+      const hash = await computeVerificationHash(encryptionKey)
       expect(typeof hash).toBe('string')
       expect(/^[0-9a-f]{64}$/i.test(hash)).toBe(true)
     })
 
-    it('should be deterministic', () => {
+    it('should be deterministic', async () => {
       const encryptionKey = randomBytes(32)
-      const hash1 = computeVerificationHash(encryptionKey)
-      const hash2 = computeVerificationHash(encryptionKey)
+      const hash1 = await computeVerificationHash(encryptionKey)
+      const hash2 = await computeVerificationHash(encryptionKey)
       expect(hash1).toBe(hash2)
     })
 
-    it('should produce different hashes for different keys', () => {
-      const hash1 = computeVerificationHash(randomBytes(32))
-      const hash2 = computeVerificationHash(randomBytes(32))
+    it('should produce different hashes for different keys', async () => {
+      const hash1 = await computeVerificationHash(randomBytes(32))
+      const hash2 = await computeVerificationHash(randomBytes(32))
       expect(hash1).not.toBe(hash2)
     })
   })

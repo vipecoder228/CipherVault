@@ -1,4 +1,4 @@
-import { randomBytes } from 'crypto'
+import { randomBytes, randomInt } from 'crypto'
 import type { PasswordOptions } from '../../shared/types'
 
 const UPPERCASE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -19,19 +19,18 @@ export function generatePassword(options: PasswordOptions): string {
   }
 
   const length = Math.max(8, Math.min(128, options.length))
-  const bytes = randomBytes(length)
   let password = ''
 
   for (let i = 0; i < length; i++) {
-    password += charset[bytes[i] % charset.length]
+    password += charset[randomInt(charset.length)]
   }
 
   // Ensure at least one character from each selected type
   const ensureChars: string[] = []
-  if (options.uppercase) ensureChars.push(UPPERCASE[randomBytes(1)[0] % UPPERCASE.length])
-  if (options.lowercase) ensureChars.push(LOWERCASE[randomBytes(1)[0] % LOWERCASE.length])
-  if (options.numbers) ensureChars.push(NUMBERS[randomBytes(1)[0] % NUMBERS.length])
-  if (options.symbols) ensureChars.push(SYMBOLS[randomBytes(1)[0] % SYMBOLS.length])
+  if (options.uppercase) ensureChars.push(UPPERCASE[randomInt(UPPERCASE.length)])
+  if (options.lowercase) ensureChars.push(LOWERCASE[randomInt(LOWERCASE.length)])
+  if (options.numbers) ensureChars.push(NUMBERS[randomInt(NUMBERS.length)])
+  if (options.symbols) ensureChars.push(SYMBOLS[randomInt(SYMBOLS.length)])
 
   // Replace random positions with guaranteed characters
   const pwArray = password.split('')

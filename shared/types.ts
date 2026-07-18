@@ -192,6 +192,7 @@ export interface IPCChannels {
   'vault:setup-alarm': (alarmPassword: string) => Promise<VaultSetupResult>
   'vault:change-alarm': (oldAlarm: string, newAlarm: string) => Promise<VaultSetupResult>
   'vault:remove-alarm': () => Promise<VaultSetupResult>
+  'vault:verify-password': (password: string) => Promise<boolean>
 
   // Entries
   'entries:list': (filters?: EntryFilters) => Promise<EncryptedEntry[]>

@@ -135,9 +135,18 @@ const handlers: Record<string, (...args: any[]) => any> = {
   'entries:get-totp': (_: unknown, id: number) => entriesService.getEntryTOTP(id),
 
   // Alarm mode — bypass key check
-  'entries:force-list': () => entriesService.forceListEntries(),
-  'entries:force-delete': (_: unknown, id: number) => entriesService.forcePermanentDeleteEntry(id),
-  'entries:panic-backup': () => entriesService.getPanicBackupEntries(),
+  'entries:force-list': () => {
+    if (!vaultService.isAlarmMode()) throw new Error('Not in alarm mode')
+    return entriesService.forceListEntries()
+  },
+  'entries:force-delete': (_: unknown, id: number) => {
+    if (!vaultService.isAlarmMode()) throw new Error('Not in alarm mode')
+    return entriesService.forcePermanentDeleteEntry(id)
+  },
+  'entries:panic-backup': () => {
+    if (!vaultService.isAlarmMode()) throw new Error('Not in alarm mode')
+    return entriesService.getPanicBackupEntries()
+  },
   'entries:complete-panic': () => entriesService.completePanic(),
 
   // Email / Telegram
@@ -184,6 +193,12 @@ const handlers: Record<string, (...args: any[]) => any> = {
     return result[0].values[0][0] as string
   },
   'settings:set': async (_: unknown, key: string, value: string) => {
+    const ALLOWED_SETTINGS = new Set([
+      'auto_lock_ms', 'clipboard_ttl_ms', 'theme', 'default_view', 'font_size',
+      'show_icons', 'global_shortcut', 'totp_enabled', 'alarm_enabled',
+      'default_vault_id', 'last_active_vault'
+    ])
+    if (!ALLOWED_SETTINGS.has(key)) throw new Error('Key not allowed')
     const db = await getDatabase()
     db.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, value])
   },
@@ -227,12 +242,12 @@ const handlers: Record<string, (...args: any[]) => any> = {
       const fileContent = readFileSync(filePath, 'utf-8').trim()
       const combined = Buffer.from(fileContent, 'base64')
 
-      // salt(16) + iv(12) + ciphertext+authTag
-      const salt = combined.subarray(0, 16)
-      const iv = combined.subarray(16, 28)
-      const encryptedData = combined.subarray(28)
+      // salt(32) + iv(12) + ciphertext+authTag
+      const salt = combined.subarray(0, 32)
+      const iv = combined.subarray(32, 44)
+      const encryptedData = combined.subarray(44)
 
-      const key = pbkdf2Sync(backupPassword, salt, 100000, 32, 'sha256')
+      const key = pbkdf2Sync(backupPassword, salt, 600000, 32, 'sha256')
       const decipher = createDecipheriv('aes-256-gcm', key, iv, { authTagLength: 16 })
       decipher.setAuthTag(encryptedData.subarray(encryptedData.length - 16))
       const decrypted = Buffer.concat([
@@ -282,7 +297,7 @@ const handlers: Record<string, (...args: any[]) => any> = {
 
       return { success: true, imported, skipped, errors }
     } catch (e: any) {
-      return { success: false, error: e.message || 'Failed to decrypt panic backup' }
+      return { success: false, error: 'Failed to decrypt: wrong password or corrupted file' }
     }
   },
 
@@ -312,20 +327,18 @@ const handlers: Record<string, (...args: any[]) => any> = {
   'integrity:check': () => checkIntegrity(),
 
   // Import CSV
-  'import:csv': async (_: unknown, filePath?: string) => {
+  'import:csv': async (_: unknown) => {
     const win = getWindow()
     if (!win) return { imported: 0, skipped: 0, errors: ['No window available'] }
-    if (!filePath) {
-      const result = await dialog.showOpenDialog(win, {
-        title: 'Import CSV',
-        filters: [{ name: 'CSV Files', extensions: ['csv'] }],
-        properties: ['openFile'],
-      })
-      if (result.canceled || !result.filePaths[0]) {
-        return { imported: 0, skipped: 0, errors: ['Cancelled'] }
-      }
-      filePath = result.filePaths[0]
+    const openResult = await dialog.showOpenDialog(win, {
+      title: 'Import CSV',
+      filters: [{ name: 'CSV Files', extensions: ['csv'] }],
+      properties: ['openFile'],
+    })
+    if (openResult.canceled || !openResult.filePaths[0]) {
+      return { imported: 0, skipped: 0, errors: ['Cancelled'] }
     }
+    const filePath = openResult.filePaths[0]
 
     try {
       // Strip BOM if present
@@ -413,20 +426,18 @@ const handlers: Record<string, (...args: any[]) => any> = {
   },
 
   // Import JSON
-  'import:json': async (_: unknown, filePath?: string) => {
+  'import:json': async (_: unknown) => {
     const win = getWindow()
     if (!win) return { imported: 0, skipped: 0, errors: ['No window available'] }
-    if (!filePath) {
-      const result = await dialog.showOpenDialog(win, {
-        title: 'Import JSON',
-        filters: [{ name: 'JSON Files', extensions: ['json'] }],
-        properties: ['openFile'],
-      })
-      if (result.canceled || !result.filePaths[0]) {
-        return { imported: 0, skipped: 0, errors: ['Cancelled'] }
-      }
-      filePath = result.filePaths[0]
+    const openResult = await dialog.showOpenDialog(win, {
+      title: 'Import JSON',
+      filters: [{ name: 'JSON Files', extensions: ['json'] }],
+      properties: ['openFile'],
+    })
+    if (openResult.canceled || !openResult.filePaths[0]) {
+      return { imported: 0, skipped: 0, errors: ['Cancelled'] }
     }
+    const filePath = openResult.filePaths[0]
 
     try {
       const content = readFileSync(filePath, 'utf-8')
@@ -513,18 +524,16 @@ const handlers: Record<string, (...args: any[]) => any> = {
   },
 
   // Export CSV
-  'export:csv': async (_: unknown, filePath?: string, entryIds?: number[]) => {
+  'export:csv': async (_: unknown, entryIds?: number[]) => {
     const win = getWindow()
     if (!win) return { success: false }
-    if (!filePath) {
-      const result = await dialog.showSaveDialog(win, {
-        title: 'Export CSV',
-        defaultPath: 'vault-export.csv',
-        filters: [{ name: 'CSV Files', extensions: ['csv'] }],
-      })
-      if (result.canceled || !result.filePath) return { success: false }
-      filePath = result.filePath
-    }
+    const saveResult = await dialog.showSaveDialog(win, {
+      title: 'Export CSV',
+      defaultPath: 'vault-export.csv',
+      filters: [{ name: 'CSV Files', extensions: ['csv'] }],
+    })
+    if (saveResult.canceled || !saveResult.filePath) return { success: false }
+    const filePath = saveResult.filePath
 
     const entries = entryIds
       ? await Promise.all(entryIds.map(id => entriesService.getEntry(id)))
@@ -552,18 +561,16 @@ const handlers: Record<string, (...args: any[]) => any> = {
   },
 
   // Export JSON
-  'export:json': async (_: unknown, filePath?: string, entryIds?: number[]) => {
+  'export:json': async (_: unknown, entryIds?: number[]) => {
     const win = getWindow()
     if (!win) return { success: false }
-    if (!filePath) {
-      const result = await dialog.showSaveDialog(win, {
-        title: 'Export JSON',
-        defaultPath: 'vault-export.json',
-        filters: [{ name: 'JSON Files', extensions: ['json'] }],
-      })
-      if (result.canceled || !result.filePath) return { success: false }
-      filePath = result.filePath
-    }
+    const saveResult = await dialog.showSaveDialog(win, {
+      title: 'Export JSON',
+      defaultPath: 'vault-export.json',
+      filters: [{ name: 'JSON Files', extensions: ['json'] }],
+    })
+    if (saveResult.canceled || !saveResult.filePath) return { success: false }
+    const filePath = saveResult.filePath
 
     const entries = entryIds
       ? await Promise.all(entryIds.map(id => entriesService.getEntry(id)))

@@ -391,6 +391,7 @@ async function createEntry(data: CreateEntryPayload): Promise<EncryptedEntry> {
       encrypted.ciphertext,
       encrypted.iv,
       encrypted.authTag,
+      // TODO: Consider encrypting display_title for additional metadata protection
       data.title || data.entry_type,
       data.category_id ?? null,
       data.is_favorite ? 1 : 0,
@@ -515,8 +516,9 @@ async function searchEntries(query: string, filters?: EntryFilters): Promise<Enc
   const encKey = getEncryptionKey()
   if (!encKey) return []
 
-  let sql = `SELECT * FROM encrypted_entries WHERE deleted_at IS NULL AND vault_id = ? AND (display_title LIKE ? OR entry_type LIKE ?)`
-  const params: any[] = [activeVaultId, `%${query}%`, `%${query}%`]
+  const escapedQuery = query.replace(/[%_]/g, '\\$&')
+  let sql = `SELECT * FROM encrypted_entries WHERE deleted_at IS NULL AND vault_id = ? AND (display_title LIKE ? ESCAPE '\\' OR entry_type LIKE ? ESCAPE '\\')`
+  const params: any[] = [activeVaultId, `%${escapedQuery}%`, `%${escapedQuery}%`]
 
   if (filters) {
     if (filters.category_id !== undefined && filters.category_id !== null) {
@@ -730,11 +732,21 @@ function generatePasswordLocal(options: PasswordOptions): string {
   if (!charset) charset = LOWERCASE
 
   const length = Math.max(8, Math.min(128, options.length))
-  const bytes = crypto.getRandomValues(new Uint8Array(length))
+  const limit = 256 - (256 % charset.length)
+  let randomBytes = crypto.getRandomValues(new Uint8Array(length * 2))
+  let byte: number
   let password = ''
+  let i = 0
 
-  for (let i = 0; i < length; i++) {
-    password += charset[bytes[i] % charset.length]
+  while (password.length < length) {
+    if (i >= randomBytes.length) {
+      randomBytes = crypto.getRandomValues(new Uint8Array(length * 2))
+      i = 0
+    }
+    byte = randomBytes[i++]
+    if (byte < limit) {
+      password += charset[byte % charset.length]
+    }
   }
 
   // Ensure at least one character from each selected type
@@ -1349,43 +1361,52 @@ export const webHandlers: HandlerMap = {
       }
     }
 
-    // Re-encrypt all entries
-    const entries = webQueryAll<any>(
-      'SELECT id, encrypted_data, iv, auth_tag FROM encrypted_entries WHERE vault_id = ?',
-      [activeVaultId]
-    )
-    for (const row of entries) {
-      const decrypted = await decryptJSON<Record<string, string>>(
-        { iv: row.iv, ciphertext: row.encrypted_data, authTag: row.auth_tag },
-        oldEncKey
-      )
-      const reEncrypted = await encryptJSON(decrypted, newEncKey)
-      webRun(
-        `UPDATE encrypted_entries SET encrypted_data = ?, iv = ?, auth_tag = ?, updated_at = datetime('now') WHERE id = ?`,
-        [reEncrypted.ciphertext, reEncrypted.iv, reEncrypted.authTag, row.id]
-      )
-    }
+    try {
+      webRun('BEGIN TRANSACTION')
 
-    // Re-encrypt history
-    const historyRows = webQueryAll<any>(
-      `SELECT h.id, h.encrypted_snapshot, h.iv, h.auth_tag
-       FROM entry_history h
-       JOIN encrypted_entries e ON h.entry_id = e.id
-       WHERE e.vault_id = ?`,
-      [activeVaultId]
-    )
-    for (const row of historyRows) {
-      try {
+      // Re-encrypt all entries
+      const entries = webQueryAll<any>(
+        'SELECT id, encrypted_data, iv, auth_tag FROM encrypted_entries WHERE vault_id = ?',
+        [activeVaultId]
+      )
+      for (const row of entries) {
         const decrypted = await decryptJSON<Record<string, string>>(
-          { iv: row.iv, ciphertext: row.encrypted_snapshot, authTag: row.auth_tag },
+          { iv: row.iv, ciphertext: row.encrypted_data, authTag: row.auth_tag },
           oldEncKey
         )
         const reEncrypted = await encryptJSON(decrypted, newEncKey)
         webRun(
-          `UPDATE entry_history SET encrypted_snapshot = ?, iv = ?, auth_tag = ? WHERE id = ?`,
+          `UPDATE encrypted_entries SET encrypted_data = ?, iv = ?, auth_tag = ?, updated_at = datetime('now') WHERE id = ?`,
           [reEncrypted.ciphertext, reEncrypted.iv, reEncrypted.authTag, row.id]
         )
-      } catch {}
+      }
+
+      // Re-encrypt history
+      const historyRows = webQueryAll<any>(
+        `SELECT h.id, h.encrypted_snapshot, h.iv, h.auth_tag
+         FROM entry_history h
+         JOIN encrypted_entries e ON h.entry_id = e.id
+         WHERE e.vault_id = ?`,
+        [activeVaultId]
+      )
+      for (const row of historyRows) {
+        try {
+          const decrypted = await decryptJSON<Record<string, string>>(
+            { iv: row.iv, ciphertext: row.encrypted_snapshot, authTag: row.auth_tag },
+            oldEncKey
+          )
+          const reEncrypted = await encryptJSON(decrypted, newEncKey)
+          webRun(
+            `UPDATE entry_history SET encrypted_snapshot = ?, iv = ?, auth_tag = ? WHERE id = ?`,
+            [reEncrypted.ciphertext, reEncrypted.iv, reEncrypted.authTag, row.id]
+          )
+        } catch {}
+      }
+
+      webRun('COMMIT')
+    } catch (err) {
+      webRun('ROLLBACK')
+      throw err
     }
 
     webRun(
@@ -1548,7 +1569,7 @@ export const webHandlers: HandlerMap = {
   'health:analyze': () => analyzePasswordHealthLocal(),
 
   // Integrity (always pass on mobile)
-  'integrity:check': () => Promise.resolve({ ok: true }),
+  'integrity:check': () => Promise.resolve({ ok: true }), // TODO: implement PRAGMA integrity_check for web
 
   // Stub handlers for features not supported on mobile
   'shortcut:get': () => Promise.resolve(''),

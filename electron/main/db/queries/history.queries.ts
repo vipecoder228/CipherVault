@@ -21,6 +21,12 @@ export function addHistoryEntry(
      VALUES (?, ?, ?, ?, ?)`,
     [entryId, encryptedSnapshot, iv, authTag, changeType]
   )
+
+  // Keep only last 50 history entries per entry
+  db.run(
+    `DELETE FROM entry_history WHERE entry_id = ? AND id NOT IN (SELECT id FROM entry_history WHERE entry_id = ? ORDER BY changed_at DESC LIMIT 50)`,
+    [entryId, entryId]
+  )
 }
 
 export function getEntryHistory(
