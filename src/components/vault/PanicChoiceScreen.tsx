@@ -35,6 +35,14 @@ export function PanicChoiceScreen({ onChoice }: Props) {
         return
       }
 
+      // Check that entries are actually decrypted
+      const hasDecrypted = entries.some((e: any) => e.decrypted && e.decrypted.password)
+      if (!hasDecrypted) {
+        addToast('Entries are not decrypted. Panic key may have expired. Please try again.', 'error')
+        setLoading(false)
+        return
+      }
+
       // 5. Create backup JSON with decrypted entries
       const backupJson = JSON.stringify({
         format: 'ciphervault-panic-backup',
