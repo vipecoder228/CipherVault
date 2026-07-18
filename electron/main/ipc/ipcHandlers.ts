@@ -12,7 +12,7 @@ import { analyzePasswordHealth } from '../services/health.service'
 import * as syncService from '../services/sync.service'
 import { sendBackup, testTelegramConnection, getTelegramChatIdFromToken, saveTelegramConfig } from '../services/email.service'
 import { saveSecret, getSecret } from '../services/secretStorage'
-import { getDatabase, saveDatabase } from '../db/connection'
+import { getDatabase } from '../db/connection'
 import { getCategories, createCategory, updateCategory, deleteCategory, reorderCategories } from '../db/queries/categories.queries'
 import { checkIntegrity } from '../integrity'
 import { getActiveVaultId } from '../services/vault.service'
@@ -472,7 +472,7 @@ const handlers: Record<string, (...args: any[]) => any> = {
 
           const totp = login.totp || login.TOTP || item.totp || ''
 
-          let entryType = 'login'
+          let entryType: string
           if (typeof item.type === 'number') entryType = bwTypeMap[item.type] || 'login'
           else if (typeof item.Type === 'number') entryType = bwTypeMap[item.Type] || 'login'
           else entryType = item.type || item.Type || 'login'

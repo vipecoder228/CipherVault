@@ -1,6 +1,5 @@
 import { WebSocketServer, WebSocket } from 'ws'
 import { randomBytes } from 'crypto'
-import { getDatabase, saveDatabase } from '../db/connection'
 import * as entriesService from './entries.service'
 import { isUnlocked, isAlarmMode } from './vault.service'
 import { saveSecret, getSecret } from './secretStorage'

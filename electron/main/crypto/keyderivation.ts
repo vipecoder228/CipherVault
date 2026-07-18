@@ -1,5 +1,4 @@
 import { randomBytes, pbkdf2, createHash } from 'crypto'
-import { promisify } from 'util'
 import { CRYPTO } from './constants'
 
 // ─── PBKDF2 Key Derivation (built into Node.js) ────────

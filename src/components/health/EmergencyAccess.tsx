@@ -3,7 +3,7 @@ import { useToastStore } from '../ui/Toast'
 import { invoke } from '../../lib/ipc'
 import { Button } from '../ui/Button'
 import { useI18n } from '../../i18n'
-import { Shield, Download, Copy, AlertTriangle } from 'lucide-react'
+import { Shield, AlertTriangle } from 'lucide-react'
 
 interface Props {
   open: boolean

@@ -107,9 +107,11 @@ export async function importEncryptedBackup(
     const decrypted = Buffer.concat([decipher.update(encryptedData), decipher.final()])
 
     const dbPath = getDatabasePath()
-    if (existsSync(dbPath)) {
-      const backupPath = dbPath + '.bak'
+    const backupPath = dbPath + '.bak'
+    try {
       copyFileSync(dbPath, backupPath)
+    } catch {
+      // DB file may not exist yet or may be locked — proceed with restore
     }
     writeFileSync(dbPath, decrypted)
     resetDatabase()

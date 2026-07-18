@@ -59,7 +59,6 @@ import {
 
 import * as dbConnection from '../../db/connection'
 import * as entriesQueries from '../../db/queries/entries.queries'
-import * as historyQueries from '../../db/queries/history.queries'
 import * as encryption from '../../crypto/encryption'
 import * as vaultService from '../vault.service'
 

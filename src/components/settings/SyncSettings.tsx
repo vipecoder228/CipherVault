@@ -4,7 +4,7 @@ import { useToastStore } from '../ui/Toast'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import { useI18n } from '../../i18n'
-import { FolderOpen, RefreshCw, CloudOff, Cloud, Check } from 'lucide-react'
+import { FolderOpen, RefreshCw, CloudOff, Cloud } from 'lucide-react'
 
 export function SyncSettings() {
   const { t } = useI18n()
@@ -42,15 +42,6 @@ export function SyncSettings() {
     } finally {
       setLoading(false)
     }
-  }
-
-  const handleSetPassword = async () => {
-    if (!password) {
-      addToast(t('enter_sync_password'), 'warning')
-      return
-    }
-    await invoke('sync:set-password', password)
-    addToast(t('sync_password_set'), 'success')
   }
 
   const handleSyncNow = async () => {

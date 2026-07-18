@@ -99,14 +99,10 @@ vi.mock('../../../shared/importMapper', () => ({
 }))
 
 describe('IPC Handlers - Security Checks', () => {
-  let handlers: Record<string, (...args: any[]) => any>
-
   beforeEach(async () => {
     vi.clearAllMocks()
     // Dynamic import to get fresh handlers after all mocks are set up
-    const mod = await import('../ipcHandlers')
-    // Access the handlers object - it's exported via registerIPC
-    // We need to test the handler logic directly
+    await import('../ipcHandlers')
   })
 
   it('alarm mode handlers should check isAlarmMode', async () => {

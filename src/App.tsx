@@ -18,7 +18,7 @@ function isMobileDevice(): boolean {
 }
 
 export function App() {
-  const { locked, initialized, checkStatus, alarmMode } = useVaultStore()
+  const { locked, checkStatus, alarmMode } = useVaultStore()
   const { theme } = useUIStore()
   const [booting, setBooting] = useState(true)
   const [integrityOk, setIntegrityOk] = useState<boolean | null>(null)

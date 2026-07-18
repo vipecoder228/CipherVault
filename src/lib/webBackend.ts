@@ -16,8 +16,7 @@ import {
   generateSalt,
 } from '../../shared/crypto/keyderivation'
 import { RATE_LIMIT } from '../../shared/crypto/constants'
-import { isElectron } from '../../shared/bridge'
-import { mapColumns, mapEntryType, detectCSVSource } from '../../shared/importMapper'
+import { mapColumns, mapEntryType } from '../../shared/importMapper'
 import type {
   IPCChannels,
   VaultStatus,
@@ -105,8 +104,7 @@ async function verifyTOTP(secret: string, token: string): Promise<boolean> {
 function generateSecret(): string {
   // Generate base32 secret
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
-  const bytes = crypto.getRandomValues(new Uint8Array(20))
-  return Array.from(bytes).map(b => chars[b % chars.length]).join('')
+  return Array.from({ length: 20 }, () => chars[unbiasedRandom(chars.length)]).join('')
 }
 
 function generateQRCodeUrl(secret: string, username: string = 'CipherVault'): string {
@@ -1043,15 +1041,8 @@ const WORDLIST = [
 function generatePassphraseLocal(wordCount: number = 4): string {
   const count = Math.max(3, Math.min(8, wordCount))
   const words: string[] = []
-  const maxValid = Math.floor(65536 / WORDLIST.length) * WORDLIST.length
   for (let i = 0; i < count; i++) {
-    let idx: number
-    do {
-      const bytes = crypto.getRandomValues(new Uint8Array(2))
-      idx = (bytes[0] << 8) | bytes[1]
-    } while (idx >= maxValid)
-    idx = Math.floor(idx * WORDLIST.length / maxValid)
-    words.push(WORDLIST[idx])
+    words.push(WORDLIST[unbiasedRandom(WORDLIST.length)])
   }
   return words.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('-')
 }
@@ -1755,7 +1746,7 @@ async function importJSON(): Promise<ImportResult> {
         const totp = login.totp || login.TOTP || item.totp || ''
 
         // Type: Bitwarden uses numbers, others use strings
-        let entryType = 'login'
+        let entryType: string
         if (typeof item.type === 'number') {
           entryType = bwTypeMap[item.type] || 'login'
         } else if (typeof item.Type === 'number') {

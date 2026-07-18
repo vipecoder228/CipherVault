@@ -3,7 +3,7 @@ import { invoke } from '../../lib/ipc'
 import { useToastStore } from '../ui/Toast'
 import { useI18n } from '../../i18n'
 import {
-  Mail, Plus, Trash2, ArrowLeft, Copy, ExternalLink, RefreshCw, Inbox
+  Mail, Plus, Trash2, ArrowLeft, Copy, RefreshCw, Inbox
 } from 'lucide-react'
 
 interface DisposableEmail {
@@ -39,7 +39,6 @@ export function DisposableEmailPanel() {
   const [messages, setMessages] = useState<EmailMessage[]>([])
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [selectedMessage, setSelectedMessage] = useState<EmailMessageDetail | null>(null)
-  const [loadingMessage, setLoadingMessage] = useState(false)
   const addToast = useToastStore((s) => s.addToast)
 
   useEffect(() => {

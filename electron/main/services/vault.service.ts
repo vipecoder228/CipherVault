@@ -93,15 +93,6 @@ function recordAttempt(db: any, success: boolean): void {
   db.run('INSERT INTO unlock_attempts (success) VALUES (?)', [success ? 1 : 0])
 }
 
-function getRequiredDelay(db: any): number {
-  const attempts = getRecentFailedAttempts(db)
-  if (attempts >= RATE_LIMIT.ATTEMPTS_BEFORE_LOCK) return -1
-  if (attempts >= RATE_LIMIT.ATTEMPTS_BEFORE_DELAY_3) return RATE_LIMIT.DELAY_3_MS
-  if (attempts >= RATE_LIMIT.ATTEMPTS_BEFORE_DELAY_2) return RATE_LIMIT.DELAY_2_MS
-  if (attempts >= RATE_LIMIT.ATTEMPTS_BEFORE_DELAY_1) return RATE_LIMIT.DELAY_1_MS
-  return 0
-}
-
 // ─── Vault Operations ───────────────────────────────────
 
 export async function getVaultStatus() {

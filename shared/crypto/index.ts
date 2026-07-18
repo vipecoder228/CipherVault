@@ -5,9 +5,6 @@ import * as webCrypto from './keyderivation'
 import { encrypt, decrypt, encryptJSON, decryptJSON } from './encryption'
 import { CRYPTO, RATE_LIMIT, DEFAULTS } from './constants'
 
-// Check if we're in a browser environment
-const isBrowser = typeof window !== 'undefined' && typeof window.crypto !== 'undefined'
-
 // Export the appropriate implementation
 export const cryptoModule = {
   // Constants

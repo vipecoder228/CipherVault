@@ -11,7 +11,7 @@ export function VaultSwitcher() {
   const [newVaultName, setNewVaultName] = useState('')
   const [newVaultPassword, setNewVaultPassword] = useState('')
   const [creating, setCreating] = useState(false)
-  const { activeVaultId, vaults, switchVault, lock } = useVaultStore()
+  const { activeVaultId, vaults, switchVault } = useVaultStore()
 
   const currentVault = vaults.find(v => v.id === activeVaultId)
 

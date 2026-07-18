@@ -98,7 +98,7 @@ export async function analyzePasswordHealth(): Promise<PasswordHealth> {
   }
 
   // Find reused passwords
-  for (const [pwd, ids] of passwordMap) {
+  for (const [, ids] of passwordMap) {
     if (ids.length > 1) {
       reused += ids.length
       for (const id of ids) {

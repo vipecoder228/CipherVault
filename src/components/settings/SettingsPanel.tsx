@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
@@ -674,8 +674,6 @@ function formatShortcut(shortcut: string): string {
     .replace('CommandOrControl', 'Ctrl')
     .replace('Control', 'Ctrl')
     .replace('Meta', 'Cmd')
-    .replace('Alt', 'Alt')
-    .replace('Shift', 'Shift')
     .replace(/\+/g, ' + ')
 }
 

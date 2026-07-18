@@ -1,5 +1,5 @@
 import { getDatabase, saveDatabase } from '../db/connection'
-import { randomBytes } from 'crypto'
+import { randomInt } from 'crypto'
 import {
   getDisposableEmails,
   getDisposableEmailById,
@@ -14,10 +14,9 @@ const MAIL_TM_BASE = 'https://api.mail.tm'
 // Generate cryptographically secure random alphanumeric string
 function randomString(length: number): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
-  const bytes = randomBytes(length)
   let result = ''
   for (let i = 0; i < length; i++) {
-    result += chars[bytes[i] % chars.length]
+    result += chars[randomInt(chars.length)]
   }
   return result
 }

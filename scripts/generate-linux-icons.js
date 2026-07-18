@@ -1,4 +1,4 @@
-const { writeFileSync, readFileSync, mkdirSync } = require('fs')
+const { readFileSync } = require('fs')
 const { join } = require('path')
 const sharp = require('sharp')
 

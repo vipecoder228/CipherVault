@@ -30,7 +30,6 @@ function createBMP(width, height, pixels) {
   let offset = 54
   for (let y = height - 1; y >= 0; y--) {
     for (let x = 0; x < width; x++) {
-      const idx = (y * width + x) * 3
       const [r, g, b] = pixels(x, y)
       buf[offset++] = b
       buf[offset++] = g
@@ -49,8 +48,6 @@ const BG_DARK = [15, 15, 20]      // #0f0f14
 const BG_LIGHT = [24, 24, 32]     // #181820
 const ACCENT = [99, 102, 241]     // #6366f1
 const ACCENT_LIGHT = [129, 140, 248] // #818cf8
-const TEXT = [255, 255, 255]
-const BORDER = [50, 50, 60]
 
 // ─── Header Image (150x57) ───────────────────────────────
 const header = createBMP(150, 57, (x, y) => {

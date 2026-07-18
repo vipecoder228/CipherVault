@@ -24,8 +24,6 @@ export function Sidebar() {
   const { setFilters } = useEntriesStore()
   const { lock, activeVaultId, vaults } = useVaultStore()
 
-  const currentVault = vaults.find(v => v.id === activeVaultId)
-
   useEffect(() => {
     loadCategories()
   }, [])

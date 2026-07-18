@@ -2,6 +2,7 @@ import { createHash } from 'crypto'
 
 const HIBP_API = 'https://api.pwnedpasswords.com/range'
 
+// HIBP API requires SHA-1 prefix — this is NOT password storage
 export async function checkBreach(password: string): Promise<{ breached: boolean; count: number; rateLimited?: boolean }> {
   const sha1 = createHash('sha1').update(password).digest('hex').toUpperCase()
   const prefix = sha1.slice(0, 5)

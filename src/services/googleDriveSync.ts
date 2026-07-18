@@ -39,7 +39,6 @@ const DEFAULT_CONFIG: SyncConfig = {
 
 // Google Drive API configuration
 const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID' // Replace with actual client ID
-const GOOGLE_API_KEY = 'YOUR_GOOGLE_API_KEY' // Replace with actual API key
 const GOOGLE_SCOPES = ['https://www.googleapis.com/auth/drive.file']
 const VAULT_FILE_NAME = 'ciphervault.db'
 
@@ -48,7 +47,7 @@ const capacitorGoogleDrive: SyncService = {
   async isAvailable(): Promise<boolean> {
     // Check if Google Sign-In plugin is available
     try {
-      const { GoogleAuth } = await import('@codetrix-studio/capacitor-google-auth')
+      await import('@codetrix-studio/capacitor-google-auth')
       return true
     } catch {
       return false

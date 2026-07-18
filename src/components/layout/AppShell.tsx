@@ -12,7 +12,6 @@ import { AlertTriangle, Search } from 'lucide-react'
 import type { EntryType } from '@shared/types'
 
 export function AppShell() {
-  const { t } = useI18n()
   const selectedEntry = useEntriesStore((s) => s.selectedEntry)
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed)
   const showDisposableEmail = useUIStore((s) => s.showDisposableEmail)

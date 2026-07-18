@@ -1,5 +1,5 @@
 const { resolve } = require('path')
-const { defineConfig, externalizeDepsPlugin } = require('electron-vite')
+const { defineConfig } = require('electron-vite')
 const react = require('@vitejs/plugin-react')
 
 // Build only the renderer (web) part for Capacitor

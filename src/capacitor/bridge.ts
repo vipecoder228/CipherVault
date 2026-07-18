@@ -1,8 +1,6 @@
 import { PlatformBridge } from '../../shared/bridge'
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
 import { Clipboard as CapacitorClipboard } from '@capacitor/clipboard'
-import { Dialog } from '@capacitor/dialog'
-import { Preferences } from '@capacitor/preferences'
 
 // Capacitor Clipboard implementation
 const capacitorClipboard = {

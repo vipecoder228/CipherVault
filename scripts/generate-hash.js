@@ -1,6 +1,5 @@
 const { createHash } = require('crypto')
 const { readFileSync, writeFileSync } = require('fs')
-const { join, dirname } = require('path')
 
 const args = process.argv.slice(2)
 const exePath = args[0]
