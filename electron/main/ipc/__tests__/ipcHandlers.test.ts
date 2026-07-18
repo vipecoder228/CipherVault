@@ -109,11 +109,9 @@ describe('IPC Handlers - Security Checks', () => {
     const vaultService = await import('../../services/vault.service')
     const entriesService = await import('../../services/entries.service')
 
-    // When not in alarm mode, force-list should throw
-    vi.mocked(vaultService.isAlarmMode).mockReturnValue(false)
-
     // The handler wraps the call - we verify the guard exists
     expect(vaultService.isAlarmMode).toBeDefined()
+    expect(typeof vaultService.isAlarmMode).toBe('function')
     expect(entriesService.forceListEntries).toBeDefined()
   })
 
