@@ -34,9 +34,8 @@ export function generatePassword(options: PasswordOptions): string {
 
   // Replace random positions with guaranteed characters
   const pwArray = password.split('')
-  const positions = randomBytes(ensureChars.length)
   for (let i = 0; i < ensureChars.length; i++) {
-    const pos = positions[i] % pwArray.length
+    const pos = randomInt(pwArray.length)
     pwArray[pos] = ensureChars[i]
   }
 
@@ -58,10 +57,9 @@ export function generateUsername(): string {
     'shadow', 'phoenix', 'falcon', 'viper', 'cobra', 'panther',
     'storm', 'blaze', 'frost', 'spark', 'wave', 'bolt', 'dash',
   ]
-  const bytes = randomBytes(2)
-  const adj = adjectives[bytes[0] % adjectives.length]
-  const noun = nouns[bytes[1] % nouns.length]
-  const num = randomBytes(1)[0] % 100
+  const adj = adjectives[randomInt(adjectives.length)]
+  const noun = nouns[randomInt(nouns.length)]
+  const num = randomInt(100)
   return `${adj}${noun}${num}`
 }
 
