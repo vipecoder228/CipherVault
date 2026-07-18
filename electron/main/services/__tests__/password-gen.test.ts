@@ -118,9 +118,9 @@ describe('Password Generator', () => {
       for (let i = 0; i < 100; i++) {
         usernames.add(generateUsername())
       }
-      // With 37 adjectives * 36 nouns * 100 numbers = 133,200 combinations
-      // 100 should all be unique
-      expect(usernames.size).toBe(100)
+      // With 36 adjectives * 26 nouns * 100 numbers = 93,600 combinations
+      // Allow tiny collision probability
+      expect(usernames.size).toBeGreaterThanOrEqual(99)
     })
 
     it('should match expected format (adjective + noun + number)', () => {
