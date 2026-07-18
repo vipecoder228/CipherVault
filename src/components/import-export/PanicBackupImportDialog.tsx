@@ -21,7 +21,7 @@ export function PanicBackupImportDialog({ open, onClose }: Props) {
 
   const handleSubmit = async () => {
     if (!password) {
-      addToast('Backup password is required', 'warning')
+      addToast('Введите пароль бэкапа', 'warning')
       return
     }
 

@@ -163,18 +163,18 @@ function SecurityTab() {
     try {
       await invoke('vault:remove-alarm')
       setAlarmEnabled(false)
-      addToast('Duress code removed', 'success')
+      addToast('Код принуждения удалён', 'success')
     } catch {
-      addToast('Failed to remove duress code', 'error')
+      addToast('Не удалось удалить код принуждения', 'error')
     }
   }
 
   const handleClearClipboard = async () => {
     try {
       await invoke('clipboard:clear')
-      addToast('Clipboard cleared', 'success')
+      addToast('Буфер обмена очищен', 'success')
     } catch {
-      addToast('Failed to clear clipboard', 'error')
+      addToast('Не удалось очистить буфер', 'error')
     }
   }
 
@@ -182,7 +182,7 @@ function SecurityTab() {
     const result = await invoke('shortcut:set', shortcut)
     if (result.success) {
       setGlobalShortcut(shortcut)
-      addToast('Global shortcut updated', 'success')
+      addToast('Горячая клавиша обновлена', 'success')
     } else {
       addToast(result.error || 'Failed to update shortcut', 'error')
     }
@@ -381,15 +381,15 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   const { t } = useI18n()
 
   const handleSubmit = async () => {
-    if (!oldPwd || !newPwd) { addToast('Fill in all fields', 'warning'); return }
-    if (newPwd !== confirmPwd) { addToast('Passwords do not match', 'warning'); return }
-    if (newPwd.length < 8) { addToast('Password must be at least 8 characters', 'warning'); return }
+    if (!oldPwd || !newPwd) { addToast('Заполните все поля', 'warning'); return }
+    if (newPwd !== confirmPwd) { addToast('Пароли не совпадают', 'warning'); return }
+    if (newPwd.length < 8) { addToast('Пароль должен быть не менее 8 символов', 'warning'); return }
     setLoading(true)
     try {
       const result = await invoke('vault:change-master-password', oldPwd, newPwd)
-      if (result.success) { addToast('Master password changed', 'success'); onClose() }
+      if (result.success) { addToast('Мастер-пароль изменён', 'success'); onClose() }
       else addToast(result.error || 'Failed', 'error')
-    } catch { addToast('Failed to change password', 'error') }
+    } catch { addToast('Не удалось изменить пароль', 'error') }
     finally { setLoading(false) }
   }
 
@@ -419,13 +419,13 @@ function TOTPSetupModal({ onClose, onStatusChange }: { onClose: () => void; onSt
     try {
       const result = await invoke('vault:enable-totp')
       setSecret(result.secret); setQrUrl(result.qrCodeUrl); setStep('verify')
-    } catch { addToast('Failed to generate TOTP secret', 'error') }
+    } catch { addToast('Не удалось сгенерировать секрет TOTP', 'error') }
   }
 
   const handleVerify = async (code: string): Promise<boolean> => {
     const success = await invoke('vault:verify-totp', code)
     if (success) { addToast('2FA enabled successfully', 'success'); onStatusChange?.(true); onClose(); return true }
-    addToast('Invalid code', 'error'); return false
+    addToast('Неверный код', 'error'); return false
   }
 
   return (
@@ -472,7 +472,7 @@ function DisableTOTPModal({ onClose, onStatusChange }: { onClose: () => void; on
   const handleVerify = async (code: string): Promise<boolean> => {
     const success = await invoke('vault:disable-totp', code)
     if (success) { addToast('2FA disabled', 'success'); onStatusChange?.(false); onClose(); return true }
-    addToast('Invalid code', 'error'); return false
+    addToast('Неверный код', 'error'); return false
   }
 
   return (
@@ -519,18 +519,18 @@ function AlarmSetupModal({ onClose, onStatusChange }: { onClose: () => void; onS
         addToast(result?.error || 'Invalid token', 'error')
       }
     } catch {
-      addToast('Connection failed', 'error')
+      addToast('Ошибка подключения', 'error')
     } finally {
       setTesting(false)
     }
   }
 
   const handleSubmit = async () => {
-    if (!alarmPassword) { addToast('Password is required', 'warning'); return }
-    if (alarmPassword !== confirmPassword) { addToast('Passwords do not match', 'warning'); return }
-    if (alarmPassword.length < 4) { addToast('Password must be at least 4 characters', 'warning'); return }
-    if (!backupPassword) { addToast('Backup password is required', 'warning'); return }
-    if (backupPassword !== confirmBackup) { addToast('Backup passwords do not match', 'warning'); return }
+    if (!alarmPassword) { addToast('Введите пароль', 'warning'); return }
+    if (alarmPassword !== confirmPassword) { addToast('Пароли не совпадают', 'warning'); return }
+    if (alarmPassword.length < 4) { addToast('Пароль должен быть не менее 4 символов', 'warning'); return }
+    if (!backupPassword) { addToast('Введите пароль для бэкапа', 'warning'); return }
+    if (backupPassword !== confirmBackup) { addToast('Пароли бэкапа не совпадают', 'warning'); return }
     setLoading(true)
     try {
       await invoke('settings:set-secure', 'panic_backup_password', backupPassword)
@@ -542,14 +542,14 @@ function AlarmSetupModal({ onClose, onStatusChange }: { onClose: () => void; onS
 
       const result = await invoke('vault:setup-alarm', alarmPassword)
       if (result.success) {
-        addToast('Duress code set up', 'success')
+        addToast('Код принуждения настроен', 'success')
         onStatusChange?.(true)
         onClose()
       } else {
         addToast(result.error || 'Failed', 'error')
       }
     } catch {
-      addToast('Failed to set up duress code', 'error')
+      addToast('Не удалось настроить код принуждения', 'error')
     } finally {
       setLoading(false)
     }
