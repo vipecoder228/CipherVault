@@ -271,7 +271,7 @@ function SecurityTab() {
           </SettingsRow>
 
           <SettingsRow label={t('backup_export')} description={t('settings_backup_desc')}>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button variant="secondary" size="sm" onClick={() => setShowBackupExport(true)}>
                 {t('settings_export_backup')}
               </Button>
