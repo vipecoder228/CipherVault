@@ -124,7 +124,9 @@ export function MobileAppShell() {
         {filteredEntries.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-vault-text-secondary">
             <div className="w-16 h-16 rounded-2xl bg-vault-surface border border-vault-border flex items-center justify-center mb-4">
-              {alarmMode ? (
+              {searchQuery ? (
+                <Search size={32} className="text-vault-text-secondary" />
+              ) : alarmMode ? (
                 <AlertTriangle size={32} className="text-vault-warning" />
               ) : (
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -134,12 +136,14 @@ export function MobileAppShell() {
               )}
             </div>
             <p className="text-lg font-medium mb-2">
-              {alarmMode ? 'Запасной сейф пуст' : 'Пока нет записей'}
+              {searchQuery ? t('no_search_results') : alarmMode ? 'Запасной сейф пуст' : 'Пока нет записей'}
             </p>
             <p className="text-sm text-center">
-              {alarmMode
-                ? 'Вы в режиме дуressа. Реальные данные скрыты.'
-                : 'Добавьте первую запись или импортируйте из другого менеджера'}
+              {searchQuery
+                ? t('no_search_results_hint')
+                : alarmMode
+                  ? 'Вы в режиме дуressа. Реальные данные скрыты.'
+                  : 'Добавьте первую запись или импортируйте из другого менеджера'}
             </p>
           </div>
         ) : (
@@ -148,7 +152,7 @@ export function MobileAppShell() {
               <div
                 key={entry.id}
                 onClick={() => selectEntry(entry.id)}
-                className="flex items-center gap-3 p-3 bg-vault-surface rounded-xl border border-vault-border active:bg-vault-surface-hover transition-colors"
+                className="flex items-center gap-3 p-3 bg-vault-surface rounded-xl border border-vault-border active:bg-vault-surface-hover transition-colors transition-opacity duration-200"
               >
                 <div className="w-10 h-10 rounded-xl bg-vault-bg flex items-center justify-center text-vault-text-secondary flex-shrink-0">
                   {getEntryIcon(entry.entry_type)}

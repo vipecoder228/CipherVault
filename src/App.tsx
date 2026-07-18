@@ -8,6 +8,7 @@ import { PanicChoiceScreen } from './components/vault/PanicChoiceScreen'
 import { AppShell } from './components/layout/AppShell'
 import { MobileAppShell } from './components/mobile/MobileAppShell'
 import { ToastContainer } from './components/ui/Toast'
+import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { invoke } from './lib/ipc'
 
 // Detect if we're on a mobile device
@@ -96,15 +97,17 @@ export function App() {
   }
 
   return (
-    <div className={`${theme}`}>
-      {locked ? (
-        <UnlockScreen />
-      ) : alarmMode && panicChoice === null ? (
-        <PanicChoiceScreen onChoice={(choice) => setPanicChoice(choice)} />
-      ) : (
-        isMobile ? <MobileAppShell /> : <AppShell />
-      )}
-      <ToastContainer />
-    </div>
+    <ErrorBoundary>
+      <div className={`${theme}`}>
+        {locked ? (
+          <UnlockScreen />
+        ) : alarmMode && panicChoice === null ? (
+          <PanicChoiceScreen onChoice={(choice) => setPanicChoice(choice)} />
+        ) : (
+          isMobile ? <MobileAppShell /> : <AppShell />
+        )}
+        <ToastContainer />
+      </div>
+    </ErrorBoundary>
   )
 }

@@ -439,6 +439,8 @@ export default {
   duress_hidden: 'Вы в режиме принуждения. Реальные данные скрыты.',
   no_entries: 'Записей пока нет',
   no_entries_hint: 'Добавьте первый пароль или импортируйте из другого менеджера',
+  no_search_results: 'Ничего не найдено',
+  no_search_results_hint: 'Попробуйте другой запрос',
   all: 'Все',
   version: 'Версия',
 } as const

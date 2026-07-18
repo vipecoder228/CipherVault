@@ -439,6 +439,8 @@ export default {
   duress_hidden: 'You are in duress mode. Real data is hidden.',
   no_entries: 'No entries yet',
   no_entries_hint: 'Add your first password or import from another manager',
+  no_search_results: 'No results found',
+  no_search_results_hint: 'Try a different search term',
   all: 'All',
   version: 'Version',
 } as const

@@ -8,7 +8,7 @@ import { useEntriesStore } from '../../store/entriesStore'
 import { useUIStore } from '../../store/uiStore'
 import { useVaultStore } from '../../store/vaultStore'
 import { useI18n } from '../../i18n'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Search } from 'lucide-react'
 import type { EntryType } from '@shared/types'
 
 export function AppShell() {
@@ -74,7 +74,7 @@ const TYPE_LABELS: Record<EntryType, string> = {
 
 function EntryGrid() {
   const { t } = useI18n()
-  const { entries, viewMode, loading, selectEntry, selectedEntry, toggleFavorite, filters, setFilters } = useEntriesStore()
+  const { entries, viewMode, loading, selectEntry, selectedEntry, toggleFavorite, filters, setFilters, searchQuery } = useEntriesStore()
   const setShowPasswordGenerator = useUIStore((s) => s.setShowPasswordGenerator)
   const alarmMode = useVaultStore((s) => s.alarmMode)
 
@@ -113,7 +113,15 @@ function EntryGrid() {
 
       {entries.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-64 text-vault-text-secondary">
-          {alarmMode ? (
+          {searchQuery ? (
+            <>
+              <div className="w-16 h-16 rounded-2xl bg-vault-surface border border-vault-border flex items-center justify-center mb-4">
+                <Search size={32} className="text-vault-text-secondary" />
+              </div>
+              <p className="text-lg font-medium mb-2">{t('no_search_results')}</p>
+              <p className="text-sm">{t('no_search_results_hint')}</p>
+            </>
+          ) : alarmMode ? (
             <>
               <div className="w-16 h-16 rounded-2xl bg-vault-surface border border-vault-border flex items-center justify-center mb-4">
                 <AlertTriangle size={32} className="text-vault-warning" />
@@ -148,7 +156,7 @@ function EntryGrid() {
             <div
               key={entry.id}
               onClick={() => selectEntry(entry.id)}
-              className={`flex items-center gap-4 p-3 rounded-xl cursor-pointer transition-all duration-150 ${
+              className={`flex items-center gap-4 p-3 rounded-xl cursor-pointer transition-all duration-150 transition-opacity duration-200 ${
                 selectedEntry?.id === entry.id
                   ? 'bg-vault-accent/10 border border-vault-accent/30'
                   : 'hover:bg-vault-surface-hover border border-transparent'
@@ -182,7 +190,7 @@ function EntryGrid() {
             <div
               key={entry.id}
               onClick={() => selectEntry(entry.id)}
-              className={`p-4 rounded-xl cursor-pointer transition-all duration-150 border ${
+              className={`p-4 rounded-xl cursor-pointer transition-all duration-150 transition-opacity duration-200 border ${
                 selectedEntry?.id === entry.id
                   ? 'bg-vault-accent/10 border-vault-accent/30'
                   : 'bg-vault-surface border-vault-border hover:border-vault-accent/30'

@@ -7,6 +7,7 @@ interface EntriesState {
   selectedEntry: DecryptedEntry | null
   viewMode: 'grid' | 'list'
   filters: EntryFilters
+  searchQuery: string
   loading: boolean
 
   loadEntries: (filters?: EntryFilters) => Promise<void>
@@ -28,6 +29,7 @@ export const useEntriesStore = create<EntriesState>((set, get) => {
     selectedEntry: null,
     viewMode: 'list',
     filters: {},
+    searchQuery: '',
     loading: false,
 
     loadEntries: async (filters?: EntryFilters) => {
@@ -87,9 +89,10 @@ export const useEntriesStore = create<EntriesState>((set, get) => {
 
   search: async (query: string) => {
     if (!query.trim()) {
+      set({ searchQuery: '' })
       return get().loadEntries()
     }
-    set({ loading: true })
+    set({ loading: true, searchQuery: query.trim() })
     try {
       const f = get().filters
       const entries = await invoke('entries:search', query, f)
