@@ -292,9 +292,9 @@ export async function verifyPassword(password: string): Promise<boolean> {
     const db = await getDatabase()
     const vault = getVault(db, activeVaultId)
     if (!vault) return false
-    const key = await deriveKey(password, Buffer.from(vault.salt, 'hex'))
-    const keyHash = computeVerificationHash(key)
-    return timingSafeEqual(Buffer.from(keyHash, 'hex'), Buffer.from(vault.password_hash, 'hex'))
+    const key = await deriveKey(password, Buffer.from(vault.kdf_salt, 'hex'))
+    const keyHash = await computeVerificationHash(key)
+    return timingSafeEqual(Buffer.from(keyHash, 'hex'), Buffer.from(vault.master_hash, 'hex'))
   } catch {
     return false
   }

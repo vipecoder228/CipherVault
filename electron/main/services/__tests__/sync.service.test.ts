@@ -106,7 +106,7 @@ describe('SyncService', () => {
 
       const result = await selectSyncFolder()
 
-      expect(result).toEqual({ success: false, error: 'No window available' })
+      expect(result).toEqual({ success: false, error: 'Нет доступного окна' })
     })
 
     it('should return success false when dialog is canceled', async () => {
@@ -150,7 +150,7 @@ describe('SyncService', () => {
 
       const result = await syncNow()
 
-      expect(result).toEqual({ success: false, error: 'Sync not configured' })
+      expect(result).toEqual({ success: false, error: 'Синхронизация не настроена' })
     })
 
     it('should return success after configuring sync', async () => {

@@ -88,7 +88,7 @@ describe('BackupService', () => {
 
       const result = await exportEncryptedBackup('testpass')
 
-      expect(result).toEqual({ success: false, error: 'No window available' })
+      expect(result).toEqual({ success: false, error: 'Нет доступного окна' })
       expect(saveDatabase).toHaveBeenCalled()
     })
 
@@ -123,7 +123,7 @@ describe('BackupService', () => {
 
       const result = await importEncryptedBackup('testpass', '/backup.ciphervault')
 
-      expect(result).toEqual({ success: false, error: 'Invalid backup file: too small' })
+      expect(result).toEqual({ success: false, error: 'Файл бэкапа слишком мал' })
     })
 
     it('should return error for bad magic header', async () => {
@@ -133,7 +133,7 @@ describe('BackupService', () => {
 
       const result = await importEncryptedBackup('testpass', '/backup.ciphervault')
 
-      expect(result).toEqual({ success: false, error: 'Invalid backup file: bad magic header' })
+      expect(result).toEqual({ success: false, error: 'Неверный формат файла бэкапа' })
     })
 
     it('should return error for unsupported version', async () => {
@@ -144,7 +144,7 @@ describe('BackupService', () => {
 
       const result = await importEncryptedBackup('testpass', '/backup.ciphervault')
 
-      expect(result).toEqual({ success: false, error: `Unsupported backup version: 99` })
+      expect(result).toEqual({ success: false, error: 'Неподдерживаемая версия бэкапа' })
     })
 
     it('should decrypt and restore database on valid backup', async () => {
