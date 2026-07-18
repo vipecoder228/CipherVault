@@ -66,9 +66,15 @@ export function PanicChoiceScreen({ onChoice }: Props) {
 
       setBackupResult({ emailed: sendResult?.sent || false, filePath: sendResult?.filePath })
 
-      // 8. Delete all entries
+      // 8. Delete all entries (track success)
+      let deleted = 0
       for (const entry of entries) {
-        await invoke('entries:force-delete', entry.id)
+        try {
+          await invoke('entries:force-delete', entry.id)
+          deleted++
+        } catch {
+          // Continue deleting other entries
+        }
       }
 
       // 9. Clear panic key

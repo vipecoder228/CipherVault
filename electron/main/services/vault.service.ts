@@ -9,6 +9,7 @@ import { timingSafeEqual } from 'crypto'
 // Held in memory ONLY — never written to disk
 let derivedKey: Buffer | null = null
 let autoLockTimer: ReturnType<typeof setTimeout> | null = null
+let panicKeyTimer: ReturnType<typeof setTimeout> | null = null
 let alarmMode = false
 let activeVaultId: number = 1
 let operationCount = 0
@@ -70,6 +71,10 @@ export function getPanicEncryptionKey(): Buffer | null {
 }
 
 export function clearPanicKey(): void {
+  if (panicKeyTimer) {
+    clearTimeout(panicKeyTimer)
+    panicKeyTimer = null
+  }
   if (panicKey) {
     panicKey.fill(0)
   }
@@ -264,7 +269,8 @@ export async function unlockVault(
     derivedKey = isAlarm ? null : key // In alarm mode, don't store real key
     if (isAlarm) {
       panicKey = key
-      setTimeout(() => { clearPanicKey() }, 300000) // Clear after 5 minutes
+      clearPanicKey() // Clear any existing timer
+      panicKeyTimer = setTimeout(() => { clearPanicKey() }, 300000) // Clear after 5 minutes
     } else {
       panicKey = null
     }
@@ -277,6 +283,19 @@ export async function unlockVault(
     return { success: true, alarmMode: isAlarm }
   } finally {
     releaseOperation()
+  }
+}
+
+export async function verifyPassword(password: string): Promise<boolean> {
+  try {
+    const db = await getDatabase()
+    const vault = getVault(db, activeVaultId)
+    if (!vault) return false
+    const key = await deriveKey(password, Buffer.from(vault.salt, 'hex'))
+    const keyHash = computeVerificationHash(key)
+    return timingSafeEqual(Buffer.from(keyHash, 'hex'), Buffer.from(vault.password_hash, 'hex'))
+  } catch {
+    return false
   }
 }
 
@@ -332,32 +351,35 @@ export async function changeMasterPassword(
       return { success: false, error: 'Vault not initialized' }
     }
 
+    // Derive key once (reused for TOTP verification and password check)
+    const oldSalt = Buffer.from(vault.kdf_salt, 'hex')
+    const oldKey = await deriveKey(oldPassword, oldSalt)
+    const { encryptionKey: oldEncKey } = splitDerivedKey(oldKey)
+
     // Verify TOTP if enabled
     if (vault.totp_enabled && vault.totp_secret) {
       if (!totpCode) {
+        oldKey.fill(0)
         return { success: false, error: 'TOTP code required' }
       }
-      const salt = Buffer.from(vault.kdf_salt, 'hex')
-      const key = await deriveKey(oldPassword, salt)
-      const { encryptionKey: encKey } = splitDerivedKey(key)
       const parsed = parseTotpSecret(vault.totp_secret)
       if (!parsed) {
+        oldKey.fill(0)
         return { success: false, error: 'TOTP configuration is corrupted' }
       }
       try {
-        const decryptedSecret = decrypt(parsed, encKey)
+        const decryptedSecret = decrypt(parsed, oldEncKey)
         if (!verifyTOTP(decryptedSecret, totpCode)) {
+          oldKey.fill(0)
           return { success: false, error: 'Invalid TOTP code' }
         }
       } catch {
+        oldKey.fill(0)
         return { success: false, error: 'TOTP configuration is corrupted' }
       }
     }
 
     // Verify old password
-    const oldSalt = Buffer.from(vault.kdf_salt, 'hex')
-    const oldKey = await deriveKey(oldPassword, oldSalt)
-    const { encryptionKey: oldEncKey } = splitDerivedKey(oldKey)
     const oldHash = await computeVerificationHash(oldEncKey)
 
     if (!safeEqual(oldHash, vault.master_hash)) {
@@ -447,6 +469,9 @@ export async function changeMasterPassword(
     updateMasterHash(db, newHash, newSalt.toString('hex'), 'pbkdf2', activeVaultId)
 
     saveDatabase()
+
+    // Zero old key before replacing
+    oldKey.fill(0)
     derivedKey = newKey
     await startAutoLockTimer()
 
