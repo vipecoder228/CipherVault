@@ -1054,7 +1054,7 @@ function generatePassphraseLocal(wordCount: number = 4): string {
       const bytes = crypto.getRandomValues(new Uint8Array(2))
       idx = (bytes[0] << 8) | bytes[1]
     } while (idx >= maxValid)
-    idx = idx % WORDLIST.length
+    idx = Math.floor(idx * WORDLIST.length / maxValid)
     words.push(WORDLIST[idx])
   }
   return words.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('-')
