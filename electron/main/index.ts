@@ -9,6 +9,7 @@ import { lockVault } from './services/vault.service'
 import { startWebSocketServer, stopWebSocketServer } from './services/websocket.service'
 import { loadSyncSettings, stopSync } from './services/sync.service'
 import { toggleWindow } from './utils/window'
+import { initUpdater } from './updater'
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -157,6 +158,7 @@ app.whenReady().then(async () => {
   registerIPC()
   await initShortcuts()
   createWindow()
+  if (mainWindow) initUpdater(mainWindow)
   createTray()
   startWebSocketServer()
   loadSyncSettings()

@@ -1,5 +1,9 @@
 appId: com.ciphervault.app
 productName: CipherVault
+publish:
+  provider: github
+  owner: vipecoder228
+  repo: CipherVault
 directories:
   buildResources: build
   output: dist

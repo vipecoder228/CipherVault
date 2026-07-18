@@ -4,7 +4,7 @@
 
 ## Скачать
 
-📥 [GitHub Releases](https://github.com/vipecoder228/CipherVault/releases/latest) — скачай zip, распакуй и запусти `CipherVault.exe`
+📥 [GitHub Releases](https://github.com/vipecoder228/CipherVault/releases/latest) — Windows (.exe), Linux (.AppImage/.deb/.rpm), macOS (.dmg)
 
 ## Возможности
 
@@ -56,15 +56,16 @@
 - **Защита секретов** — bot token и backup-пароль шифруются через ключейку ОС
 
 ### Удобство
-- **Генератор паролей** — настраиваемая длина и набор символов
+- **Генератор паролей** — настраиваемая длина и набор символов, passphrase генератор
 - **Disposable email** — временные почты через mail.tm прямо в приложении
-- **Импорт/экспорт** — CSV и JSON (Bitwarden, Chrome, Firefox)
+- **Импорт/экспорт** — CSV и JSON (Bitwarden, 1Password, LastPass, KeePass, Chrome, Firefox)
 - **Категории** — организация записей с иконками и цветами
 - **Избранное** — быстрый доступ к важным записям
 - **История изменений** — отслеживание всех изменений записи
 - **Корзина** — восстановление удалённых записей
 - **Режим скрытности** — скрытое окно, глобальная горячая клавиша (Ctrl+Shift+Space)
 - **Автоочистка буфера** — копии очищаются через 30 секунд
+- **Автообновления** — приложение проверяет обновления при запуске
 - **Тёмная и светлая тема**
 - **i18n** — интерфейс на русском и английском
 
@@ -92,7 +93,7 @@ npm run build
 # Создание portable-версии
 npm run pack
 
-# Создание установщика (требует Developer Mode в Windows)
+# Создание установщика
 npm run dist
 
 # Сборка Android APK
@@ -101,11 +102,11 @@ npm run dist:android
 # Проверка типов
 npm run typecheck
 
-# Линтинг
-npm run lint
-
-# Тесты
+# Тесты (unit)
 npm run test
+
+# Тесты (E2E)
+npm run test:e2e
 ```
 
 ## Технологии
@@ -121,7 +122,9 @@ npm run test
 | Крипто | Node.js crypto (AES-256-GCM, PBKDF2) |
 | 2FA | otplib + qrcode.react |
 | Extension | Chrome Manifest V3 + WebSocket |
+| Автообновления | electron-updater + GitHub Releases |
 | Сборка | electron-vite + electron-builder |
+| Тесты | Vitest (unit) + Playwright (E2E) |
 
 ## Архитектура
 
@@ -147,12 +150,16 @@ npm run test
 ## Безопасность
 
 - Мастер-пароль никогда не хранится — только хеш производного ключа
-- Каждая запись зашифрована уникальным IV
+- Каждая запись зашифрована уникальным IV (AES-256-GCM)
+- PBKDF2 600K итераций для защиты от brute-force
+- Проверка целостности (integrity check) при запуске
+- Инсталлятор проверяет свою подлинность перед установкой
 - Browser extension работает только через localhost (127.0.0.1)
 - Пароли отправляются расширению ТОЛЬКО при явном клике пользователя
 - DevTools отключены в продакшене
 - Изоляция контекста включена, nodeIntegration отключен
 - Android: биометрические данные хранятся в Hardware Security Module
+- Секреты шифруются через ключевую(OS Keychain на macOS, DPAPI на Windows)
 
 ## Лицензия
 

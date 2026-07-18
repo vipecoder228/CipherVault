@@ -22,11 +22,11 @@ export interface ColumnMap {
 }
 
 // All known column name variants per field
-const NAME_COLS = ['name', 'title', 'item_name', 'entry_title', 'label', 'sitename', 'site_name', 'webapp']
+const NAME_COLS = ['name', 'title', 'item_name', 'entry_title', 'label', 'sitename', 'site_name', 'webapp', 'entry']
 const URL_COLS = ['url', 'login_uri', 'login_url', 'website', 'web_address', 'web_url', 'link', 'homepage', 'site_url', 'uri', 'websiteLocation']
 const USER_COLS = ['username', 'login', 'login_username', 'email', 'user', 'user_name', 'login_name', 'account', 'account_name', 'webaccount_username']
 const PASS_COLS = ['password', 'login_password', 'pass', 'pwd', 'credential', 'secret']
-const TYPE_COLS = ['type', 'item_type', 'grouping', 'category', 'folder']
+const TYPE_COLS = ['type', 'item_type', 'grouping', 'category', 'folder', 'group']
 const NOTES_COLS = ['notes', 'note', 'extra', 'comment', 'description', 'memo', 'notePlain']
 const TOTP_COLS = ['totp', 'otp', 'token', 'authenticator_key', 'two_factor']
 const CARD_NUM_COLS = ['card_number', 'cc_number', 'cardnumber', 'cc_num', 'card_num', 'number']
@@ -69,12 +69,14 @@ export function mapColumns(headerLine: string): ColumnMap {
 export function detectCSVSource(headerLine: string): string {
   const lower = headerLine.toLowerCase()
   if (lower.includes('login_uri') && lower.includes('login_username')) return 'bitwarden'
-  if (lower.includes('webaccount_username') || lower.includes('websiteLocation')) return '1password'
+  if (lower.includes('webaccount_username') || lower.includes('websitelocation')) return '1password'
   if (lower.includes('grouping') && lower.includes('fav')) return 'lastpass'
   if (lower.includes('sitename') || lower.includes('webapp')) return 'keeper'
   if (lower.includes('web_url') || lower.includes('link')) return 'chrome'
   if (lower.includes('cardnumber') || lower.includes('validuntil')) return 'nordpass'
   if (lower.includes('matchurl') || lower.includes('autosubmit')) return 'roboform'
+  // KeePass CSV: "Group,Title,URL,Username,Password,Notes"
+  if (lower.includes('group') && lower.includes('title') && lower.includes('password')) return 'keepass'
   return 'generic'
 }
 
@@ -84,13 +86,16 @@ export function mapEntryType(rawType: string, source: string): string {
 
   // Bitwarden: "login", "secure_note", "card", "identity"
   if (t === 'login' || t === 'password' || t === 'webaccount') return 'login'
-  if (t === 'secure_note' || t === 'note' || t === 'notePlain') return 'secure_note'
+  if (t === 'secure_note' || t === 'note' || t === 'noteplain') return 'secure_note'
   if (t === 'card' || t === 'credit_card' || t === 'creditcard') return 'card'
   if (t === 'identity' || t === 'personal') return 'identity'
 
   // LastPass: "Login", "Secure Note", "Credit Card"
   if (t.includes('credit')) return 'card'
   if (t.includes('note') || t.includes('secure')) return 'secure_note'
+
+  // KeePass: group names like "Windows", "Network", "Internet"
+  if (source === 'keepass') return 'login'
 
   // Default
   return 'login'
