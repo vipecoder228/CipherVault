@@ -22,7 +22,7 @@ export function PanicChoiceScreen({ onChoice }: Props) {
       // 1. Get backup password
       const backupPassword = await invoke('settings:get-secure', 'panic_backup_password')
       if (!backupPassword) {
-        addToast('Backup password not configured', 'error')
+        addToast('Пароль бэкапа не настроен', 'error')
         setLoading(false)
         return
       }
@@ -31,7 +31,7 @@ export function PanicChoiceScreen({ onChoice }: Props) {
       const entries = await invoke('entries:panic-backup')
 
       if (!entries || entries.length === 0) {
-        addToast('No entries found to wipe', 'warning')
+        addToast('Нет записей для удаления', 'warning')
         onChoice('wipe')
         return
       }
@@ -39,7 +39,7 @@ export function PanicChoiceScreen({ onChoice }: Props) {
       // Check that entries are actually decrypted
       const hasDecrypted = entries.some((e: any) => e.decrypted && e.decrypted.password)
       if (!hasDecrypted) {
-        addToast('Panic key expired. Re-enter alarm password and try again quickly.', 'error')
+        addToast('Ключ принуждения истёк. Заново введите пароль принуждения и повторите быстро.', 'error')
         setLoading(false)
         return
       }
@@ -83,17 +83,17 @@ export function PanicChoiceScreen({ onChoice }: Props) {
       const msg = sendResult?.sent
         ? `Encrypted backup sent to Telegram`
         : `Encrypted backup saved${sendResult?.filePath ? '' : ''}`
-      addToast(msg + '. All data wiped.', 'success')
+      addToast(msg + '. Все данные удалены.', 'success')
     } catch (err: any) {
       console.error('Panic backup failed:', err)
-      addToast('Backup failed: ' + (err.message || 'Unknown error'), 'error')
+      addToast('Ошибка бэкапа: ' + (err.message || 'Неизвестная ошибка'), 'error')
       try {
         const entries = await invoke('entries:panic-backup')
         for (const entry of entries) {
           await invoke('entries:force-delete', entry.id)
         }
         await invoke('entries:complete-panic')
-        addToast('Data wiped (backup failed)', 'warning')
+        addToast('Данные удалены (бэкап не удался)', 'warning')
         onChoice('wipe')
       } catch {}
     } finally {
