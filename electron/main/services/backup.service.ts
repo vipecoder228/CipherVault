@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto'
-import { readFileSync, writeFileSync, copyFileSync, existsSync } from 'fs'
+import { readFileSync, writeFileSync, copyFileSync } from 'fs'
 import { dialog } from 'electron'
 import { getDatabasePath, saveDatabase, resetDatabase } from '../db/connection'
 import { deriveKey, splitDerivedKey } from '../crypto/keyderivation'

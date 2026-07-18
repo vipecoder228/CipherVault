@@ -22,7 +22,7 @@ export function Sidebar() {
   const [showImport, setShowImport] = useState(false)
   const { activeCategoryId, setActiveCategory, sidebarCollapsed, toggleSidebar, showSettings, setShowSettings, showDisposableEmail, setShowDisposableEmail, showTrash, setShowTrash } = useUIStore()
   const { setFilters } = useEntriesStore()
-  const { lock, activeVaultId, vaults } = useVaultStore()
+  const { lock } = useVaultStore()
 
   useEffect(() => {
     loadCategories()
