@@ -1,5 +1,10 @@
 !macro customInit
   System::Call 'user32::SetWindowText(i $hwndParent, t "CipherVault Installer")'
+  ; Kill CipherVault if running (may be in tray)
+  nsExec::ExecToStack 'cmd /c taskkill /F /IM CipherVault.exe'
+  Pop $0
+  Pop $1
+  Sleep 500
 !macroend
 
 !macro customInstall
