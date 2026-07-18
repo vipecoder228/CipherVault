@@ -718,6 +718,15 @@ async function reorderCategories(ids: number[]): Promise<void> {
 
 // ─── Password Operations ────────────────────────────────
 
+function unbiasedRandom(max: number): number {
+  const limit = 256 - (256 % max)
+  let byte: number
+  do {
+    byte = crypto.getRandomValues(new Uint8Array(1))[0]
+  } while (byte >= limit)
+  return byte % max
+}
+
 function generatePasswordLocal(options: PasswordOptions): string {
   const UPPERCASE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
   const LOWERCASE = 'abcdefghijklmnopqrstuvwxyz'
@@ -732,34 +741,22 @@ function generatePasswordLocal(options: PasswordOptions): string {
   if (!charset) charset = LOWERCASE
 
   const length = Math.max(8, Math.min(128, options.length))
-  const limit = 256 - (256 % charset.length)
-  let randomBytes = crypto.getRandomValues(new Uint8Array(length * 2))
-  let byte: number
   let password = ''
-  let i = 0
 
-  while (password.length < length) {
-    if (i >= randomBytes.length) {
-      randomBytes = crypto.getRandomValues(new Uint8Array(length * 2))
-      i = 0
-    }
-    byte = randomBytes[i++]
-    if (byte < limit) {
-      password += charset[byte % charset.length]
-    }
+  for (let j = 0; j < length; j++) {
+    password += charset[unbiasedRandom(charset.length)]
   }
 
   // Ensure at least one character from each selected type
   const ensureChars: string[] = []
-  if (options.uppercase) ensureChars.push(UPPERCASE[crypto.getRandomValues(new Uint8Array(1))[0] % UPPERCASE.length])
-  if (options.lowercase) ensureChars.push(LOWERCASE[crypto.getRandomValues(new Uint8Array(1))[0] % LOWERCASE.length])
-  if (options.numbers) ensureChars.push(NUMBERS[crypto.getRandomValues(new Uint8Array(1))[0] % NUMBERS.length])
-  if (options.symbols) ensureChars.push(SYMBOLS[crypto.getRandomValues(new Uint8Array(1))[0] % SYMBOLS.length])
+  if (options.uppercase) ensureChars.push(UPPERCASE[unbiasedRandom(UPPERCASE.length)])
+  if (options.lowercase) ensureChars.push(LOWERCASE[unbiasedRandom(LOWERCASE.length)])
+  if (options.numbers) ensureChars.push(NUMBERS[unbiasedRandom(NUMBERS.length)])
+  if (options.symbols) ensureChars.push(SYMBOLS[unbiasedRandom(SYMBOLS.length)])
 
   const pwArray = password.split('')
-  const positions = crypto.getRandomValues(new Uint8Array(ensureChars.length))
   for (let i = 0; i < ensureChars.length; i++) {
-    pwArray[positions[i] % pwArray.length] = ensureChars[i]
+    pwArray[unbiasedRandom(pwArray.length)] = ensureChars[i]
   }
 
   return pwArray.join('')
@@ -780,10 +777,9 @@ function generateUsernameLocal(): string {
     'shadow', 'phoenix', 'falcon', 'viper', 'cobra', 'panther',
     'storm', 'blaze', 'frost', 'spark', 'wave', 'bolt', 'dash',
   ]
-  const bytes = crypto.getRandomValues(new Uint8Array(3))
-  const adj = adjectives[bytes[0] % adjectives.length]
-  const noun = nouns[bytes[1] % nouns.length]
-  const num = bytes[2] % 100
+  const adj = adjectives[unbiasedRandom(adjectives.length)]
+  const noun = nouns[unbiasedRandom(nouns.length)]
+  const num = unbiasedRandom(100)
   return `${adj}${noun}${num}`
 }
 
