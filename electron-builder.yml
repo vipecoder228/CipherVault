@@ -69,10 +69,6 @@ linux:
   maintainer: CipherVault
   vendor: CipherVault
   category: Utility
-  desktop:
-    Name: CipherVault
-    Comment: Secure desktop password manager
-    Keywords: password;security;encryption;vault;
 deb:
   artifactName: ${name}-${version}-linux.${ext}
   depends:
