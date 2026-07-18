@@ -3,7 +3,6 @@ import { createHash } from 'crypto'
 const HIBP_API = 'https://api.pwnedpasswords.com/range'
 
 // HIBP k-anonymity API requires SHA-1 prefix — this is NOT password storage
-// lgtm[js/insufficient-password-hash]
 export async function checkBreach(password: string): Promise<{ breached: boolean; count: number; rateLimited?: boolean }> {
   const sha1 = createHash('sha1').update(password).digest('hex').toUpperCase()
   const prefix = sha1.slice(0, 5)
