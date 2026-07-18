@@ -2,6 +2,18 @@
 
 Безопасный менеджер паролей с шифрованием AES-256-GCM, построенный на Electron + React + TypeScript.
 
+> **⚠️ Проект в режиме поддержки**
+> 
+> CipherVault переходит в maintenance mode. Новых фич больше не будет.
+> 
+> - ✅ Исправление багов
+> - ✅ Исправление уязвимостей
+> - ✅ Поддержка текущих функций
+> 
+> Версия v13.1.0 — последняя с новыми фичами. Дальше только багофиксы.
+> 
+> Причина: автор сфокусировался на изучении кибербезы (TryHackMe, CTF, Bug Bounty).
+
 ## Скачать
 
 📥 [GitHub Releases](https://github.com/vipecoder228/CipherVault/releases/latest) — Windows (.exe), Linux (.AppImage/.deb/.rpm), macOS (.dmg)
