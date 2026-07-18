@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync, copyFileSync } from 'fs'
 import { dialog } from 'electron'
 import { getDatabasePath, saveDatabase, resetDatabase } from '../db/connection'
 import { deriveKey, splitDerivedKey } from '../crypto/keyderivation'
+import { ERRORS } from '../../../shared/errors'
 import { CRYPTO } from '../crypto/constants'
 import { getWindow } from '../utils/window'
 
@@ -31,7 +32,7 @@ export async function exportEncryptedBackup(
   const authTag = cipher.getAuthTag()
 
   const win = getWindow()
-  if (!win) return { success: false, error: 'No window available' }
+  if (!win) return { success: false, error: ERRORS.BACKUP_NO_WINDOW }
   const result = await dialog.showSaveDialog(win, {
     title: 'Export Encrypted Backup',
     defaultPath: 'cipher-vault-backup.ciphervault',
@@ -60,7 +61,7 @@ export async function importEncryptedBackup(
 ): Promise<{ success: boolean; error?: string }> {
   if (!filePath) {
     const win = getWindow()
-    if (!win) return { success: false, error: 'No window available' }
+    if (!win) return { success: false, error: ERRORS.BACKUP_NO_WINDOW }
     const result = await dialog.showOpenDialog(win, {
       title: 'Import Encrypted Backup',
       filters: [{ name: 'CipherVault Backup', extensions: ['ciphervault'] }],
@@ -75,17 +76,17 @@ export async function importEncryptedBackup(
   const fileBuffer = readFileSync(filePath)
 
   if (fileBuffer.length < HEADER_SIZE) {
-    return { success: false, error: 'Invalid backup file: too small' }
+    return { success: false, error: ERRORS.BACKUP_FILE_TOO_SMALL }
   }
 
   const magic = fileBuffer.subarray(0, 11).toString('ascii')
   if (magic !== MAGIC) {
-    return { success: false, error: 'Invalid backup file: bad magic header' }
+    return { success: false, error: ERRORS.BACKUP_BAD_MAGIC }
   }
 
   const version = fileBuffer[11]
   if (version !== 1) {
-    return { success: false, error: `Unsupported backup version: ${version}` }
+    return { success: false, error: ERRORS.BACKUP_UNSUPPORTED_VERSION }
   }
 
   const salt = fileBuffer.subarray(12, 12 + CRYPTO.SALT_SIZE)
@@ -118,6 +119,6 @@ export async function importEncryptedBackup(
 
     return { success: true }
   } catch {
-    return { success: false, error: 'Wrong password or corrupted file' }
+    return { success: false, error: ERRORS.BACKUP_DECRYPT_FAILED }
   }
 }

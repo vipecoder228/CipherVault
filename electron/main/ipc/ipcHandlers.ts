@@ -1,6 +1,7 @@
 import { ipcMain, dialog, globalShortcut } from 'electron'
 import { readFileSync, writeFileSync } from 'fs'
 import type { IPCChannels } from '../../../shared/types'
+import { ERRORS } from '../../../shared/errors'
 import * as vaultService from '../services/vault.service'
 import * as entriesService from '../services/entries.service'
 import * as clipboardService from '../services/clipboard.service'
@@ -46,7 +47,7 @@ function registerGlobalShortcuts(): void {
 async function setGlobalShortcut(shortcut: string): Promise<{ success: boolean; error?: string }> {
   try {
     if (!shortcut || !shortcut.includes('+')) {
-      return { success: false, error: 'Invalid shortcut format' }
+      return { success: false, error: ERRORS.SHORTCUT_INVALID_FORMAT }
     }
     globalShortcut.unregisterAll()
     const registered = globalShortcut.register(shortcut, () => {
@@ -56,7 +57,7 @@ async function setGlobalShortcut(shortcut: string): Promise<{ success: boolean; 
       globalShortcut.register(currentShortcut, () => {
         toggleWindow()
       })
-      return { success: false, error: 'Failed to register shortcut. It may be in use by another app.' }
+      return { success: false, error: ERRORS.SHORTCUT_REGISTER_FAILED }
     }
     currentShortcut = shortcut
     const db = await getDatabase()
@@ -212,7 +213,7 @@ const handlers: Record<string, (...args: any[]) => any> = {
   'backup:import': (_: unknown, backupPassword: string, filePath?: string) => backupService.importEncryptedBackup(backupPassword, filePath),
   'backup:import-panic': async (_: unknown, backupPassword: string, filePath?: string) => {
     const win = getWindow()
-    if (!win) return { success: false, error: 'No window available' }
+    if (!win) return { success: false, error: ERRORS.BACKUP_NO_WINDOW }
 
     if (!filePath) {
       const result = await dialog.showOpenDialog(win, {
@@ -221,7 +222,7 @@ const handlers: Record<string, (...args: any[]) => any> = {
         properties: ['openFile'],
       })
       if (result.canceled || !result.filePaths[0]) {
-        return { success: false, error: 'Cancelled' }
+        return { success: false, error: ERRORS.BACKUP_CANCELLED }
       }
       filePath = result.filePaths[0]
     }
@@ -247,7 +248,7 @@ const handlers: Record<string, (...args: any[]) => any> = {
 
       const backup = JSON.parse(decrypted)
       if (backup.format !== 'ciphervault-panic-backup') {
-        return { success: false, error: 'Invalid panic backup format' }
+        return { success: false, error: ERRORS.BACKUP_FORMAT_INVALID }
       }
 
       let imported = 0
@@ -287,7 +288,7 @@ const handlers: Record<string, (...args: any[]) => any> = {
 
       return { success: true, imported, skipped, errors }
     } catch (e: any) {
-      return { success: false, error: 'Failed to decrypt: wrong password or corrupted file' }
+      return { success: false, error: ERRORS.BACKUP_DECRYPT_FAILED }
     }
   },
 

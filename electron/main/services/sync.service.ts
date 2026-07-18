@@ -3,6 +3,7 @@ import { join } from 'path'
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto'
 import { dialog, BrowserWindow } from 'electron'
 import { getDatabasePath, saveDatabase, getDatabase, resetDatabase } from '../db/connection'
+import { ERRORS } from '../../../shared/errors'
 import { deriveKey, splitDerivedKey } from '../crypto/keyderivation'
 import { CRYPTO } from '../crypto/constants'
 import { isAlarmMode } from './vault.service'
@@ -171,7 +172,7 @@ function stopWatching(): void {
 
 export async function selectSyncFolder(): Promise<{ success: boolean; folder?: string; error?: string }> {
   const win = getWindow()
-  if (!win) return { success: false, error: 'No window available' }
+  if (!win) return { success: false, error: ERRORS.BACKUP_NO_WINDOW }
   const result = await dialog.showOpenDialog(win, {
     title: 'Select Sync Folder',
     properties: ['openDirectory'],
@@ -202,12 +203,12 @@ export async function setSyncPassword(password: string): Promise<void> {
 
 export async function syncNow(): Promise<{ success: boolean; error?: string }> {
   if (!syncEnabled || !syncFolder) {
-    return { success: false, error: 'Sync not configured' }
+    return { success: false, error: ERRORS.SYNC_NOT_CONFIGURED }
   }
 
   const exported = await exportToSync()
   if (!exported) {
-    return { success: false, error: 'Export failed' }
+    return { success: false, error: ERRORS.SYNC_EXPORT_FAILED }
   }
 
   return { success: true }

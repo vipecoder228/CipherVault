@@ -3,6 +3,7 @@ import { getVault, getAllVaults, createVault, updateMasterHash, updateTOTP, upda
 import { generateSalt, deriveKey, computeVerificationHash, splitDerivedKey } from '../crypto/keyderivation'
 import { encrypt, decrypt, encryptJSON, decryptJSON } from '../crypto/encryption'
 import { generateSecret, verifyTOTP, generateQRCodeUrl } from '../crypto/totp'
+import { ERRORS } from '../../../shared/errors'
 import { RATE_LIMIT } from '../crypto/constants'
 import { timingSafeEqual } from 'crypto'
 
@@ -129,7 +130,7 @@ export async function setupVault(masterPassword: string, alarmPassword?: string,
     if (newVaultId === 1) {
       const firstVault = getVault(db, 1)
       if (firstVault) {
-        return { success: false, error: 'Vault already initialized' }
+        return { success: false, error: ERRORS.VAULT_ALREADY_INITIALIZED }
       }
     }
 
@@ -187,7 +188,7 @@ export async function unlockVault(
   acquireOperation()
   try {
     if (isUnlocked()) {
-      return { success: false, error: 'Vault is already unlocked' }
+      return { success: false, error: ERRORS.VAULT_IS_UNLOCKED }
     }
 
     const db = await getDatabase()
@@ -195,7 +196,7 @@ export async function unlockVault(
 
     const attempts = getRecentFailedAttempts(db)
     if (attempts >= RATE_LIMIT.ATTEMPTS_BEFORE_LOCK) {
-      return { success: false, error: 'Too many failed attempts. Please restart the application.' }
+      return { success: false, error: ERRORS.TOO_MANY_ATTEMPTS }
     }
     if (attempts >= RATE_LIMIT.ATTEMPTS_BEFORE_DELAY_1) {
       const delay = attempts >= RATE_LIMIT.ATTEMPTS_BEFORE_DELAY_3
@@ -208,7 +209,7 @@ export async function unlockVault(
 
     const vault = getVault(db, targetVaultId)
     if (!vault) {
-      return { success: false, error: 'Vault not initialized' }
+      return { success: false, error: ERRORS.VAULT_NOT_INITIALIZED }
     }
 
     // Check master password
@@ -236,33 +237,33 @@ export async function unlockVault(
         // Neither password matches
         recordAttempt(db, false)
         saveDatabase()
-        return { success: false, error: 'Invalid master password' }
+        return { success: false, error: ERRORS.INVALID_MASTER_PASSWORD }
       }
     } else {
       // No alarm password set, master password wrong
       recordAttempt(db, false)
       saveDatabase()
-      return { success: false, error: 'Invalid master password' }
+      return { success: false, error: ERRORS.INVALID_MASTER_PASSWORD }
     }
 
     // Verify TOTP if enabled (skip in alarm mode for speed)
     if (!isAlarm && vault.totp_enabled && vault.totp_secret) {
       if (!totpCode) {
-        return { success: false, error: 'TOTP code required', requiresTotp: true }
+        return { success: false, error: ERRORS.TOTP_CODE_REQUIRED, requiresTotp: true }
       }
       const parsed = parseTotpSecret(vault.totp_secret)
       if (!parsed) {
-        return { success: false, error: 'TOTP configuration is corrupted' }
+        return { success: false, error: ERRORS.TOTP_CORRUPTED }
       }
       try {
         const decryptedSecret = decrypt(parsed, encryptionKey)
         if (!verifyTOTP(decryptedSecret, totpCode)) {
           recordAttempt(db, false)
           saveDatabase()
-          return { success: false, error: 'Invalid TOTP code' }
+          return { success: false, error: ERRORS.TOTP_INVALID_CODE }
         }
       } catch {
-        return { success: false, error: 'TOTP configuration is corrupted' }
+        return { success: false, error: ERRORS.TOTP_CORRUPTED }
       }
     }
 
@@ -323,13 +324,13 @@ export function lockVault(): void {
 
 export async function switchVault(vaultId: number): Promise<{ success: boolean; error?: string }> {
   if (isUnlocked()) {
-    return { success: false, error: 'Lock the vault before switching' }
+    return { success: false, error: ERRORS.LOCK_BEFORE_SWITCH }
   }
   // Validate vault exists
   const db = await getDatabase()
   const vault = getVault(db, vaultId)
   if (!vault) {
-    return { success: false, error: 'Vault not found' }
+    return { success: false, error: ERRORS.VAULT_NOT_FOUND }
   }
   activeVaultId = vaultId
   return { success: true }
@@ -343,12 +344,12 @@ export async function changeMasterPassword(
   acquireOperation()
   try {
     if (!isUnlocked()) {
-      return { success: false, error: 'Vault is locked' }
+      return { success: false, error: ERRORS.VAULT_IS_LOCKED }
     }
     const db = await getDatabase()
     const vault = getVault(db, activeVaultId)
     if (!vault) {
-      return { success: false, error: 'Vault not initialized' }
+      return { success: false, error: ERRORS.VAULT_NOT_INITIALIZED }
     }
 
     // Derive key once (reused for TOTP verification and password check)
@@ -360,22 +361,22 @@ export async function changeMasterPassword(
     if (vault.totp_enabled && vault.totp_secret) {
       if (!totpCode) {
         oldKey.fill(0)
-        return { success: false, error: 'TOTP code required' }
+        return { success: false, error: ERRORS.TOTP_CODE_REQUIRED }
       }
       const parsed = parseTotpSecret(vault.totp_secret)
       if (!parsed) {
         oldKey.fill(0)
-        return { success: false, error: 'TOTP configuration is corrupted' }
+        return { success: false, error: ERRORS.TOTP_CORRUPTED }
       }
       try {
         const decryptedSecret = decrypt(parsed, oldEncKey)
         if (!verifyTOTP(decryptedSecret, totpCode)) {
           oldKey.fill(0)
-          return { success: false, error: 'Invalid TOTP code' }
+          return { success: false, error: ERRORS.TOTP_INVALID_CODE }
         }
       } catch {
         oldKey.fill(0)
-        return { success: false, error: 'TOTP configuration is corrupted' }
+        return { success: false, error: ERRORS.TOTP_CORRUPTED }
       }
     }
 
@@ -383,7 +384,7 @@ export async function changeMasterPassword(
     const oldHash = await computeVerificationHash(oldEncKey)
 
     if (!safeEqual(oldHash, vault.master_hash)) {
-      return { success: false, error: 'Current password is incorrect' }
+      return { success: false, error: ERRORS.CURRENT_PASSWORD_INCORRECT }
     }
 
     // Derive new key
@@ -396,7 +397,7 @@ export async function changeMasterPassword(
     if (vault.totp_enabled && vault.totp_secret) {
       const parsed = parseTotpSecret(vault.totp_secret)
       if (!parsed) {
-        return { success: false, error: 'TOTP configuration is corrupted' }
+        return { success: false, error: ERRORS.TOTP_CORRUPTED }
       }
       try {
         const decryptedSecret = decrypt(parsed, oldEncKey)
@@ -404,7 +405,7 @@ export async function changeMasterPassword(
         const reEncryptedStr = JSON.stringify({ iv: reEncrypted.iv, ciphertext: reEncrypted.ciphertext, authTag: reEncrypted.authTag })
         updateTOTP(db, reEncryptedStr, true, activeVaultId)
       } catch {
-        return { success: false, error: 'Failed to re-encrypt TOTP secret' }
+        return { success: false, error: ERRORS.TOTP_RE_ENCRYPT_FAILED }
       }
     }
 
@@ -485,7 +486,7 @@ export async function changeMasterPassword(
 
 export function enableTOTP(): { secret: string; qrCodeUrl: string } | { error: string } {
   if (!isUnlocked()) return { error: 'Vault is locked' }
-  if (pendingTotpSecret) return { error: 'TOTP setup already in progress' }
+  if (pendingTotpSecret) return { error: ERRORS.TOTP_SETUP_IN_PROGRESS }
   const secret = generateSecret()
   const qrCodeUrl = generateQRCodeUrl(secret, 'CipherVault')
   pendingTotpSecret = secret
@@ -584,11 +585,11 @@ export async function setupAlarmPassword(alarmPassword: string): Promise<{ succe
   acquireOperation()
   try {
     const encKey = getEncryptionKey()
-    if (!encKey) return { success: false, error: 'Vault is locked' }
+    if (!encKey) return { success: false, error: ERRORS.VAULT_IS_LOCKED }
 
     const db = await getDatabase()
     const vault = getVault(db, activeVaultId)
-    if (!vault) return { success: false, error: 'Vault not initialized' }
+    if (!vault) return { success: false, error: ERRORS.VAULT_NOT_INITIALIZED }
 
     const salt = generateSalt()
     const key = await deriveKey(alarmPassword, salt)
@@ -612,10 +613,10 @@ export async function changeAlarmPassword(oldAlarmPassword: string, newAlarmPass
   try {
     const db = await getDatabase()
     const vault = getVault(db, activeVaultId)
-    if (!vault) return { success: false, error: 'Vault not initialized' }
+    if (!vault) return { success: false, error: ERRORS.VAULT_NOT_INITIALIZED }
 
     if (!vault.alarm_hash || !vault.alarm_salt) {
-      return { success: false, error: 'Alarm password not set' }
+      return { success: false, error: ERRORS.ALARM_PASSWORD_NOT_SET }
     }
 
     // Verify old alarm password
@@ -625,7 +626,7 @@ export async function changeAlarmPassword(oldAlarmPassword: string, newAlarmPass
     const oldHash = await computeVerificationHash(oldEncKey)
 
     if (!safeEqual(oldHash, vault.alarm_hash)) {
-      return { success: false, error: 'Invalid alarm password' }
+      return { success: false, error: ERRORS.ALARM_PASSWORD_INVALID }
     }
 
     // Set new alarm password
