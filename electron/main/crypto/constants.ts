@@ -2,6 +2,15 @@
 // (DIGEST: 'sha-256', ENCRYPTION_ALGO: 'AES-GCM')
 // Both files must keep the same numeric values for PBKDF2, SALT_SIZE, IV_SIZE, AUTH_TAG_SIZE, etc.
 export const CRYPTO = {
+  // Argon2id parameters (OWASP recommended)
+  ARGON2: {
+    TIME_COST: 3,        // iterations
+    MEMORY_COST: 65536,  // 64 MB
+    PARALLELISM: 4,      // threads
+    KEY_LENGTH: 32,      // bytes
+    SALT_LENGTH: 16,     // bytes
+  },
+  // Legacy PBKDF2 (kept for migration)
   PBKDF2: {
     ITERATIONS: 600_000,
     KEY_LENGTH: 64,

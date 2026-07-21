@@ -4,12 +4,12 @@ import { deriveKey, splitDerivedKey, computeVerificationHash, generateSalt } fro
 
 describe('Key Derivation', () => {
   describe('deriveKey', () => {
-    it('should derive a key of correct length (64 bytes)', async () => {
+    it('should derive a key of correct length (32 bytes for Argon2id)', async () => {
       const password = 'test-password'
       const salt = randomBytes(32)
       const key = await deriveKey(password, salt)
       expect(key).toBeInstanceOf(Buffer)
-      expect(key.length).toBe(64)
+      expect(key.length).toBe(32)
     })
 
     it('should derive the same key for the same password and salt', async () => {
@@ -38,7 +38,7 @@ describe('Key Derivation', () => {
       const salt = randomBytes(32)
       const key = await deriveKey('', salt)
       expect(key).toBeInstanceOf(Buffer)
-      expect(key.length).toBe(64)
+      expect(key.length).toBe(32)
     })
 
     it('should handle long password', async () => {
@@ -46,7 +46,7 @@ describe('Key Derivation', () => {
       const salt = randomBytes(32)
       const key = await deriveKey(password, salt)
       expect(key).toBeInstanceOf(Buffer)
-      expect(key.length).toBe(64)
+      expect(key.length).toBe(32)
     })
   })
 

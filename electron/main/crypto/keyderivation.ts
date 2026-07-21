@@ -1,25 +1,26 @@
-import { randomBytes, pbkdf2, createHash } from 'crypto'
+import { randomBytes, createHash } from 'crypto'
 import { CRYPTO } from './constants'
 
-// ─── PBKDF2 Key Derivation (built into Node.js) ────────
+// ─── Argon2id Key Derivation (OWASP recommended) ──────
 
 export async function deriveKey(
   password: string,
   salt: Buffer,
 ): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    pbkdf2(
-      password,
-      salt,
-      CRYPTO.PBKDF2.ITERATIONS,
-      CRYPTO.PBKDF2.KEY_LENGTH,
-      CRYPTO.PBKDF2.DIGEST,
-      (err, key) => {
-        if (err) reject(err)
-        else resolve(key)
-      }
-    )
+  // Use argon2id for key derivation
+  const { hash: argon2Hash } = await import('argon2')
+
+  const key = await argon2Hash(password, {
+    salt: salt,
+    type: 2, // argon2id
+    timeCost: CRYPTO.ARGON2.TIME_COST,
+    memoryCost: CRYPTO.ARGON2.MEMORY_COST,
+    parallelism: CRYPTO.ARGON2.PARALLELISM,
+    hashLength: CRYPTO.ARGON2.KEY_LENGTH,
+    raw: true,
   })
+
+  return Buffer.from(key)
 }
 
 // ─── Split derived key into encryption + HMAC keys ──────

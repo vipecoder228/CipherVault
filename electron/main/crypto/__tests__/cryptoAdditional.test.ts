@@ -60,19 +60,19 @@ describe('Additional Crypto Tests', () => {
     it('should handle very long password', async () => {
       const longPass = 'x'.repeat(10000)
       const key = await deriveKey(longPass, generateSalt())
-      expect(key.length).toBe(64)
+      expect(key.length).toBe(32)
     })
 
     it('should handle empty salt', async () => {
       const salt = Buffer.alloc(32, 0)
       const key = await deriveKey('test', salt)
-      expect(key.length).toBe(64)
+      expect(key.length).toBe(32)
     })
 
     it('should handle max salt', async () => {
       const salt = Buffer.alloc(32, 0xFF)
       const key = await deriveKey('test', salt)
-      expect(key.length).toBe(64)
+      expect(key.length).toBe(32)
     })
   })
 
