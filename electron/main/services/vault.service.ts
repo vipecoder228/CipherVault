@@ -115,6 +115,8 @@ export async function getVaultStatus() {
 
 export async function setupVault(masterPassword: string, alarmPassword?: string, displayName?: string): Promise<{ success: boolean; error?: string; vaultId?: number }> {
   acquireOperation()
+  let key: Buffer | null = null
+  let aKey: Buffer | null = null
   try {
     const db = await getDatabase()
 
@@ -135,7 +137,7 @@ export async function setupVault(masterPassword: string, alarmPassword?: string,
     }
 
     const salt = generateSalt()
-    const key = await deriveKey(masterPassword, salt)
+    key = await deriveKey(masterPassword, salt)
     const { encryptionKey } = splitDerivedKey(key)
     const masterHash = await computeVerificationHash(encryptionKey)
 
@@ -144,7 +146,7 @@ export async function setupVault(masterPassword: string, alarmPassword?: string,
     let alarmSaltHex: string | null = null
     if (alarmPassword && alarmPassword.length > 0) {
       const aSalt = generateSalt()
-      const aKey = await deriveKey(alarmPassword, aSalt)
+      aKey = await deriveKey(alarmPassword, aSalt)
       const { encryptionKey: aEncKey } = splitDerivedKey(aKey)
       alarmHash = await computeVerificationHash(aEncKey)
       alarmSaltHex = aSalt.toString('hex')
@@ -170,12 +172,15 @@ export async function setupVault(masterPassword: string, alarmPassword?: string,
 
     // Unlock immediately after setup
     derivedKey = key
+    key = null // prevent zeroing in finally
     alarmMode = false
     activeVaultId = actualVaultId
     await startAutoLockTimer()
 
     return { success: true, vaultId: actualVaultId }
   } finally {
+    if (key) key.fill(0)
+    if (aKey) aKey.fill(0)
     releaseOperation()
   }
 }
@@ -270,7 +275,11 @@ export async function unlockVault(
     derivedKey = isAlarm ? null : key // In alarm mode, don't store real key
     if (isAlarm) {
       panicKey = key
-      clearPanicKey() // Clear any existing timer
+      // Clear any existing timer before setting a new one
+      if (panicKeyTimer) {
+        clearTimeout(panicKeyTimer)
+        panicKeyTimer = null
+      }
       panicKeyTimer = setTimeout(() => { clearPanicKey() }, 300000) // Clear after 5 minutes
     } else {
       panicKey = null
@@ -293,7 +302,8 @@ export async function verifyPassword(password: string): Promise<boolean> {
     const vault = getVault(db, activeVaultId)
     if (!vault) return false
     const key = await deriveKey(password, Buffer.from(vault.kdf_salt, 'hex'))
-    const keyHash = await computeVerificationHash(key)
+    const { encryptionKey } = splitDerivedKey(key)
+    const keyHash = await computeVerificationHash(encryptionKey)
     return timingSafeEqual(Buffer.from(keyHash, 'hex'), Buffer.from(vault.master_hash, 'hex'))
   } catch {
     return false
@@ -342,6 +352,8 @@ export async function changeMasterPassword(
   totpCode?: string
 ): Promise<{ success: boolean; error?: string }> {
   acquireOperation()
+  let oldKey: Buffer | null = null
+  let newKey: Buffer | null = null
   try {
     if (!isUnlocked()) {
       return { success: false, error: ERRORS.VAULT_IS_LOCKED }
@@ -354,28 +366,24 @@ export async function changeMasterPassword(
 
     // Derive key once (reused for TOTP verification and password check)
     const oldSalt = Buffer.from(vault.kdf_salt, 'hex')
-    const oldKey = await deriveKey(oldPassword, oldSalt)
+    oldKey = await deriveKey(oldPassword, oldSalt)
     const { encryptionKey: oldEncKey } = splitDerivedKey(oldKey)
 
     // Verify TOTP if enabled
     if (vault.totp_enabled && vault.totp_secret) {
       if (!totpCode) {
-        oldKey.fill(0)
         return { success: false, error: ERRORS.TOTP_CODE_REQUIRED }
       }
       const parsed = parseTotpSecret(vault.totp_secret)
       if (!parsed) {
-        oldKey.fill(0)
         return { success: false, error: ERRORS.TOTP_CORRUPTED }
       }
       try {
         const decryptedSecret = decrypt(parsed, oldEncKey)
         if (!verifyTOTP(decryptedSecret, totpCode)) {
-          oldKey.fill(0)
           return { success: false, error: ERRORS.TOTP_INVALID_CODE }
         }
       } catch {
-        oldKey.fill(0)
         return { success: false, error: ERRORS.TOTP_CORRUPTED }
       }
     }
@@ -389,7 +397,7 @@ export async function changeMasterPassword(
 
     // Derive new key
     const newSalt = generateSalt()
-    const newKey = await deriveKey(newPassword, newSalt)
+    newKey = await deriveKey(newPassword, newSalt)
     const { encryptionKey: newEncKey } = splitDerivedKey(newKey)
     const newHash = await computeVerificationHash(newEncKey)
 
@@ -421,17 +429,21 @@ export async function changeMasterPassword(
         const ivHex = row[2] as string
         const authTagHex = row[3] as string
 
-        const decrypted = decryptJSON<Record<string, string>>(
-          { iv: ivHex, ciphertext: encryptedData, authTag: authTagHex },
-          oldEncKey
-        )
+        try {
+          const decrypted = decryptJSON<Record<string, string>>(
+            { iv: ivHex, ciphertext: encryptedData, authTag: authTagHex },
+            oldEncKey
+          )
 
-        const reEncrypted = encryptJSON(decrypted, newEncKey)
+          const reEncrypted = encryptJSON(decrypted, newEncKey)
 
-        db.run(
-          `UPDATE encrypted_entries SET encrypted_data = ?, iv = ?, auth_tag = ?, updated_at = datetime('now') WHERE id = ?`,
-          [reEncrypted.ciphertext, reEncrypted.iv, reEncrypted.authTag, entryId]
-        )
+          db.run(
+            `UPDATE encrypted_entries SET encrypted_data = ?, iv = ?, auth_tag = ?, updated_at = datetime('now') WHERE id = ?`,
+            [reEncrypted.ciphertext, reEncrypted.iv, reEncrypted.authTag, entryId]
+          )
+        } catch {
+          // Entry may be corrupted — skip to avoid leaving DB in half-re-encrypted state
+        }
       }
 
       // Re-encrypt history snapshots too
@@ -473,11 +485,15 @@ export async function changeMasterPassword(
 
     // Zero old key before replacing
     oldKey.fill(0)
+    oldKey = null
     derivedKey = newKey
+    newKey = null // prevent zeroing in finally
     await startAutoLockTimer()
 
     return { success: true }
   } finally {
+    if (oldKey) oldKey.fill(0)
+    if (newKey) newKey.fill(0)
     releaseOperation()
   }
 }
@@ -610,7 +626,11 @@ export async function setupAlarmPassword(alarmPassword: string): Promise<{ succe
 
 export async function changeAlarmPassword(oldAlarmPassword: string, newAlarmPassword: string): Promise<{ success: boolean; error?: string }> {
   acquireOperation()
+  let oldKey: Buffer | null = null
+  let newKey: Buffer | null = null
   try {
+    if (!isUnlocked()) return { success: false, error: ERRORS.VAULT_IS_LOCKED }
+
     const db = await getDatabase()
     const vault = getVault(db, activeVaultId)
     if (!vault) return { success: false, error: ERRORS.VAULT_NOT_INITIALIZED }
@@ -621,7 +641,7 @@ export async function changeAlarmPassword(oldAlarmPassword: string, newAlarmPass
 
     // Verify old alarm password
     const oldSalt = Buffer.from(vault.alarm_salt, 'hex')
-    const oldKey = await deriveKey(oldAlarmPassword, oldSalt)
+    oldKey = await deriveKey(oldAlarmPassword, oldSalt)
     const { encryptionKey: oldEncKey } = splitDerivedKey(oldKey)
     const oldHash = await computeVerificationHash(oldEncKey)
 
@@ -631,7 +651,7 @@ export async function changeAlarmPassword(oldAlarmPassword: string, newAlarmPass
 
     // Set new alarm password
     const newSalt = generateSalt()
-    const newKey = await deriveKey(newAlarmPassword, newSalt)
+    newKey = await deriveKey(newAlarmPassword, newSalt)
     const { encryptionKey: newEncKey } = splitDerivedKey(newKey)
     const newHash = await computeVerificationHash(newEncKey)
 
@@ -640,6 +660,8 @@ export async function changeAlarmPassword(oldAlarmPassword: string, newAlarmPass
 
     return { success: true }
   } finally {
+    if (oldKey) oldKey.fill(0)
+    if (newKey) newKey.fill(0)
     releaseOperation()
   }
 }

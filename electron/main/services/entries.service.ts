@@ -276,13 +276,13 @@ export async function getEntryTOTP(id: number): Promise<string | null> {
   const entry = getEntryById(db, id)
   if (!entry) return null
 
-  const decrypted = decryptJSON<Record<string, string>>(
-    { iv: entry.iv, ciphertext: entry.encrypted_data, authTag: entry.auth_tag },
-    encKey
-  )
-  if (!decrypted.totp_secret) return null
-
   try {
+    const decrypted = decryptJSON<Record<string, string>>(
+      { iv: entry.iv, ciphertext: entry.encrypted_data, authTag: entry.auth_tag },
+      encKey
+    )
+    if (!decrypted.totp_secret) return null
+
     return generateTOTPToken(decrypted.totp_secret)
   } catch {
     return null

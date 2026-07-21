@@ -1828,10 +1828,10 @@ async function importPanicBackup(): Promise<{ success: boolean; error?: string; 
     const fileContent = await file.text()
     const combined = Uint8Array.from(atob(fileContent.trim()), c => c.charCodeAt(0))
 
-    // salt(16) + iv(12) + ciphertext+authTag
-    const salt = combined.slice(0, 16)
-    const iv = combined.slice(16, 28)
-    const encryptedData = combined.slice(28)
+    // salt(32) + iv(12) + ciphertext+authTag
+    const salt = combined.slice(0, 32)
+    const iv = combined.slice(32, 44)
+    const encryptedData = combined.slice(44)
 
     // Derive key via PBKDF2
     const keyMaterial = await crypto.subtle.importKey(
@@ -1843,7 +1843,7 @@ async function importPanicBackup(): Promise<{ success: boolean; error?: string; 
     )
 
     const key = await crypto.subtle.deriveKey(
-      { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
+      { name: 'PBKDF2', salt, iterations: 600000, hash: 'SHA-256' },
       keyMaterial,
       { name: 'AES-GCM', length: 256 },
       false,

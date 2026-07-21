@@ -32,10 +32,15 @@ export function generatePassword(options: PasswordOptions): string {
   if (options.numbers) ensureChars.push(NUMBERS[randomInt(NUMBERS.length)])
   if (options.symbols) ensureChars.push(SYMBOLS[randomInt(SYMBOLS.length)])
 
-  // Replace random positions with guaranteed characters
+  // Replace random positions with guaranteed characters (no collisions)
   const pwArray = password.split('')
+  const usedPositions = new Set<number>()
   for (let i = 0; i < ensureChars.length; i++) {
-    const pos = randomInt(pwArray.length)
+    let pos: number
+    do {
+      pos = randomInt(pwArray.length)
+    } while (usedPositions.has(pos) && usedPositions.size < pwArray.length)
+    usedPositions.add(pos)
     pwArray[pos] = ensureChars[i]
   }
 

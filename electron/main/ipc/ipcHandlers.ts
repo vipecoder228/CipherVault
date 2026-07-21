@@ -228,7 +228,7 @@ const handlers: Record<string, (...args: any[]) => any> = {
     }
 
     try {
-      const { pbkdf2Sync, createDecipheriv } = await import('crypto')
+      const { pbkdf2, createDecipheriv } = await import('crypto')
 
       const fileContent = readFileSync(filePath, 'utf-8').trim()
       const combined = Buffer.from(fileContent, 'base64')
@@ -238,7 +238,12 @@ const handlers: Record<string, (...args: any[]) => any> = {
       const iv = combined.subarray(32, 44)
       const encryptedData = combined.subarray(44)
 
-      const key = pbkdf2Sync(backupPassword, salt, 600000, 32, 'sha256')
+      const key = await new Promise<Buffer>((resolve, reject) => {
+        pbkdf2(backupPassword, salt, 600000, 32, 'sha256', (err, derivedKey) => {
+          if (err) reject(err)
+          else resolve(derivedKey)
+        })
+      })
       const decipher = createDecipheriv('aes-256-gcm', key, iv, { authTagLength: 16 })
       decipher.setAuthTag(encryptedData.subarray(encryptedData.length - 16))
       const decrypted = Buffer.concat([
@@ -527,7 +532,9 @@ const handlers: Record<string, (...args: any[]) => any> = {
     const filePath = saveResult.filePath
 
     const entries = entryIds
-      ? await Promise.all(entryIds.map(id => entriesService.getEntry(id)))
+      ? (await Promise.allSettled(entryIds.map(id => entriesService.getEntry(id))))
+          .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled' && r.value !== null)
+          .map(r => r.value)
       : (await entriesService.listEntries()).map(e => ({ ...e } as any))
 
     const csvLines = ['name,url,username,password,notes,type,card_number,card_holder,card_expiry,card_cvv']
@@ -564,7 +571,9 @@ const handlers: Record<string, (...args: any[]) => any> = {
     const filePath = saveResult.filePath
 
     const entries = entryIds
-      ? await Promise.all(entryIds.map(id => entriesService.getEntry(id)))
+      ? (await Promise.allSettled(entryIds.map(id => entriesService.getEntry(id))))
+          .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled' && r.value !== null)
+          .map(r => r.value)
       : (await entriesService.listEntries()).map(e => ({ ...e } as any))
 
     const data = entries.filter(Boolean).map((entry: any) => ({

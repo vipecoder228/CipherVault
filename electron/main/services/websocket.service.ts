@@ -125,21 +125,22 @@ export function startWebSocketServer(): void {
     wss.on('connection', (ws) => {
       connectionCount++
 
+      // Always register close handler so connectionCount decrements
+      ws.on('close', () => {
+        connectionCount = Math.max(0, connectionCount - 1)
+        ;(ws as any).authenticated = false
+      })
+
       // Enforce connection limit
       if (connectionCount > MAX_CONNECTIONS) {
         ws.close(1013, 'Too many connections')
         return
       }
 
-      (ws as any).authenticated = false
+      ;(ws as any).authenticated = false
 
       ws.on('message', (data) => {
         handleMessage(ws, data.toString())
-      })
-
-      ws.on('close', () => {
-        connectionCount = Math.max(0, connectionCount - 1)
-        ;(ws as any).authenticated = false
       })
     })
 

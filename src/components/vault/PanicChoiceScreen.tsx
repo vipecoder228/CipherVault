@@ -94,8 +94,11 @@ export function PanicChoiceScreen({ onChoice }: Props) {
         }
         await invoke('entries:complete-panic')
         addToast('Данные удалены (бэкап не удался)', 'warning')
-        onChoice('wipe')
-      } catch {}
+      } catch (deleteErr) {
+        console.error('Fallback delete also failed:', deleteErr)
+        addToast('Не удалось удалить записи. Попробуйте снова.', 'error')
+      }
+      onChoice('wipe')
     } finally {
       setLoading(false)
     }
