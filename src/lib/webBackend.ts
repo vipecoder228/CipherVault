@@ -348,6 +348,7 @@ async function getEntry(id: number): Promise<DecryptedEntry | null> {
     encKey
   )
   decrypted.id = row.id
+  decrypted.entry_type = row.entry_type
   decrypted.display_title = row.display_title
   decrypted.created_at = row.created_at
   decrypted.updated_at = row.updated_at
