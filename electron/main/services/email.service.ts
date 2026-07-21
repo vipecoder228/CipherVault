@@ -29,7 +29,7 @@ async function getTelegramChatId(): Promise<string | null> {
   return getSecret('telegram_chat_id')
 }
 
-async function sendViaTelegram(chatId: string, backupData: string, filePath: string): Promise<boolean> {
+async function sendViaTelegram(chatId: string, _backupData: string, filePath: string): Promise<boolean> {
   const token = await getTelegramToken()
   if (!token) return false
 

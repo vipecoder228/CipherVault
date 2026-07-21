@@ -4,12 +4,6 @@
 import { randomBytes, createCipheriv, createDecipheriv } from 'crypto'
 import { CRYPTO } from '../crypto/constants'
 
-interface EphemeralKeyPair {
-  publicKey: Buffer
-  privateKey: Buffer
-  expiresAt: number
-}
-
 let currentSessionKey: Buffer | null = null
 let sessionKeyExpiry: number = 0
 

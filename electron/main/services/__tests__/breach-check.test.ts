@@ -62,13 +62,13 @@ describe('Breach Check Logic', () => {
 
   describe('Error handling', () => {
     it('should handle rate limiting (429)', () => {
-      const status = 429
+      const status: number = 429
       const isRateLimited = status === 429 || status === 403
       expect(isRateLimited).toBe(true)
     })
 
     it('should handle forbidden (403)', () => {
-      const status = 403
+      const status: number = 403
       const isRateLimited = status === 429 || status === 403
       expect(isRateLimited).toBe(true)
     })

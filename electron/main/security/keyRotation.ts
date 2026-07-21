@@ -2,10 +2,9 @@
 // Supports rotating encryption keys without re-encrypting all data
 
 import { getDatabase } from '../db/connection'
-import { getEntries, getEntryById } from '../db/queries/entries.queries'
+import { getEntries } from '../db/queries/entries.queries'
 import { encryptJSON, decryptJSON } from '../crypto/encryption'
 import { deriveKey, generateSalt, splitDerivedKey } from '../crypto/keyderivation'
-import { getActiveVaultId } from '../services/vault.service'
 
 interface KeyVersion {
   version: number

@@ -18,7 +18,7 @@ describe('Additional Crypto Tests', () => {
     })
 
     it('should handle binary data', () => {
-      const data = Buffer.alloc(1000).map((_, i) => i % 256)
+      const data = Buffer.from(Array.from({ length: 1000 }, (_, i) => i % 256))
       const plaintext = data.toString('hex')
       const encrypted = encrypt(plaintext, key)
       const decrypted = decrypt(encrypted, key)

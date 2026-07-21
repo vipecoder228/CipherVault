@@ -6,9 +6,6 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { app } from 'electron'
 
-let expectedHashes: Map<string, string> | null = null
-const HASHES_FILE = 'file-hashes.json'
-
 /**
  * Generate SHA-256 hash of a file
  */

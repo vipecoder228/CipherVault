@@ -54,7 +54,6 @@ export function initAuditLog(): void {
 
 function getDatabaseSync(): any {
   // Synchronous access for audit log initialization
-  const Database = require('sql.js')
   // This is a simplified version - in production, use the main DB connection
   return { run: () => {} }
 }

@@ -105,12 +105,12 @@ export async function decryptJSON<T = unknown>(payload: EncryptedPayload, key: U
 }
 
 // Export for Node.js compatibility (Buffer-based)
-export function encryptSync(plaintext: string, key: Buffer): EncryptedPayload {
+export function encryptSync(_plaintext: string, _key: Buffer): EncryptedPayload {
   // This is a placeholder - actual implementation should use the async version
   throw new Error('Use encrypt() for Web Crypto API')
 }
 
-export function decryptSync(payload: EncryptedPayload, key: Buffer): string {
+export function decryptSync(_payload: EncryptedPayload, _key: Buffer): string {
   // This is a placeholder - actual implementation should use the async version
   throw new Error('Use decrypt() for Web Crypto API')
 }

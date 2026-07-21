@@ -14,7 +14,7 @@ import {
 } from '../db/queries/entries.queries'
 import { addHistoryEntry, getEntryHistory, getFullEntryHistory } from '../db/queries/history.queries'
 import { encryptJSON, decryptJSON } from '../crypto/encryption'
-import { getEncryptionKey, getActiveVaultId, getPanicEncryptionKey, clearPanicKey } from './vault.service'
+import { getEncryptionKey, getActiveVaultId, clearPanicKey } from './vault.service'
 import { generateTOTPToken } from '../crypto/totp'
 import type { CreateEntryPayload, UpdateEntryPayload, DecryptedEntry, EncryptedEntry, EntryFilters, EntryHistoryItem } from '../../../shared/types'
 

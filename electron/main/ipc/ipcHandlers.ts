@@ -1,6 +1,5 @@
 import { ipcMain, dialog, globalShortcut } from 'electron'
 import { readFileSync, writeFileSync } from 'fs'
-import type { IPCChannels } from '../../../shared/types'
 import { ERRORS } from '../../../shared/errors'
 import * as vaultService from '../services/vault.service'
 import * as entriesService from '../services/entries.service'
@@ -8,7 +7,7 @@ import * as clipboardService from '../services/clipboard.service'
 import * as disposableEmailService from '../services/disposable-email.service'
 import { generatePassword, generateUsername, generatePassphrase } from '../services/password-gen.service'
 import { checkBreach } from '../services/breach-check.service'
-import { checkAllPasswordsForBreaches, startBreachMonitor, stopBreachMonitor } from '../services/breach-monitor.service'
+import { checkAllPasswordsForBreaches } from '../services/breach-monitor.service'
 import * as backupService from '../services/backup.service'
 import { analyzePasswordHealth } from '../services/health.service'
 import * as syncService from '../services/sync.service'
@@ -20,8 +19,6 @@ import { checkIntegrity } from '../integrity'
 import { getActiveVaultId } from '../services/vault.service'
 import { getWindow, toggleWindow } from '../utils/window'
 import { mapColumns, mapEntryType, detectCSVSource } from '../../../shared/importMapper'
-
-type IPCChannel = keyof IPCChannels
 
 let currentShortcut: string = 'CommandOrControl+Shift+Space'
 
