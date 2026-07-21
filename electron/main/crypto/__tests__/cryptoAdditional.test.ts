@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { randomBytes, createHash } from 'crypto'
 import { encrypt, decrypt, encryptJSON, decryptJSON } from '../encryption'
-import { deriveKey, generateSalt, splitDerivedKey, computeVerificationHash } from '../keyderivation'
+import { deriveKey, generateSalt } from '../keyderivation'
 import { CRYPTO, RATE_LIMIT } from '../constants'
 
 describe('Additional Crypto Tests', () => {

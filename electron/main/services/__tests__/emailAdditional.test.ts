@@ -41,13 +41,13 @@ describe('Email/Telegram Service Logic', () => {
 
     it('should handle plural breach count', () => {
       const count = 1
-      const suffix = count > 1 ? 'es' : ''
+      const suffix = count !== 1 ? 'es' : ''
       expect(`breach${suffix}`).toBe('breach')
     })
 
     it('should handle multiple breaches', () => {
       const count = 5
-      const suffix = count > 1 ? 'es' : ''
+      const suffix = count !== 1 ? 'es' : ''
       expect(`breach${suffix}`).toBe('breaches')
     })
   })
