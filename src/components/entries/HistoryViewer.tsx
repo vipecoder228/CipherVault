@@ -62,6 +62,23 @@ export function HistoryViewer({ open, onClose, entryId }: Props) {
     setExpandedId(expandedId === id ? null : id)
   }
 
+  const getChanges = (current: DecryptedHistoryItem, previous: DecryptedHistoryItem | null): Record<string, { old: string; new: string }> => {
+    if (!current.decrypted) return {}
+    if (!previous?.decrypted) return {}
+
+    const changes: Record<string, { old: string; new: string }> = {}
+    const fields = Object.keys(current.decrypted)
+
+    for (const field of fields) {
+      const oldVal = previous.decrypted[field] || ''
+      const newVal = current.decrypted[field] || ''
+      if (oldVal !== newVal) {
+        changes[field] = { old: oldVal, new: newVal }
+      }
+    }
+    return changes
+  }
+
   return (
     <Modal open={open} onClose={onClose} title={t('change_history')} maxWidth="max-w-lg">
       <div className="space-y-3 max-h-96 overflow-y-auto">
@@ -74,10 +91,13 @@ export function HistoryViewer({ open, onClose, entryId }: Props) {
             {t('no_history')}
           </div>
         ) : (
-          history.map((item) => {
+          history.map((item, index) => {
             const typeInfo = TYPE_LABELS[item.change_type] || TYPE_LABELS.update
             const isExpanded = expandedId === item.id
             const hasData = item.decrypted && Object.keys(item.decrypted).length > 0
+            const previousItem = index < history.length - 1 ? history[index + 1] : null
+            const changes = item.change_type === 'update' ? getChanges(item, previousItem) : {}
+            const hasChanges = Object.keys(changes).length > 0
 
             return (
               <div
@@ -102,6 +122,11 @@ export function HistoryViewer({ open, onClose, entryId }: Props) {
                     <span className="text-xs text-vault-text-secondary ml-2">
                       {formatDate(item.changed_at)}
                     </span>
+                    {hasChanges && (
+                      <span className="text-xs text-vault-warning ml-2">
+                        ({Object.keys(changes).length} {t('changes')})
+                      </span>
+                    )}
                   </div>
                   {hasData && (
                     <span className="text-xs text-vault-text-secondary">
@@ -110,21 +135,41 @@ export function HistoryViewer({ open, onClose, entryId }: Props) {
                   )}
                 </div>
 
-                {/* Expanded content - decrypted snapshot */}
+                {/* Expanded content */}
                 {isExpanded && item.decrypted && (
                   <div className="px-3 pb-3 pt-0 space-y-2 border-t border-vault-border">
-                    {Object.entries(item.decrypted).map(([key, value]) => (
-                      value && (
-                        <div key={key} className="flex items-start gap-2 text-xs">
-                          <span className="text-vault-text-secondary font-medium min-w-[80px] capitalize">
+                    {item.change_type === 'update' && hasChanges ? (
+                      // Show diffs
+                      Object.entries(changes).map(([key, { old: oldVal, new: newVal }]) => (
+                        <div key={key} className="text-xs space-y-1">
+                          <span className="text-vault-text-secondary font-medium capitalize">
                             {key.replace(/_/g, ' ')}:
                           </span>
-                          <span className="text-vault-text break-all">
-                            {key === 'password' ? '••••••••' : String(value)}
-                          </span>
+                          <div className="flex items-start gap-2">
+                            <span className="text-vault-danger line-through">
+                              {key === 'password' ? '••••••••' : (oldVal || '(empty)')}
+                            </span>
+                            <span className="text-vault-success">
+                              {key === 'password' ? '••••••••' : (newVal || '(empty)')}
+                            </span>
+                          </div>
                         </div>
-                      )
-                    ))}
+                      ))
+                    ) : (
+                      // Show full snapshot
+                      Object.entries(item.decrypted).map(([key, value]) => (
+                        value && (
+                          <div key={key} className="flex items-start gap-2 text-xs">
+                            <span className="text-vault-text-secondary font-medium min-w-[80px] capitalize">
+                              {key.replace(/_/g, ' ')}:
+                            </span>
+                            <span className="text-vault-text break-all">
+                              {key === 'password' ? '••••••••' : String(value)}
+                            </span>
+                          </div>
+                        )
+                      ))
+                    )}
                   </div>
                 )}
               </div>

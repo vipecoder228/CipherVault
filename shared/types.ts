@@ -2,6 +2,13 @@
 
 export type EntryType = 'login' | 'secure_note' | 'card' | 'identity'
 
+export interface CustomField {
+  id: string
+  label: string
+  value: string
+  type: 'text' | 'password' | 'url' | 'email' | 'phone'
+}
+
 export interface CreateEntryPayload {
   entry_type: EntryType
   title: string
@@ -26,6 +33,8 @@ export interface CreateEntryPayload {
   identity_ssn?: string
   identity_passport?: string
   identity_birthdate?: string
+  // Custom fields
+  custom_fields?: CustomField[]
 }
 
 export interface UpdateEntryPayload {
@@ -49,6 +58,7 @@ export interface UpdateEntryPayload {
   identity_ssn?: string
   identity_passport?: string
   identity_birthdate?: string
+  custom_fields?: CustomField[]
 }
 
 export interface DecryptedEntry {
@@ -76,6 +86,7 @@ export interface DecryptedEntry {
   identity_ssn: string
   identity_passport: string
   identity_birthdate: string
+  custom_fields: CustomField[]
   created_at: string
   updated_at: string
 }

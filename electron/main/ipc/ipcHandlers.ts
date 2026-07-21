@@ -8,10 +8,11 @@ import * as clipboardService from '../services/clipboard.service'
 import * as disposableEmailService from '../services/disposable-email.service'
 import { generatePassword, generateUsername, generatePassphrase } from '../services/password-gen.service'
 import { checkBreach } from '../services/breach-check.service'
+import { checkAllPasswordsForBreaches, startBreachMonitor, stopBreachMonitor } from '../services/breach-monitor.service'
 import * as backupService from '../services/backup.service'
 import { analyzePasswordHealth } from '../services/health.service'
 import * as syncService from '../services/sync.service'
-import { sendBackup, testTelegramConnection, getTelegramChatIdFromToken, saveTelegramConfig } from '../services/email.service'
+import { sendBackup, testTelegramConnection, getTelegramChatIdFromToken, saveTelegramConfig, sendBreachNotification } from '../services/email.service'
 import { saveSecret, getSecret } from '../services/secretStorage'
 import { getDatabase } from '../db/connection'
 import { getCategories, createCategory, updateCategory, deleteCategory, reorderCategories } from '../db/queries/categories.queries'
@@ -151,10 +152,13 @@ const handlers: Record<string, (...args: any[]) => any> = {
   'email:test-telegram': (_: unknown, token: string) => testTelegramConnection(token),
   'email:get-chat-id': (_: unknown, token: string) => getTelegramChatIdFromToken(token),
   'email:save-telegram': (_: unknown, token: string, chatId: string) => saveTelegramConfig(token, chatId),
+  'email:send-breach-notification': (_: unknown, entryTitle: string, breachCount: number) => sendBreachNotification(entryTitle, breachCount),
 
   // Password
   'password:generate': (_: unknown, options: any) => generatePassword(options),
   'password:check-breach': (_: unknown, password: string) => checkBreach(password),
+  'password:check-duplicate': (_: unknown, password: string) => checkDuplicatePassword(password),
+  'password:check-all-breaches': () => checkAllPasswordsForBreaches(),
 
   // Categories
   'categories:list': async () => {
@@ -381,6 +385,21 @@ const handlers: Record<string, (...args: any[]) => any> = {
 
   // Integrity check
   'integrity:check': () => checkIntegrity(),
+
+  // API Server
+  'api:start': () => {
+    const { startApiServer } = require('../services/api.service')
+    return startApiServer()
+  },
+  'api:stop': () => {
+    const { stopApiServer } = require('../services/api.service')
+    stopApiServer()
+    return { success: true }
+  },
+  'api:get-key': () => {
+    const { getApiKey } = require('../services/api.service')
+    return { apiKey: getApiKey() }
+  },
 
   // Import CSV
   'import:csv': async (_: unknown) => {
@@ -688,6 +707,45 @@ function parseCSVLine(line: string): string[] {
   }
   result.push(current.trim())
   return result
+}
+
+async function checkDuplicatePassword(password: string): Promise<{ duplicated: boolean; count: number; titles: string[] }> {
+  try {
+    const db = await getDatabase()
+    const { getEncryptionKey } = await import('../services/vault.service')
+    const { decryptJSON } = await import('../crypto/encryption')
+    const encKey = getEncryptionKey()
+    if (!encKey) return { duplicated: false, count: 0, titles: [] }
+
+    const vaultId = (await import('../services/vault.service')).getActiveVaultId()
+    const result = db.exec(
+      'SELECT id, display_title, encrypted_data, iv, auth_tag FROM encrypted_entries WHERE deleted_at IS NULL AND vault_id = ?',
+      [vaultId]
+    )
+
+    if (result.length === 0) return { duplicated: false, count: 0, titles: [] }
+
+    const titles: string[] = []
+    for (const row of result[0].values) {
+      try {
+        const decrypted = decryptJSON<Record<string, string>>(
+          { iv: row[3] as string, ciphertext: row[2] as string, authTag: row[4] as string },
+          encKey
+        )
+        if (decrypted.password === password) {
+          titles.push(row[1] as string)
+        }
+      } catch {}
+    }
+
+    return {
+      duplicated: titles.length > 0,
+      count: titles.length,
+      titles,
+    }
+  } catch {
+    return { duplicated: false, count: 0, titles: [] }
+  }
 }
 
 async function isDuplicateEntry(title: string, username: string, vaultId?: number): Promise<boolean> {

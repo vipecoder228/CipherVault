@@ -17,15 +17,23 @@ function isMobileDevice(): boolean {
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
 }
 
+const FONT_SIZE_CLASSES: Record<string, string> = {
+  small: 'text-[13px]',
+  normal: 'text-sm',
+  large: 'text-base',
+}
+
 export function App() {
-  const { locked, checkStatus, alarmMode } = useVaultStore()
-  const { theme } = useUIStore()
+  const { locked, checkStatus, alarmMode, lock } = useVaultStore()
+  const { theme, fontSize } = useUIStore()
   const [booting, setBooting] = useState(true)
   const [integrityOk, setIntegrityOk] = useState<boolean | null>(null)
   const [isMobile, setIsMobile] = useState(false)
   const [panicChoice, setPanicChoice] = useState<'empty' | 'wipe' | null>(null)
   const checkStatusRef = useRef(checkStatus)
   checkStatusRef.current = checkStatus
+  const lockRef = useRef(lock)
+  lockRef.current = lock
 
   // Check if we're on mobile
   useEffect(() => {
@@ -59,6 +67,12 @@ export function App() {
     }
   }, [theme])
 
+  useEffect(() => {
+    const root = document.documentElement
+    root.classList.remove('text-[13px]', 'text-sm', 'text-base')
+    root.classList.add(FONT_SIZE_CLASSES[fontSize])
+  }, [fontSize])
+
   // Listen for sync:imported events (from cloud sync)
   useEffect(() => {
     if (typeof window !== 'undefined' && window.electronAPI?.on) {
@@ -68,6 +82,30 @@ export function App() {
       return cleanup
     }
   }, [])
+
+  // Auto-lock on inactivity
+  useEffect(() => {
+    if (locked) return
+
+    let timeout: ReturnType<typeof setTimeout> | null = null
+    const AUTO_LOCK_MS = 5 * 60 * 1000 // 5 minutes
+
+    const resetTimer = () => {
+      if (timeout) clearTimeout(timeout)
+      timeout = setTimeout(() => {
+        lockRef.current()
+      }, AUTO_LOCK_MS)
+    }
+
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart']
+    events.forEach(event => document.addEventListener(event, resetTimer, { passive: true }))
+    resetTimer()
+
+    return () => {
+      if (timeout) clearTimeout(timeout)
+      events.forEach(event => document.removeEventListener(event, resetTimer))
+    }
+  }, [locked])
 
   if (booting) {
     return (
@@ -99,11 +137,12 @@ export function App() {
   return (
     <ErrorBoundary>
       <div className={`${theme}`}>
-        {locked ? (
-          <UnlockScreen />
-        ) : alarmMode && panicChoice === null ? (
-          <PanicChoiceScreen onChoice={(choice) => {
-            if (choice === 'empty') {
+        <div className="animate-fade-in">
+          {locked ? (
+            <UnlockScreen />
+          ) : alarmMode && panicChoice === null ? (
+            <PanicChoiceScreen onChoice={(choice) => {
+              if (choice === 'empty') {
               // Lock vault to properly exit alarm mode
               useVaultStore.getState().lock()
             } else {

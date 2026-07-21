@@ -1,12 +1,38 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { invoke } from '../../lib/ipc'
 import { useToastStore } from '../ui/Toast'
 import { useI18n } from '../../i18n'
-import { Copy, RefreshCw } from 'lucide-react'
+import { Copy, RefreshCw, Save, Trash2, Download, Upload } from 'lucide-react'
 import { calculateStrength } from '../../lib/passwordStrength'
 import type { PasswordOptions } from '@shared/types'
 
 type GeneratorMode = 'password' | 'passphrase' | 'username'
+
+interface Preset {
+  name: string
+  options: PasswordOptions
+  passphraseWords: number
+  mode: GeneratorMode
+}
+
+const DEFAULT_PRESETS: Preset[] = [
+  { name: 'PIN (6)', options: { length: 6, uppercase: false, lowercase: false, numbers: true, symbols: false }, passphraseWords: 4, mode: 'password' },
+  { name: 'Standard', options: { length: 16, uppercase: true, lowercase: true, numbers: true, symbols: true }, passphraseWords: 4, mode: 'password' },
+  { name: 'Strong', options: { length: 24, uppercase: true, lowercase: true, numbers: true, symbols: true }, passphraseWords: 4, mode: 'password' },
+  { name: 'Passphrase', options: { length: 16, uppercase: true, lowercase: true, numbers: false, symbols: false }, passphraseWords: 4, mode: 'passphrase' },
+]
+
+function loadPresets(): Preset[] {
+  try {
+    const saved = localStorage.getItem('generator_presets')
+    if (saved) return JSON.parse(saved)
+  } catch {}
+  return DEFAULT_PRESETS
+}
+
+function savePresets(presets: Preset[]) {
+  localStorage.setItem('generator_presets', JSON.stringify(presets))
+}
 
 export function PasswordGenerator({ onUsePassword }: { onUsePassword?: (pwd: string) => void }) {
   const { t } = useI18n()
@@ -20,6 +46,9 @@ export function PasswordGenerator({ onUsePassword }: { onUsePassword?: (pwd: str
   })
   const [passphraseWords, setPassphraseWords] = useState(4)
   const [password, setPassword] = useState('')
+  const [presets, setPresets] = useState<Preset[]>(loadPresets)
+  const [presetName, setPresetName] = useState('')
+  const [showSavePreset, setShowSavePreset] = useState(false)
   const addToast = useToastStore((s) => s.addToast)
 
   const generate = async () => {
@@ -45,8 +74,143 @@ export function PasswordGenerator({ onUsePassword }: { onUsePassword?: (pwd: str
     addToast(t('copied_toast'), 'success')
   }
 
+  const applyPreset = (preset: Preset) => {
+    setMode(preset.mode)
+    setOptions(preset.options)
+    setPassphraseWords(preset.passphraseWords)
+  }
+
+  const saveCurrentAsPreset = () => {
+    if (!presetName.trim()) return
+    const newPreset: Preset = { name: presetName.trim(), options, passphraseWords, mode }
+    const updated = [...presets, newPreset]
+    setPresets(updated)
+    savePresets(updated)
+    setPresetName('')
+    setShowSavePreset(false)
+    addToast(t('preset_saved'), 'success')
+  }
+
+  const deletePreset = (index: number) => {
+    const updated = presets.filter((_, i) => i !== index)
+    setPresets(updated)
+    savePresets(updated)
+  }
+
+  const exportPresets = () => {
+    const data = JSON.stringify(presets, null, 2)
+    const blob = new Blob([data], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'ciphervault-presets.json'
+    a.click()
+    URL.revokeObjectURL(url)
+    addToast(t('presets_exported'), 'success')
+  }
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const importPresets = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      try {
+        const imported = JSON.parse(event.target?.result as string)
+        if (Array.isArray(imported)) {
+          const updated = [...presets, ...imported]
+          setPresets(updated)
+          savePresets(updated)
+          addToast(t('presets_imported', { n: imported.length }), 'success')
+        }
+      } catch {
+        addToast(t('import_failed'), 'error')
+      }
+    }
+    reader.readAsText(file)
+    e.target.value = ''
+  }
+
   return (
     <div className="space-y-5">
+      {/* Presets */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-vault-text-secondary">{t('presets')}</span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={exportPresets}
+              className="flex items-center gap-1 text-xs text-vault-text-secondary hover:text-vault-text"
+              title={t('export')}
+            >
+              <Download size={12} />
+            </button>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-1 text-xs text-vault-text-secondary hover:text-vault-text"
+              title={t('import')}
+            >
+              <Upload size={12} />
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json"
+              onChange={importPresets}
+              className="hidden"
+            />
+            <button
+              onClick={() => setShowSavePreset(!showSavePreset)}
+              className="flex items-center gap-1 text-xs text-vault-accent hover:text-vault-accent-hover"
+            >
+              <Save size={12} />
+              {t('save_preset')}
+            </button>
+          </div>
+        </div>
+        {showSavePreset && (
+          <div className="flex gap-2 animate-slide-up">
+            <input
+              type="text"
+              placeholder={t('preset_name')}
+              value={presetName}
+              onChange={(e) => setPresetName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && saveCurrentAsPreset()}
+              className="flex-1 h-8 px-2 rounded-lg bg-vault-surface border border-vault-border text-xs text-vault-text placeholder:text-vault-text-secondary/50 focus:outline-none focus:ring-1 focus:ring-vault-accent"
+              autoFocus
+            />
+            <button
+              onClick={saveCurrentAsPreset}
+              disabled={!presetName.trim()}
+              className="h-8 px-3 rounded-lg bg-vault-accent text-white text-xs font-medium hover:bg-vault-accent-hover disabled:opacity-50"
+            >
+              {t('save')}
+            </button>
+          </div>
+        )}
+        <div className="flex flex-wrap gap-1.5">
+          {presets.map((preset, i) => (
+            <div key={i} className="group relative">
+              <button
+                onClick={() => applyPreset(preset)}
+                className="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-vault-bg border border-vault-border text-vault-text-secondary hover:text-vault-text hover:border-vault-accent/30 transition-colors"
+              >
+                {preset.name}
+              </button>
+              {i >= DEFAULT_PRESETS.length && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); deletePreset(i) }}
+                  className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-vault-danger text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Trash2 size={8} />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Mode selector */}
       <div className="flex gap-1 p-1 bg-vault-bg rounded-lg">
         {([

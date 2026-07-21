@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
@@ -599,6 +599,7 @@ function AlarmSetupModal({ onClose, onStatusChange }: { onClose: () => void; onS
 
 function AppearanceTab({ theme, setTheme }: { theme: string; setTheme: (t: 'dark' | 'light') => void }) {
   const { locale, setLocale, t } = useI18n()
+  const { fontSize, setFontSize } = useUIStore()
 
   return (
     <div className="space-y-6">
@@ -617,6 +618,28 @@ function AppearanceTab({ theme, setTheme }: { theme: string; setTheme: (t: 'dark
             >
               <div className={`w-12 h-8 rounded-md ${th === 'dark' ? 'bg-[#1a1a24]' : 'bg-[#f8f9fc] border border-gray-200'}`} />
               <span className="text-xs font-medium text-vault-text capitalize">{t(th === 'dark' ? 'dark' : 'light')}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <label className="text-sm font-medium text-vault-text block mb-3">{t('font_size')}</label>
+        <div className="flex gap-3">
+          {([
+            { key: 'small' as const, label: t('small') },
+            { key: 'normal' as const, label: t('normal') },
+            { key: 'large' as const, label: t('large') },
+          ]).map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setFontSize(key)}
+              className={`flex-1 h-12 rounded-xl border-2 flex items-center justify-center text-sm font-medium transition-all ${
+                fontSize === key
+                  ? 'border-vault-accent bg-vault-accent/10 text-vault-accent'
+                  : 'border-vault-border bg-vault-surface text-vault-text hover:border-vault-accent/30'
+              }`}
+            >
+              {label}
             </button>
           ))}
         </div>
@@ -650,6 +673,49 @@ function AppearanceTab({ theme, setTheme }: { theme: string; setTheme: (t: 'dark
 
 function AboutTab() {
   const { t } = useI18n()
+  const addToast = useToastStore((s) => s.addToast)
+
+  const exportSettings = () => {
+    const settings = {
+      theme: localStorage.getItem('theme'),
+      fontSize: localStorage.getItem('fontSize'),
+      generatorPresets: localStorage.getItem('generator_presets'),
+      healthHistory: localStorage.getItem('health_history'),
+    }
+    const data = JSON.stringify(settings, null, 2)
+    const blob = new Blob([data], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'ciphervault-settings.json'
+    a.click()
+    URL.revokeObjectURL(url)
+    addToast(t('settings_exported'), 'success')
+  }
+
+  const importSettings = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      try {
+        const settings = JSON.parse(event.target?.result as string)
+        if (settings.theme) localStorage.setItem('theme', settings.theme)
+        if (settings.fontSize) localStorage.setItem('fontSize', settings.fontSize)
+        if (settings.generatorPresets) localStorage.setItem('generator_presets', settings.generatorPresets)
+        if (settings.healthHistory) localStorage.setItem('health_history', settings.healthHistory)
+        addToast(t('settings_imported'), 'success')
+        window.location.reload()
+      } catch {
+        addToast(t('import_failed'), 'error')
+      }
+    }
+    reader.readAsText(file)
+    e.target.value = ''
+  }
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   return (
     <div className="space-y-4 text-center">
       <div className="w-16 h-16 rounded-2xl bg-vault-accent/10 border border-vault-accent/30 flex items-center justify-center mx-auto">
@@ -662,6 +728,27 @@ function AboutTab() {
       </div>
       <div className="p-4 rounded-xl bg-vault-bg border border-vault-border text-left">
         <p className="text-xs text-vault-text-secondary leading-relaxed">{t('about_description')}</p>
+      </div>
+      <div className="flex gap-3">
+        <button
+          onClick={exportSettings}
+          className="flex-1 py-2 px-3 rounded-lg bg-vault-surface border border-vault-border text-xs font-medium text-vault-text hover:bg-vault-surface-hover transition-colors"
+        >
+          {t('export_settings')}
+        </button>
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="flex-1 py-2 px-3 rounded-lg bg-vault-surface border border-vault-border text-xs font-medium text-vault-text hover:bg-vault-surface-hover transition-colors"
+        >
+          {t('import_settings')}
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json"
+          onChange={importSettings}
+          className="hidden"
+        />
       </div>
     </div>
   )

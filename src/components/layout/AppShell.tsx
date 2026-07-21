@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 import { EntryDetail } from '../entries/EntryDetail'
@@ -8,7 +8,9 @@ import { useEntriesStore } from '../../store/entriesStore'
 import { useUIStore } from '../../store/uiStore'
 import { useVaultStore } from '../../store/vaultStore'
 import { useI18n } from '../../i18n'
-import { AlertTriangle, Search } from 'lucide-react'
+import { useToastStore } from '../ui/Toast'
+import { invoke } from '../../lib/ipc'
+import { AlertTriangle, Search, Copy, Check, Shield } from 'lucide-react'
 import type { EntryType } from '@shared/types'
 
 export function AppShell() {
@@ -76,6 +78,161 @@ function EntryGrid() {
   const { entries, viewMode, loading, selectEntry, selectedEntry, toggleFavorite, filters, setFilters, searchQuery } = useEntriesStore()
   const setShowPasswordGenerator = useUIStore((s) => s.setShowPasswordGenerator)
   const alarmMode = useVaultStore((s) => s.alarmMode)
+  const addToast = useToastStore((s) => s.addToast)
+  const [copiedId, setCopiedId] = useState<number | null>(null)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; entryId: number } | null>(null)
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [showBulkActions, setShowBulkActions] = useState(false)
+
+  const toggleSelect = (id: number, ctrlKey?: boolean) => {
+    if (ctrlKey) {
+      setSelectedIds(prev =>
+        prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+      )
+    } else {
+      setSelectedIds(prev => prev.includes(id) ? [] : [id])
+    }
+  }
+
+  const clearSelection = () => {
+    setSelectedIds([])
+    setShowBulkActions(false)
+  }
+
+  const handleBulkDelete = async () => {
+    if (!confirm(t('bulk_delete_confirm', { n: selectedIds.length }))) return
+    for (const id of selectedIds) {
+      await invoke('entries:delete', id)
+    }
+    addToast(t('bulk_deleted', { n: selectedIds.length }), 'success')
+    clearSelection()
+    loadEntries()
+  }
+
+  const handleBulkMove = async (categoryId: number) => {
+    for (const id of selectedIds) {
+      const entry = await invoke('entries:get', id)
+      if (entry) {
+        await invoke('entries:update', id, { category_id: categoryId })
+      }
+    }
+    addToast(t('bulk_moved', { n: selectedIds.length }), 'success')
+    clearSelection()
+    loadEntries()
+  }
+
+  useEffect(() => {
+    setShowBulkActions(selectedIds.length > 1)
+  }, [selectedIds])
+
+  // Keyboard shortcuts for entry list
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't handle if focus is in input
+      if ((e.target as HTMLElement)?.tagName === 'INPUT' || (e.target as HTMLElement)?.tagName === 'TEXTAREA') return
+
+      const currentIdx = entries.findIndex(en => en.id === selectedEntry?.id)
+
+      // Arrow keys - navigate entries
+      if (e.key === 'ArrowDown' || e.key === 'j') {
+        e.preventDefault()
+        const nextIdx = currentIdx < entries.length - 1 ? currentIdx + 1 : 0
+        selectEntry(entries[nextIdx]?.id || null)
+      }
+      if (e.key === 'ArrowUp' || e.key === 'k') {
+        e.preventDefault()
+        const prevIdx = currentIdx > 0 ? currentIdx - 1 : entries.length - 1
+        selectEntry(entries[prevIdx]?.id || null)
+      }
+
+      // Enter - open entry
+      if (e.key === 'Enter' && selectedEntry) {
+        // Already selected, detail panel opens automatically
+      }
+
+      // Delete - delete entry
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedEntry) {
+        e.preventDefault()
+        const event = new CustomEvent('entry-delete', { detail: { id: selectedEntry.id } })
+        window.dispatchEvent(event)
+      }
+
+      // Ctrl+C - copy password
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selectedEntry?.password) {
+        e.preventDefault()
+        invoke('clipboard:copy', selectedEntry.password, 30000)
+        addToast(t('copied_to_clipboard'), 'success')
+      }
+
+      // Ctrl+U - copy username
+      if ((e.ctrlKey || e.metaKey) && e.key === 'u' && selectedEntry?.username) {
+        e.preventDefault()
+        invoke('clipboard:copy', selectedEntry.username, 30000)
+        addToast(t('copied_to_clipboard'), 'success')
+      }
+
+      // Escape - deselect
+      if (e.key === 'Escape') {
+        if (selectedIds.length > 0) {
+          clearSelection()
+        } else {
+          selectEntry(null)
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [entries, selectedEntry, selectedIds, selectEntry, addToast, t])
+
+  const handleQuickCopy = async (e: React.MouseEvent, entryId: number) => {
+    e.stopPropagation()
+    try {
+      const entry = await invoke('entries:get', entryId)
+      if (entry?.password) {
+        await invoke('clipboard:copy', entry.password, 30000)
+        setCopiedId(entryId)
+        addToast(t('copied_to_clipboard'), 'success')
+        setTimeout(() => setCopiedId(null), 2000)
+      }
+    } catch {
+      addToast(t('failed_to_copy'), 'error')
+    }
+  }
+
+  const handleContextMenu = (e: React.MouseEvent, entryId: number) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setContextMenu({ x: e.clientX, y: e.clientY, entryId })
+  }
+
+  const handleContextAction = async (action: 'username' | 'password' | 'url') => {
+    if (!contextMenu) return
+    try {
+      const entry = await invoke('entries:get', contextMenu.entryId)
+      if (!entry) return
+      let text = ''
+      if (action === 'username') text = entry.username || ''
+      else if (action === 'password') text = entry.password || ''
+      else if (action === 'url') text = entry.url || ''
+      if (text) {
+        await invoke('clipboard:copy', text, 30000)
+        addToast(t('copied_to_clipboard'), 'success')
+      }
+    } catch {
+      addToast(t('failed_to_copy'), 'error')
+    }
+    setContextMenu(null)
+  }
+
+  // Close context menu on click outside
+  useEffect(() => {
+    const handleClick = () => setContextMenu(null)
+    if (contextMenu) {
+      document.addEventListener('click', handleClick)
+      return () => document.removeEventListener('click', handleClick)
+    }
+  }, [contextMenu])
 
   const activeType = filters.entry_type || null
 
@@ -109,6 +266,28 @@ function EntryGrid() {
           </button>
         ))}
       </div>
+
+      {/* Bulk actions toolbar */}
+      {showBulkActions && (
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-vault-accent/10 border border-vault-accent/30 animate-slide-up">
+          <span className="text-sm font-medium text-vault-accent">
+            {t('selected_count', { n: selectedIds.length })}
+          </span>
+          <div className="flex-1" />
+          <button
+            onClick={handleBulkDelete}
+            className="px-3 py-1.5 rounded-lg bg-vault-danger/10 text-vault-danger text-xs font-medium hover:bg-vault-danger/20 transition-colors"
+          >
+            {t('delete')}
+          </button>
+          <button
+            onClick={clearSelection}
+            className="px-3 py-1.5 rounded-lg bg-vault-surface text-vault-text-secondary text-xs font-medium hover:bg-vault-surface-hover transition-colors"
+          >
+            {t('cancel')}
+          </button>
+        </div>
+      )}
 
       {entries.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-64 text-vault-text-secondary">
@@ -154,13 +333,35 @@ function EntryGrid() {
           {entries.map((entry) => (
             <div
               key={entry.id}
-              onClick={() => selectEntry(entry.id)}
+              onClick={(e) => {
+                if (e.ctrlKey || e.metaKey) {
+                  toggleSelect(entry.id, true)
+                } else if (selectedIds.length > 0) {
+                  toggleSelect(entry.id)
+                } else {
+                  selectEntry(entry.id)
+                }
+              }}
+              onContextMenu={(e) => handleContextMenu(e, entry.id)}
               className={`flex items-center gap-4 p-3 rounded-xl cursor-pointer transition-all duration-150 transition-opacity duration-200 ${
                 selectedEntry?.id === entry.id
                   ? 'bg-vault-accent/10 border border-vault-accent/30'
+                  : selectedIds.includes(entry.id)
+                  ? 'bg-vault-accent/5 border border-vault-accent/20'
                   : 'hover:bg-vault-surface-hover border border-transparent'
               }`}
             >
+              {selectedIds.length > 0 && (
+                <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                  selectedIds.includes(entry.id) ? 'bg-vault-accent border-vault-accent' : 'border-vault-border'
+                }`}>
+                  {selectedIds.includes(entry.id) && (
+                    <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                      <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </div>
+              )}
               <div className="w-10 h-10 rounded-xl bg-vault-surface border border-vault-border flex items-center justify-center text-vault-text-secondary flex-shrink-0">
                 {getEntryIcon(entry.entry_type)}
               </div>
@@ -172,6 +373,19 @@ function EntryGrid() {
                   {entry.display_url || entry.entry_type}
                 </div>
               </div>
+              {entry.entry_type === 'login' && (
+                <button
+                  onClick={(e) => handleQuickCopy(e, entry.id)}
+                  className={`p-1.5 rounded-lg transition-colors ${
+                    copiedId === entry.id
+                      ? 'text-vault-success bg-vault-success/10'
+                      : 'text-vault-text-secondary hover:text-vault-accent hover:bg-vault-accent/10'
+                  }`}
+                  title={t('copy_password')}
+                >
+                  {copiedId === entry.id ? <Check size={14} /> : <Copy size={14} />}
+                </button>
+              )}
               <button
                 onClick={(e) => { e.stopPropagation(); toggleFavorite(entry.id) }}
                 className={`p-1 transition-colors ${entry.is_favorite ? 'text-vault-warning' : 'text-vault-text-secondary hover:text-vault-warning'}`}
@@ -212,6 +426,52 @@ function EntryGrid() {
           ))}
         </div>
       )}
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <div
+          className="fixed z-50 bg-vault-surface border border-vault-border rounded-xl shadow-2xl py-1 min-w-[160px]"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+        >
+          <button
+            onClick={() => handleContextAction('username')}
+            className="w-full px-4 py-2 text-left text-sm text-vault-text hover:bg-vault-surface-hover transition-colors"
+          >
+            {t('copy_username')}
+          </button>
+          <button
+            onClick={() => handleContextAction('password')}
+            className="w-full px-4 py-2 text-left text-sm text-vault-text hover:bg-vault-surface-hover transition-colors"
+          >
+            {t('copy_password')}
+          </button>
+          <button
+            onClick={() => handleContextAction('url')}
+            className="w-full px-4 py-2 text-left text-sm text-vault-text hover:bg-vault-surface-hover transition-colors"
+          >
+            {t('copy_url')}
+          </button>
+          <div className="border-t border-vault-border my-1" />
+          <button
+            onClick={() => { selectEntry(contextMenu.entryId); setContextMenu(null) }}
+            className="w-full px-4 py-2 text-left text-sm text-vault-text hover:bg-vault-surface-hover transition-colors"
+          >
+            {t('open')}
+          </button>
+          <button
+            onClick={async () => {
+              if (confirm(t('delete_entry_confirm'))) {
+                await deleteEntry(contextMenu.entryId)
+                addToast(t('entry_deleted'), 'success')
+              }
+              setContextMenu(null)
+            }}
+            className="w-full px-4 py-2 text-left text-sm text-vault-danger hover:bg-vault-danger/10 transition-colors"
+          >
+            {t('delete')}
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -224,4 +484,45 @@ function getEntryIcon(type: string) {
     case 'identity': return '👤'
     default: return '🔐'
   }
+}
+
+function TOTPBadge({ entryId }: { entryId: number }) {
+  const [code, setCode] = useState<string | null>(null)
+  const [timeLeft, setTimeLeft] = useState(30)
+
+  const fetchCode = useCallback(async () => {
+    try {
+      const totpCode = await invoke('entries:get-totp', entryId)
+      if (typeof totpCode === 'string' && totpCode) {
+        setCode(totpCode)
+      }
+    } catch {}
+  }, [entryId])
+
+  useEffect(() => {
+    fetchCode()
+    const interval = setInterval(() => {
+      fetchCode()
+      setTimeLeft(30)
+    }, 30000)
+
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => (prev <= 1 ? 30 : prev - 1))
+    }, 1000)
+
+    return () => {
+      clearInterval(interval)
+      clearInterval(timer)
+    }
+  }, [fetchCode])
+
+  if (!code) return null
+
+  return (
+    <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-vault-accent/10 border border-vault-accent/20">
+      <Shield size={10} className="text-vault-accent" />
+      <span className="text-[10px] font-mono font-bold text-vault-accent tracking-wider">{code}</span>
+      <span className="text-[8px] text-vault-text-secondary">{timeLeft}s</span>
+    </div>
+  )
 }

@@ -3,6 +3,7 @@ import { useVaultStore } from '../../store/vaultStore'
 import { VerificationScreen } from './VerificationScreen'
 import { Shield, Eye, EyeOff, AlertTriangle } from 'lucide-react'
 import { useI18n } from '../../i18n'
+import { calculateStrength, estimateCrackTime } from '../../lib/passwordStrength'
 
 export function UnlockScreen() {
   const { t } = useI18n()
@@ -53,6 +54,8 @@ export function UnlockScreen() {
   }
 
   // Password entry screen
+  const passwordStrength = !initialized && password ? calculateStrength(password) : null
+
   return (
     <div className="h-screen flex items-center justify-center bg-vault-bg">
       <div className="w-full max-w-md mx-4">
@@ -72,22 +75,46 @@ export function UnlockScreen() {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="relative">
-            <input
-              type={showPassword ? 'text' : 'password'}
-              placeholder={t('master_password_placeholder')}
-              value={password}
-              onChange={(e) => { setPassword(e.target.value); clearError() }}
-              autoFocus
-              className="w-full h-12 px-4 pr-12 rounded-xl bg-vault-surface border border-vault-border text-vault-text placeholder:text-vault-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-vault-accent/50 focus:border-vault-accent transition-colors text-center text-lg tracking-wide"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-vault-text-secondary hover:text-vault-text transition-colors"
-            >
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
+          <div className="space-y-2">
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                placeholder={t('master_password_placeholder')}
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); clearError() }}
+                autoFocus
+                className="w-full h-12 px-4 pr-12 rounded-xl bg-vault-surface border border-vault-border text-vault-text placeholder:text-vault-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-vault-accent/50 focus:border-vault-accent transition-colors text-center text-lg tracking-wide"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-vault-text-secondary hover:text-vault-text transition-colors"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+            {/* Strength meter (setup only) */}
+            {!initialized && passwordStrength && (
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-1.5 rounded-full bg-vault-border overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-300"
+                      style={{
+                        width: `${(passwordStrength.score / 4) * 100}%`,
+                        backgroundColor: passwordStrength.color,
+                      }}
+                    />
+                  </div>
+                  <span className="text-[10px] font-medium" style={{ color: passwordStrength.color }}>
+                    {passwordStrength.label}
+                  </span>
+                </div>
+                <p className="text-[10px] text-vault-text-secondary text-center">
+                  {t('crack_time')}: {estimateCrackTime(password)}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Alarm password field (setup only) */}

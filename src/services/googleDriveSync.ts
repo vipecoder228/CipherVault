@@ -38,7 +38,8 @@ const DEFAULT_CONFIG: SyncConfig = {
 }
 
 // Google Drive API configuration
-const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID' // Replace with actual client ID
+// Client ID must be set via environment variable or config file
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || ''
 const GOOGLE_SCOPES = ['https://www.googleapis.com/auth/drive.file']
 const VAULT_FILE_NAME = 'ciphervault.db'
 

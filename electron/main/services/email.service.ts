@@ -97,6 +97,30 @@ export async function saveTelegramConfig(token: string, chatId: string): Promise
   await saveSecret('telegram_chat_id', chatId)
 }
 
+// ─── Breach Notifications ────────────────────────────────
+
+export async function sendBreachNotification(entryTitle: string, breachCount: number): Promise<boolean> {
+  const chatId = await getTelegramChatId()
+  if (!chatId) return false
+
+  const token = await getTelegramToken()
+  if (!token) return false
+
+  try {
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: `⚠️ CipherVault Breach Alert\n\nEntry: ${entryTitle}\nFound in ${breachCount} data breach${breachCount > 1 ? 'es' : ''}\n\nPlease change this password immediately.`,
+      }),
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
 // ─── Main Export ─────────────────────────────────────────
 
 export async function sendBackup(

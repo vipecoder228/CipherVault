@@ -2,6 +2,9 @@ import { create } from 'zustand'
 import { invoke } from '../lib/ipc'
 import type { EncryptedEntry, DecryptedEntry, CreateEntryPayload, UpdateEntryPayload, EntryFilters } from '@shared/types'
 
+export type SortField = 'updated_at' | 'display_title' | 'entry_type'
+export type SortDir = 'asc' | 'desc'
+
 interface EntriesState {
   entries: EncryptedEntry[]
   selectedEntry: DecryptedEntry | null
@@ -9,6 +12,8 @@ interface EntriesState {
   filters: EntryFilters
   searchQuery: string
   loading: boolean
+  sortField: SortField
+  sortDir: SortDir
 
   loadEntries: (filters?: EntryFilters) => Promise<void>
   selectEntry: (id: number | null) => Promise<void>
@@ -19,6 +24,22 @@ interface EntriesState {
   search: (query: string) => Promise<void>
   setViewMode: (mode: 'grid' | 'list') => void
   setFilters: (filters: EntryFilters) => void
+  setSort: (field: SortField, dir?: SortDir) => void
+}
+
+function sortEntries(entries: EncryptedEntry[], field: SortField, dir: SortDir): EncryptedEntry[] {
+  const sorted = [...entries].sort((a, b) => {
+    let comparison = 0
+    if (field === 'display_title') {
+      comparison = (a.display_title || '').localeCompare(b.display_title || '')
+    } else if (field === 'entry_type') {
+      comparison = a.entry_type.localeCompare(b.entry_type)
+    } else {
+      comparison = new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime()
+    }
+    return dir === 'asc' ? comparison : -comparison
+  })
+  return sorted
 }
 
 export const useEntriesStore = create<EntriesState>((set, get) => {
@@ -31,6 +52,8 @@ export const useEntriesStore = create<EntriesState>((set, get) => {
     filters: {},
     searchQuery: '',
     loading: false,
+    sortField: 'updated_at',
+    sortDir: 'desc',
 
     loadEntries: async (filters?: EntryFilters) => {
       const requestId = ++loadRequestId
@@ -39,7 +62,8 @@ export const useEntriesStore = create<EntriesState>((set, get) => {
         const f = filters ?? get().filters
         const entries = await invoke('entries:list', f)
         if (requestId !== loadRequestId) return
-        set({ entries, loading: false })
+        const sorted = sortEntries(entries, get().sortField, get().sortDir)
+        set({ entries: sorted, loading: false })
       } catch {
         if (requestId !== loadRequestId) return
         set({ loading: false })
@@ -96,7 +120,8 @@ export const useEntriesStore = create<EntriesState>((set, get) => {
     try {
       const f = get().filters
       const entries = await invoke('entries:search', query, f)
-      set({ entries, loading: false })
+      const sorted = sortEntries(entries, get().sortField, get().sortDir)
+      set({ entries: sorted, loading: false })
     } catch {
       set({ loading: false })
     }
@@ -106,6 +131,13 @@ export const useEntriesStore = create<EntriesState>((set, get) => {
   setFilters: (filters) => {
     set({ filters })
     get().loadEntries(filters)
+  },
+  setSort: (field, dir) => {
+    const currentDir = get().sortDir
+    const newDir = dir || (get().sortField === field && currentDir === 'desc' ? 'asc' : 'desc')
+    set({ sortField: field, sortDir: newDir })
+    const entries = get().entries
+    set({ entries: sortEntries(entries, field, newDir) })
   },
   }
 })

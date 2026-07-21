@@ -75,6 +75,7 @@ export async function createEntry(data: CreateEntryPayload): Promise<EncryptedEn
     identity_ssn: data.identity_ssn || '',
     identity_passport: data.identity_passport || '',
     identity_birthdate: data.identity_birthdate || '',
+    custom_fields: data.custom_fields || [],
   }
 
   const encrypted = encryptJSON(entryData, encKey)
@@ -131,6 +132,7 @@ export async function updateEntry(id: number, data: UpdateEntryPayload): Promise
     identity_ssn: data.identity_ssn ?? existingData.identity_ssn,
     identity_passport: data.identity_passport ?? existingData.identity_passport,
     identity_birthdate: data.identity_birthdate ?? existingData.identity_birthdate,
+    custom_fields: data.custom_fields ?? existingData.custom_fields ?? [],
   }
 
   addHistoryEntry(db, id, existing.encrypted_data, existing.iv, existing.auth_tag, 'update')
@@ -188,7 +190,33 @@ export async function searchEntries(query: string, filters?: EntryFilters): Prom
   if (!encKey) return [] // Alarm mode — return empty
   const db = await getDatabase()
   const vaultId = getActiveVaultId()
-  return dbSearchEntries(db, query, vaultId, filters)
+
+  // First try fast SQL search on display fields
+  const fastResults = dbSearchEntries(db, query, vaultId, filters)
+
+  // Also search decrypted notes content
+  const queryLower = query.toLowerCase()
+  const allEntries = getEntries(db, filters, vaultId)
+  const noteMatches: EncryptedEntry[] = []
+
+  for (const entry of allEntries) {
+    // Skip if already found in fast search
+    if (fastResults.some(r => r.id === entry.id)) continue
+
+    try {
+      const decrypted = decryptJSON<Record<string, string>>(
+        { iv: entry.iv, ciphertext: entry.encrypted_data, authTag: entry.auth_tag },
+        encKey
+      )
+      if (decrypted.notes && decrypted.notes.toLowerCase().includes(queryLower)) {
+        noteMatches.push(entry)
+      }
+    } catch {
+      // skip corrupted entries
+    }
+  }
+
+  return [...fastResults, ...noteMatches]
 }
 
 export async function toggleFavoriteEntry(id: number): Promise<void> {

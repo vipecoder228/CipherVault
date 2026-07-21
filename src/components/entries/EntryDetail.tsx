@@ -348,6 +348,22 @@ export function EntryDetail() {
             </div>
           )}
 
+          {/* Custom Fields */}
+          {entry.custom_fields && entry.custom_fields.length > 0 && (
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-vault-text-secondary">{t('custom_fields')}</label>
+              {entry.custom_fields.map((field) => (
+                <FieldRow
+                  key={field.id}
+                  label={field.label}
+                  value={field.type === 'password' ? '••••••••' : field.value}
+                  copied={copiedField === `custom_${field.id}`}
+                  onCopy={() => handleCopy(field.value, `custom_${field.id}`)}
+                />
+              ))}
+            </div>
+          )}
+
           {/* Metadata */}
           <div className="pt-4 border-t border-vault-border space-y-2">
             <div className="flex items-center gap-2 text-xs text-vault-text-secondary">

@@ -10,9 +10,32 @@ interface Props {
   onClose: () => void
 }
 
+function loadHealthHistory(): Array<{ date: string; score: number }> {
+  try {
+    const saved = localStorage.getItem('health_history')
+    if (saved) return JSON.parse(saved)
+  } catch {}
+  return []
+}
+
+function saveHealthHistory(score: number) {
+  const history = loadHealthHistory()
+  const today = new Date().toISOString().split('T')[0]
+  const existing = history.findIndex(h => h.date === today)
+  if (existing >= 0) {
+    history[existing].score = score
+  } else {
+    history.push({ date: today, score })
+  }
+  // Keep last 30 entries
+  if (history.length > 30) history.splice(0, history.length - 30)
+  localStorage.setItem('health_history', JSON.stringify(history))
+}
+
 export function SecurityHealth({ open, onClose }: Props) {
   const [health, setHealth] = useState<PasswordHealth | null>(null)
   const [loading, setLoading] = useState(false)
+  const [history, setHistory] = useState<Array<{ date: string; score: number }>>([])
   const addToast = useToastStore((s) => s.addToast)
   const { t } = useI18n()
 
@@ -21,6 +44,8 @@ export function SecurityHealth({ open, onClose }: Props) {
     try {
       const result = await invoke('health:analyze')
       setHealth(result)
+      saveHealthHistory(result.score)
+      setHistory(loadHealthHistory())
     } catch {
       addToast(t('toast_health_failed'), 'error')
     } finally {
@@ -29,7 +54,10 @@ export function SecurityHealth({ open, onClose }: Props) {
   }
 
   useEffect(() => {
-    if (open) analyze()
+    if (open) {
+      analyze()
+      setHistory(loadHealthHistory())
+    }
   }, [open])
 
   if (!open) return null
@@ -110,6 +138,29 @@ export function SecurityHealth({ open, onClose }: Props) {
                   <div className="text-[10px] text-vault-text-secondary">{t('health_old')}</div>
                 </div>
               </div>
+
+              {/* Score trend */}
+              {history.length > 1 && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium text-vault-text">{t('health_trend')}</h3>
+                  <div className="flex items-end gap-1 h-16">
+                    {history.slice(-10).map((h, i) => (
+                      <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                        <div
+                          className="w-full rounded-t transition-all"
+                          style={{
+                            height: `${(h.score / 100) * 100}%`,
+                            backgroundColor: getScoreColor(h.score),
+                          }}
+                        />
+                        <span className="text-[8px] text-vault-text-secondary">
+                          {new Date(h.date).toLocaleDateString('ru', { day: '2-digit', month: '2-digit' })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Details */}
               {health.details.length > 0 && (

@@ -2,13 +2,15 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { useEntriesStore } from '../../store/entriesStore'
 import { useUIStore } from '../../store/uiStore'
 import { useVaultStore } from '../../store/vaultStore'
+import { useClipboardStore } from '../../store/clipboardStore'
 import { useI18n } from '../../i18n'
-import { Search, Plus, LayoutGrid, List, Sun, Moon, Download, Upload, Key } from 'lucide-react'
+import { Search, Plus, LayoutGrid, List, Sun, Moon, Download, Upload, Key, ArrowUpDown, ArrowUp, ArrowDown, Clock, Trash2 } from 'lucide-react'
 import { CreateEntryModal } from '../entries/CreateEntryModal'
 import { ImportDialog } from '../import-export/ImportDialog'
 import { ExportDialog } from '../import-export/ExportDialog'
 import { Modal } from '../ui/Modal'
 import { PasswordGenerator } from '../password-gen/PasswordGenerator'
+import type { SortField } from '../../store/entriesStore'
 
 export function Header() {
   const { t } = useI18n()
@@ -20,8 +22,12 @@ export function Header() {
   const searchRef = useRef<HTMLInputElement>(null)
 
   const { theme, toggleTheme, showPasswordGenerator, setShowPasswordGenerator } = useUIStore()
-  const { viewMode, setViewMode, search, loadEntries } = useEntriesStore()
+  const { viewMode, setViewMode, search, loadEntries, sortField, sortDir, setSort } = useEntriesStore()
   const { lock } = useVaultStore()
+  const { items: clipboardItems, clearItems: clearClipboard } = useClipboardStore()
+  const [showSortMenu, setShowSortMenu] = useState(false)
+  const [showClipboard, setShowClipboard] = useState(false)
+  const addToast = useToastStore((s) => s.addToast)
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -95,6 +101,39 @@ export function Header() {
           </button>
         </div>
 
+        {/* Sort selector */}
+        <div className="relative">
+          <button
+            onClick={() => setShowSortMenu(!showSortMenu)}
+            className="p-2 rounded-lg text-vault-text-secondary hover:text-vault-text hover:bg-vault-surface-hover transition-colors"
+            title={t('sort_by')}
+          >
+            <ArrowUpDown size={16} />
+          </button>
+          {showSortMenu && (
+            <div className="absolute right-0 top-full mt-1 bg-vault-surface border border-vault-border rounded-xl shadow-2xl py-1 min-w-[140px] z-50">
+              {([
+                { field: 'updated_at' as SortField, label: t('sort_date') },
+                { field: 'display_title' as SortField, label: t('sort_name') },
+                { field: 'entry_type' as SortField, label: t('sort_type') },
+              ]).map(({ field, label }) => (
+                <button
+                  key={field}
+                  onClick={() => { setSort(field); setShowSortMenu(false) }}
+                  className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 ${
+                    sortField === field ? 'text-vault-accent bg-vault-accent/10' : 'text-vault-text hover:bg-vault-surface-hover'
+                  }`}
+                >
+                  {label}
+                  {sortField === field && (
+                    sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Theme toggle */}
         <button
           onClick={toggleTheme}
@@ -129,6 +168,64 @@ export function Header() {
         >
           <Upload size={16} />
         </button>
+
+        {/* Recent clipboard */}
+        <div className="relative">
+          <button
+            onClick={() => setShowClipboard(!showClipboard)}
+            className="p-2 rounded-lg text-vault-text-secondary hover:text-vault-text hover:bg-vault-surface-hover transition-colors"
+            title={t('recent_clipboard')}
+          >
+            <Clock size={16} />
+          </button>
+          {showClipboard && (
+            <div className="absolute right-0 top-full mt-1 w-64 bg-vault-surface border border-vault-border rounded-xl shadow-2xl z-50">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-vault-border">
+                <span className="text-xs font-medium text-vault-text">{t('recent_clipboard')}</span>
+                {clipboardItems.length > 0 && (
+                  <button
+                    onClick={clearClipboard}
+                    className="text-xs text-vault-text-secondary hover:text-vault-danger"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                )}
+              </div>
+              <div className="max-h-48 overflow-y-auto">
+                {clipboardItems.length === 0 ? (
+                  <div className="px-3 py-4 text-center text-xs text-vault-text-secondary">
+                    {t('no_copied_items')}
+                  </div>
+                ) : (
+                  clipboardItems.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={async () => {
+                        // Re-copy the item
+                        const entry = await invoke('entries:get', parseInt(item.id))
+                        if (entry) {
+                          let text = ''
+                          if (item.type === 'password') text = entry.password || ''
+                          else if (item.type === 'username') text = entry.username || ''
+                          else if (item.type === 'url') text = entry.url || ''
+                          if (text) {
+                            await invoke('clipboard:copy', text, 30000)
+                            addToast(t('copied_to_clipboard'), 'success')
+                          }
+                        }
+                        setShowClipboard(false)
+                      }}
+                      className="w-full px-3 py-2 text-left hover:bg-vault-surface-hover transition-colors flex items-center gap-2"
+                    >
+                      <span className="text-xs text-vault-text-secondary capitalize">{item.type}:</span>
+                      <span className="text-xs text-vault-text truncate flex-1">{item.label}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Add entry */}
         <button

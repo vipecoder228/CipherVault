@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, Tray, Menu, nativeImage, globalShortcut, session } from 'electron'
+import { app, BrowserWindow, shell, Tray, Menu, nativeImage, globalShortcut, session, powerMonitor } from 'electron'
 import { join } from 'path'
 import { readFileSync } from 'fs'
 import AutoLaunch from 'auto-launch'
@@ -7,6 +7,9 @@ import { registerIPC, unregisterIPC, initShortcuts } from './ipc/ipcHandlers'
 import { closeDatabase } from './db/connection'
 import { lockVault } from './services/vault.service'
 import { startWebSocketServer, stopWebSocketServer } from './services/websocket.service'
+import { startBreachMonitor, stopBreachMonitor } from './services/breach-monitor.service'
+import { logAuditEvent, stopAuditLog } from './security/auditLog'
+import { verifyIntegrity } from './security/tamperDetection'
 import { loadSyncSettings, stopSync } from './services/sync.service'
 import { toggleWindow } from './utils/window'
 import { initUpdater } from './updater'
@@ -155,6 +158,12 @@ app.whenReady().then(async () => {
     optimizer.watchWindowShortcuts(window)
   })
 
+  // Security checks on startup
+  const integrityCheck = verifyIntegrity()
+  if (!integrityCheck.ok) {
+    console.warn('[CipherVault] Integrity check failed:', integrityCheck.tamperedFiles)
+  }
+
   registerIPC()
   await initShortcuts()
   createWindow()
@@ -162,6 +171,20 @@ app.whenReady().then(async () => {
   createTray()
   startWebSocketServer()
   loadSyncSettings()
+  startBreachMonitor()
+
+  // Log app start
+  logAuditEvent('vault_unlocked', 'App started')
+
+  // Lock vault when OS is locked/sleeping
+  powerMonitor.on('lock-screen', () => {
+    lockVault()
+    mainWindow?.webContents.send('vault:locked')
+  })
+  powerMonitor.on('suspend', () => {
+    lockVault()
+    mainWindow?.webContents.send('vault:locked')
+  })
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -177,8 +200,11 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   isQuitting = true
+  logAuditEvent('vault_locked', 'App shutting down')
+  stopAuditLog()
   globalShortcut.unregisterAll()
   stopWebSocketServer()
+  stopBreachMonitor()
   stopSync()
   lockVault()
   unregisterIPC()
