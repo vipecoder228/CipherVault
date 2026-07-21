@@ -41,6 +41,7 @@ export async function getEntry(id: number): Promise<DecryptedEntry | null> {
   decrypted.id = row.id
   decrypted.entry_type = row.entry_type
   decrypted.display_title = row.display_title
+  decrypted.display_url = row.display_url
   decrypted.created_at = row.created_at
   decrypted.updated_at = row.updated_at
 
@@ -86,7 +87,8 @@ export async function createEntry(data: CreateEntryPayload): Promise<EncryptedEn
     data.title || data.entry_type,
     data.category_id ?? null,
     data.is_favorite ?? false,
-    vaultId
+    vaultId,
+    data.url || ''
   )
 
   addHistoryEntry(db, entry.id, encrypted.ciphertext, encrypted.iv, encrypted.authTag, 'create')
@@ -133,7 +135,8 @@ export async function updateEntry(id: number, data: UpdateEntryPayload): Promise
 
   const encrypted = encryptJSON(updatedData, encKey)
   const displayTitle = data.title ?? existing.display_title
-  dbUpdateEntry(db, id, encrypted.ciphertext, encrypted.iv, encrypted.authTag, displayTitle)
+  const displayUrl = data.url ?? updatedData.url
+  dbUpdateEntry(db, id, encrypted.ciphertext, encrypted.iv, encrypted.authTag, displayTitle, displayUrl)
   saveDatabase()
 }
 

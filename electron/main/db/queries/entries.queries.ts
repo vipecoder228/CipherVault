@@ -74,12 +74,13 @@ export function createEntry(
   displayTitle: string,
   categoryId: number | null = null,
   isFavorite: boolean = false,
-  vaultId: number = 1
+  vaultId: number = 1,
+  displayUrl: string = ''
 ): EncryptedEntry {
   db.run(
-    `INSERT INTO encrypted_entries (entry_type, encrypted_data, iv, auth_tag, display_title, category_id, is_favorite, vault_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [entryType, encryptedData, iv, authTag, displayTitle, categoryId, isFavorite ? 1 : 0, vaultId]
+    `INSERT INTO encrypted_entries (entry_type, encrypted_data, iv, auth_tag, display_title, category_id, is_favorite, vault_id, display_url)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [entryType, encryptedData, iv, authTag, displayTitle, categoryId, isFavorite ? 1 : 0, vaultId, displayUrl]
   )
 
   const lastId = db.exec('SELECT last_insert_rowid()')[0].values[0][0] as number
@@ -92,13 +93,22 @@ export function updateEntry(
   encryptedData: string,
   iv: string,
   authTag: string,
-  displayTitle?: string
+  displayTitle?: string,
+  displayUrl?: string
 ): void {
-  if (displayTitle !== undefined) {
-    db.run(
-      `UPDATE encrypted_entries SET encrypted_data = ?, iv = ?, auth_tag = ?, display_title = ?, updated_at = datetime('now') WHERE id = ?`,
-      [encryptedData, iv, authTag, displayTitle, id]
-    )
+  if (displayTitle !== undefined || displayUrl !== undefined) {
+    const sets: string[] = ['encrypted_data = ?', 'iv = ?', 'auth_tag = ?', "updated_at = datetime('now')"]
+    const params: any[] = [encryptedData, iv, authTag]
+    if (displayTitle !== undefined) {
+      sets.push('display_title = ?')
+      params.push(displayTitle)
+    }
+    if (displayUrl !== undefined) {
+      sets.push('display_url = ?')
+      params.push(displayUrl)
+    }
+    params.push(id)
+    db.run(`UPDATE encrypted_entries SET ${sets.join(', ')} WHERE id = ?`, params)
   } else {
     db.run(
       `UPDATE encrypted_entries SET encrypted_data = ?, iv = ?, auth_tag = ?, updated_at = datetime('now') WHERE id = ?`,

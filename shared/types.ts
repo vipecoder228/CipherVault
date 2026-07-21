@@ -56,6 +56,7 @@ export interface DecryptedEntry {
   entry_type: EntryType
   title: string
   display_title: string
+  display_url: string
   username: string
   password: string
   url: string
@@ -86,6 +87,7 @@ export interface EncryptedEntry {
   iv: string
   auth_tag: string
   display_title: string
+  display_url: string
   category_id: number | null
   is_favorite: number
   vault_id: number

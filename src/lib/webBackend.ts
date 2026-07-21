@@ -350,6 +350,7 @@ async function getEntry(id: number): Promise<DecryptedEntry | null> {
   decrypted.id = row.id
   decrypted.entry_type = row.entry_type
   decrypted.display_title = row.display_title
+  decrypted.display_url = row.display_url
   decrypted.created_at = row.created_at
   decrypted.updated_at = row.updated_at
   return decrypted as DecryptedEntry
@@ -383,8 +384,8 @@ async function createEntry(data: CreateEntryPayload): Promise<EncryptedEntry> {
   const encrypted = await encryptJSON(entryData, encKey)
 
   webRun(
-    `INSERT INTO encrypted_entries (entry_type, encrypted_data, iv, auth_tag, display_title, category_id, is_favorite, vault_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO encrypted_entries (entry_type, encrypted_data, iv, auth_tag, display_title, category_id, is_favorite, vault_id, display_url)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       data.entry_type,
       encrypted.ciphertext,
@@ -395,6 +396,7 @@ async function createEntry(data: CreateEntryPayload): Promise<EncryptedEntry> {
       data.category_id ?? null,
       data.is_favorite ? 1 : 0,
       activeVaultId,
+      data.url || '',
     ]
   )
 
@@ -458,10 +460,11 @@ async function updateEntry(id: number, data: UpdateEntryPayload): Promise<void> 
 
   const encrypted = await encryptJSON(updatedData, encKey)
   const displayTitle = data.title ?? existing.display_title
+  const displayUrl = data.url ?? updatedData.url
 
   webRun(
-    `UPDATE encrypted_entries SET encrypted_data = ?, iv = ?, auth_tag = ?, display_title = ?, updated_at = datetime('now') WHERE id = ?`,
-    [encrypted.ciphertext, encrypted.iv, encrypted.authTag, displayTitle, id]
+    `UPDATE encrypted_entries SET encrypted_data = ?, iv = ?, auth_tag = ?, display_title = ?, display_url = ?, updated_at = datetime('now') WHERE id = ?`,
+    [encrypted.ciphertext, encrypted.iv, encrypted.authTag, displayTitle, displayUrl, id]
   )
 
   await saveWebDatabase()

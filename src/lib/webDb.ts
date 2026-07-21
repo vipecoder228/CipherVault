@@ -97,6 +97,9 @@ const MIGRATIONS = [
   );`,
   `ALTER TABLE encrypted_entries ADD COLUMN deleted_at TEXT;`,
   `CREATE INDEX IF NOT EXISTS idx_entries_deleted ON encrypted_entries(deleted_at);`,
+
+  // v14: Add display_url for unencrypted URL display in list
+  `ALTER TABLE encrypted_entries ADD COLUMN display_url TEXT NOT NULL DEFAULT '';`,
 ]
 
 function runMigrations(database: Database): void {
