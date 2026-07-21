@@ -604,7 +604,7 @@ const handlers: Record<string, (...args: any[]) => any> = {
       const title = e.display_title || e.title || ''
       const username = e.username || ''
       const password = e.password || ''
-      const url = e.url || ''
+      const url = e.url || e.display_url || ''
       const notes = (e.notes || '').replace(/\n/g, ' ')
       const type = e.entry_type || 'login'
       const cardNumber = e.card_number || ''
@@ -640,7 +640,7 @@ const handlers: Record<string, (...args: any[]) => any> = {
       title: entry.display_title || entry.title || '',
       username: entry.username || '',
       password: entry.password || '',
-      url: entry.url || '',
+      url: entry.url || entry.display_url || '',
       notes: entry.notes || '',
       type: entry.entry_type || 'login',
       card_number: entry.card_number || '',

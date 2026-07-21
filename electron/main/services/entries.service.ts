@@ -42,6 +42,8 @@ export async function getEntry(id: number): Promise<DecryptedEntry | null> {
   decrypted.entry_type = row.entry_type
   decrypted.display_title = row.display_title
   decrypted.display_url = row.display_url
+  decrypted.category_id = row.category_id
+  decrypted.is_favorite = !!row.is_favorite
   decrypted.created_at = row.created_at
   decrypted.updated_at = row.updated_at
 

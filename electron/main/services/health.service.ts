@@ -104,7 +104,7 @@ export async function analyzePasswordHealth(): Promise<PasswordHealth> {
       for (const id of ids) {
         const item = details.find(d => d.entryId === id)
         if (item) {
-          item.issues.push('reused')
+          if (!item.issues.includes('reused')) item.issues.push('reused')
         } else {
           const entry = entries.find(e => e.id === id)
           if (entry) {

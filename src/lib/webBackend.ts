@@ -351,6 +351,8 @@ async function getEntry(id: number): Promise<DecryptedEntry | null> {
   decrypted.entry_type = row.entry_type
   decrypted.display_title = row.display_title
   decrypted.display_url = row.display_url
+  decrypted.category_id = row.category_id
+  decrypted.is_favorite = !!row.is_favorite
   decrypted.created_at = row.created_at
   decrypted.updated_at = row.updated_at
   return decrypted as DecryptedEntry
@@ -519,8 +521,8 @@ async function searchEntries(query: string, filters?: EntryFilters): Promise<Enc
   if (!encKey) return []
 
   const escapedQuery = query.replace(/\\/g, '\\\\').replace(/[%_]/g, '\\$&')
-  let sql = `SELECT * FROM encrypted_entries WHERE deleted_at IS NULL AND vault_id = ? AND (display_title LIKE ? ESCAPE '\\' OR entry_type LIKE ? ESCAPE '\\')`
-  const params: any[] = [activeVaultId, `%${escapedQuery}%`, `%${escapedQuery}%`]
+  let sql = `SELECT * FROM encrypted_entries WHERE deleted_at IS NULL AND vault_id = ? AND (display_title LIKE ? ESCAPE '\\' OR entry_type LIKE ? ESCAPE '\\' OR display_url LIKE ? ESCAPE '\\')`
+  const params: any[] = [activeVaultId, `%${escapedQuery}%`, `%${escapedQuery}%`, `%${escapedQuery}%`]
 
   if (filters) {
     if (filters.category_id !== undefined && filters.category_id !== null) {

@@ -40,7 +40,8 @@ export function MobileAppShell() {
       const query = searchQuery.toLowerCase()
       return (
         entry.display_title?.toLowerCase().includes(query) ||
-        entry.entry_type.toLowerCase().includes(query)
+        entry.entry_type.toLowerCase().includes(query) ||
+        entry.display_url?.toLowerCase().includes(query)
       )
     }
     if (filters.entry_type) {
@@ -162,7 +163,7 @@ export function MobileAppShell() {
                     {entry.display_title || TYPE_LABELS[entry.entry_type] || entry.entry_type}
                   </div>
                   <div className="text-xs text-vault-text-secondary truncate">
-                    {entry.entry_type}
+                    {entry.display_url || entry.entry_type}
                   </div>
                 </div>
                 <button
