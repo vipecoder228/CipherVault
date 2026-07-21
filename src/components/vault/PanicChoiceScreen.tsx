@@ -27,7 +27,7 @@ export function PanicChoiceScreen({ onChoice }: Props) {
         return
       }
 
-      // 2. Get entries with decryption
+      // 2. Get entries (encrypted — duress mode can't decrypt with panic key)
       const entries = await invoke('entries:panic-backup')
 
       if (!entries || entries.length === 0) {
@@ -36,25 +36,24 @@ export function PanicChoiceScreen({ onChoice }: Props) {
         return
       }
 
-      // Check that entries are actually decrypted
-      const hasDecrypted = entries.some((e: any) => e.decrypted && e.decrypted.password)
-      if (!hasDecrypted) {
-        addToast('Ключ принуждения истёк. Заново введите пароль принуждения и повторите быстро.', 'error')
-        setLoading(false)
-        return
-      }
+      // 3. Get vault's kdf_salt for import restoration
+      const vaultStatus = await invoke('vault:status') as { activeVaultId: number }
+      const kdfSalt = await invoke('vault:get-kdf-salt', vaultStatus.activeVaultId) as string | null
 
-      // 5. Create backup JSON with decrypted entries
+      // 4. Create backup JSON with encrypted entries + salt for restoration
       const backupJson = JSON.stringify({
         format: 'ciphervault-panic-backup',
-        version: '1.0',
+        version: '2.0',
         timestamp: new Date().toISOString(),
         entryCount: entries.length,
+        kdf_salt: kdfSalt,
         entries: entries.map((e) => ({
           id: e.id,
           entry_type: e.entry_type,
           display_title: e.display_title,
-          ...(e.decrypted || {}),
+          iv: e.iv,
+          encrypted_data: e.encrypted_data,
+          auth_tag: e.auth_tag,
         })),
       }, null, 2)
 

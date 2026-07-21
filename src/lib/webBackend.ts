@@ -567,19 +567,9 @@ async function getPanicBackupEntries(): Promise<Array<EncryptedEntry & { decrypt
     [activeVaultId]
   )
 
-  const panicEncKey = getPanicEncryptionKey()
-  if (!panicEncKey) return entries
-
-  return Promise.all(entries.map(async (entry) => {
-    let decrypted: Record<string, string> | undefined
-    try {
-      decrypted = await decryptJSON<Record<string, string>>(
-        { iv: entry.iv, ciphertext: entry.encrypted_data, authTag: entry.auth_tag },
-        panicEncKey
-      )
-    } catch {}
-    return { ...entry, decrypted }
-  }))
+  // Return raw encrypted entries — backup stores them encrypted
+  // They will be decrypted during import with the master password
+  return entries
 }
 
 function completePanic(): void {
@@ -1865,34 +1855,101 @@ async function importPanicBackup(): Promise<{ success: boolean; error?: string; 
     let skipped = 0
     const errors: string[] = []
 
-    for (const entry of backup.entries) {
-      try {
-        const entryType = entry.entry_type || 'login'
-        const title = entry.display_title || entry.title || ''
-        if (!title) { skipped++; continue }
+    // v2.0: entries are encrypted with original vault key
+    if (backup.version === '2.0') {
+      const masterPassword = prompt('Enter original master password (for v2.0 backup):')
+      if (!masterPassword) return { success: false, error: 'Master password required' }
+      if (!backup.kdf_salt) return { success: false, error: 'Backup missing kdf_salt' }
 
-        await createEntry({
-          entry_type: entryType,
-          title,
-          username: entry.username || '',
-          password: entry.password || '',
-          url: entry.url || '',
-          notes: entry.notes || '',
-          totp_secret: entry.totp_secret || '',
-          card_number: entry.card_number || undefined,
-          card_holder: entry.card_holder || undefined,
-          card_expiry: entry.card_expiry || undefined,
-          card_cvv: entry.card_cvv || undefined,
-          identity_first_name: entry.identity_first_name || undefined,
-          identity_last_name: entry.identity_last_name || undefined,
-          identity_phone: entry.identity_phone || undefined,
-          identity_email: entry.identity_email || undefined,
-          identity_address: entry.identity_address || undefined,
-        })
-        imported++
-      } catch (e: any) {
-        errors.push(`Entry: ${e.message}`)
-        skipped++
+      // Derive original encryption key
+      const originalSalt = hexToUint8Array(backup.kdf_salt)
+      const originalKeyMaterial = await crypto.subtle.importKey(
+        'raw',
+        new TextEncoder().encode(masterPassword),
+        'PBKDF2',
+        false,
+        ['deriveKey']
+      )
+      const originalKey = await crypto.subtle.deriveKey(
+        { name: 'PBKDF2', salt: originalSalt, iterations: 600000, hash: 'SHA-256' },
+        originalKeyMaterial,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['decrypt']
+      )
+
+      for (const entry of backup.entries) {
+        try {
+          if (!entry.display_title) { skipped++; continue }
+
+          // Decrypt entry with original master key
+          const entryIv = hexToUint8Array(entry.iv)
+          const entryCiphertext = hexToUint8Array(entry.encrypted_data)
+          const entryAuthTag = hexToUint8Array(entry.auth_tag)
+
+          const decryptedData = await crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv: entryIv, tagLength: 128 },
+            originalKey,
+            new Uint8Array([...entryCiphertext, ...entryAuthTag])
+          )
+          const decryptedEntry = JSON.parse(new TextDecoder().decode(decryptedData))
+
+          // Re-encrypt with current vault key via createEntry
+          await createEntry({
+            entry_type: entry.entry_type || 'login',
+            title: entry.display_title,
+            username: decryptedEntry.username || '',
+            password: decryptedEntry.password || '',
+            url: decryptedEntry.url || '',
+            notes: decryptedEntry.notes || '',
+            totp_secret: decryptedEntry.totp_secret || '',
+            card_number: decryptedEntry.card_number || undefined,
+            card_holder: decryptedEntry.card_holder || undefined,
+            card_expiry: decryptedEntry.card_expiry || undefined,
+            card_cvv: decryptedEntry.card_cvv || undefined,
+            identity_first_name: decryptedEntry.identity_first_name || undefined,
+            identity_last_name: decryptedEntry.identity_last_name || undefined,
+            identity_phone: decryptedEntry.identity_phone || undefined,
+            identity_email: decryptedEntry.identity_email || undefined,
+            identity_address: decryptedEntry.identity_address || undefined,
+          })
+          imported++
+        } catch (e: any) {
+          errors.push(`Entry: ${e.message}`)
+          skipped++
+        }
+      }
+    } else {
+      // v1.0: entries have decrypted fields (legacy format)
+      for (const entry of backup.entries) {
+        try {
+          const entryType = entry.entry_type || 'login'
+          const title = entry.display_title || entry.title || ''
+          if (!title) { skipped++; continue }
+
+          await createEntry({
+            entry_type: entryType,
+            title,
+            username: entry.username || '',
+            password: entry.password || '',
+            url: entry.url || '',
+            notes: entry.notes || '',
+            totp_secret: entry.totp_secret || '',
+            card_number: entry.card_number || undefined,
+            card_holder: entry.card_holder || undefined,
+            card_expiry: entry.card_expiry || undefined,
+            card_cvv: entry.card_cvv || undefined,
+            identity_first_name: entry.identity_first_name || undefined,
+            identity_last_name: entry.identity_last_name || undefined,
+            identity_phone: entry.identity_phone || undefined,
+            identity_email: entry.identity_email || undefined,
+            identity_address: entry.identity_address || undefined,
+          })
+          imported++
+        } catch (e: any) {
+          errors.push(`Entry: ${e.message}`)
+          skipped++
+        }
       }
     }
 
@@ -1901,4 +1958,12 @@ async function importPanicBackup(): Promise<{ success: boolean; error?: string; 
   } catch (e: any) {
     return { success: false, error: e.message || 'Failed to decrypt panic backup' }
   }
+}
+
+function hexToUint8Array(hex: string): Uint8Array {
+  const bytes = new Uint8Array(hex.length / 2)
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = parseInt(hex.substr(i, 2), 16)
+  }
+  return bytes
 }

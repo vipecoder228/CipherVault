@@ -212,22 +212,9 @@ export async function getPanicBackupEntries(): Promise<Array<EncryptedEntry & { 
   const vaultId = getActiveVaultId()
   const entries = getEntries(db, {}, vaultId)
 
-  // Try to decrypt entries with panic key
-  const panicKey = getPanicEncryptionKey()
-  if (!panicKey) return entries
-
-  return entries.map((entry) => {
-    let decrypted: Record<string, string> | undefined
-    try {
-      decrypted = decryptJSON<Record<string, string>>(
-        { iv: entry.iv, ciphertext: entry.encrypted_data, authTag: entry.auth_tag },
-        panicKey
-      )
-    } catch {
-      // Decryption failed — return encrypted entry
-    }
-    return { ...entry, decrypted }
-  })
+  // Return raw encrypted entries — backup stores them encrypted
+  // They will be decrypted during import with the master password
+  return entries
 }
 
 export function completePanic(): void {

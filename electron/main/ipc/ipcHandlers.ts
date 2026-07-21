@@ -102,6 +102,12 @@ const handlers: Record<string, (...args: any[]) => any> = {
       return false
     }
   },
+  'vault:get-kdf-salt': async (_: unknown, vaultId: number) => {
+    const db = await getDatabase()
+    const result = db.exec('SELECT kdf_salt FROM vault WHERE id = ?', [vaultId])
+    if (result.length === 0 || result[0].values.length === 0) return null
+    return result[0].values[0][0] as string
+  },
 
   // Entries
   'entries:list': (_: unknown, filters?: any) => entriesService.listEntries(filters),
@@ -211,7 +217,7 @@ const handlers: Record<string, (...args: any[]) => any> = {
   // Backup
   'backup:export': (_: unknown, backupPassword: string) => backupService.exportEncryptedBackup(backupPassword),
   'backup:import': (_: unknown, backupPassword: string, filePath?: string) => backupService.importEncryptedBackup(backupPassword, filePath),
-  'backup:import-panic': async (_: unknown, backupPassword: string, filePath?: string) => {
+  'backup:import-panic': async (_: unknown, backupPassword: string, masterPassword?: string, filePath?: string) => {
     const win = getWindow()
     if (!win) return { success: false, error: ERRORS.BACKUP_NO_WINDOW }
 
@@ -229,6 +235,8 @@ const handlers: Record<string, (...args: any[]) => any> = {
 
     try {
       const { pbkdf2, createDecipheriv } = await import('crypto')
+      const { deriveKey, splitDerivedKey } = await import('../crypto/keyderivation')
+      const { decryptJSON } = await import('../crypto/encryption')
 
       const fileContent = readFileSync(filePath, 'utf-8').trim()
       const combined = Buffer.from(fileContent, 'base64')
@@ -260,34 +268,86 @@ const handlers: Record<string, (...args: any[]) => any> = {
       let skipped = 0
       const errors: string[] = []
 
-      for (const entry of backup.entries) {
-        try {
-          const entryType = entry.entry_type || 'login'
-          const title = entry.display_title || entry.title || ''
-          if (!title) { skipped++; continue }
+      // v2.0: entries are encrypted with original vault key, need master password to restore
+      if (backup.version === '2.0') {
+        if (!masterPassword) {
+          return { success: false, error: 'Мастер-пароль необходим для восстановления зашифрованных записей' }
+        }
+        if (!backup.kdf_salt) {
+          return { success: false, error: 'Бэкап не содержит kdf_salt. Невозможно восстановить записи.' }
+        }
 
-          await entriesService.createEntry({
-            entry_type: entryType,
-            title,
-            username: entry.username || '',
-            password: entry.password || '',
-            url: entry.url || '',
-            notes: entry.notes || '',
-            totp_secret: entry.totp_secret || '',
-            card_number: entry.card_number || undefined,
-            card_holder: entry.card_holder || undefined,
-            card_expiry: entry.card_expiry || undefined,
-            card_cvv: entry.card_cvv || undefined,
-            identity_first_name: entry.identity_first_name || undefined,
-            identity_last_name: entry.identity_last_name || undefined,
-            identity_phone: entry.identity_phone || undefined,
-            identity_email: entry.identity_email || undefined,
-            identity_address: entry.identity_address || undefined,
-          })
-          imported++
-        } catch (e: any) {
-          errors.push(`Entry: ${e.message}`)
-          skipped++
+        // Derive original encryption key from master password + backup's kdf_salt
+        const originalSalt = Buffer.from(backup.kdf_salt, 'hex')
+        const originalKey = await deriveKey(masterPassword, originalSalt)
+        const { encryptionKey: originalEncKey } = splitDerivedKey(originalKey)
+
+        for (const entry of backup.entries) {
+          try {
+            if (!entry.display_title) { skipped++; continue }
+
+            // Decrypt entry with original master key
+            const decryptedEntry = decryptJSON<Record<string, string>>(
+              { iv: entry.iv, ciphertext: entry.encrypted_data, authTag: entry.auth_tag },
+              originalEncKey
+            )
+
+            // Re-encrypt with current vault key via createEntry
+            await entriesService.createEntry({
+              entry_type: entry.entry_type || 'login',
+              title: entry.display_title || '',
+              username: decryptedEntry.username || '',
+              password: decryptedEntry.password || '',
+              url: decryptedEntry.url || '',
+              notes: decryptedEntry.notes || '',
+              totp_secret: decryptedEntry.totp_secret || '',
+              card_number: decryptedEntry.card_number || undefined,
+              card_holder: decryptedEntry.card_holder || undefined,
+              card_expiry: decryptedEntry.card_expiry || undefined,
+              card_cvv: decryptedEntry.card_cvv || undefined,
+              identity_first_name: decryptedEntry.identity_first_name || undefined,
+              identity_last_name: decryptedEntry.identity_last_name || undefined,
+              identity_phone: decryptedEntry.identity_phone || undefined,
+              identity_email: decryptedEntry.identity_email || undefined,
+              identity_address: decryptedEntry.identity_address || undefined,
+            })
+            imported++
+          } catch (e: any) {
+            errors.push(`Entry: ${e.message}`)
+            skipped++
+          }
+        }
+      } else {
+        // v1.0: entries have decrypted fields (legacy format)
+        for (const entry of backup.entries) {
+          try {
+            const entryType = entry.entry_type || 'login'
+            const title = entry.display_title || entry.title || ''
+            if (!title) { skipped++; continue }
+
+            await entriesService.createEntry({
+              entry_type: entryType,
+              title,
+              username: entry.username || '',
+              password: entry.password || '',
+              url: entry.url || '',
+              notes: entry.notes || '',
+              totp_secret: entry.totp_secret || '',
+              card_number: entry.card_number || undefined,
+              card_holder: entry.card_holder || undefined,
+              card_expiry: entry.card_expiry || undefined,
+              card_cvv: entry.card_cvv || undefined,
+              identity_first_name: entry.identity_first_name || undefined,
+              identity_last_name: entry.identity_last_name || undefined,
+              identity_phone: entry.identity_phone || undefined,
+              identity_email: entry.identity_email || undefined,
+              identity_address: entry.identity_address || undefined,
+            })
+            imported++
+          } catch (e: any) {
+            errors.push(`Entry: ${e.message}`)
+            skipped++
+          }
         }
       }
 

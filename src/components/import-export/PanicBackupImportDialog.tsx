@@ -15,6 +15,7 @@ interface Props {
 export function PanicBackupImportDialog({ open, onClose }: Props) {
   const { t } = useI18n()
   const [password, setPassword] = useState('')
+  const [masterPassword, setMasterPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<{ imported: number; skipped: number } | null>(null)
   const addToast = useToastStore((s) => s.addToast)
@@ -28,7 +29,7 @@ export function PanicBackupImportDialog({ open, onClose }: Props) {
     setLoading(true)
     setResult(null)
     try {
-      const res = await invoke('backup:import-panic', password)
+      const res = await invoke('backup:import-panic', password, masterPassword || undefined)
       if (res.success) {
         setResult({ imported: res.imported || 0, skipped: res.skipped || 0 })
         addToast(`Restored ${res.imported} entries from panic backup`, 'success')
@@ -44,6 +45,7 @@ export function PanicBackupImportDialog({ open, onClose }: Props) {
 
   const handleClose = () => {
     setPassword('')
+    setMasterPassword('')
     setResult(null)
     onClose()
   }
@@ -66,6 +68,7 @@ export function PanicBackupImportDialog({ open, onClose }: Props) {
           <>
             <p className="text-sm text-vault-text-secondary">
               Select the .enc backup file and enter your backup password to decrypt it.
+              If the backup contains encrypted entries (v2.0), also enter the original master password.
             </p>
 
             <Input
@@ -75,6 +78,15 @@ export function PanicBackupImportDialog({ open, onClose }: Props) {
               onChange={(e) => setPassword(e.target.value)}
               showPasswordToggle
               autoFocus
+            />
+
+            <Input
+              label="Master Password (for v2.0 backups)"
+              type="password"
+              value={masterPassword}
+              onChange={(e) => setMasterPassword(e.target.value)}
+              showPasswordToggle
+              placeholder="Required for encrypted entry backups"
             />
           </>
         ) : (

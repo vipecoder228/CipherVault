@@ -320,32 +320,27 @@ describe('EntriesService', () => {
 
   // ─── getPanicBackupEntries ─────────────────────────────
   describe('getPanicBackupEntries', () => {
-    it('should decrypt entries with panic key', async () => {
+    it('should return raw encrypted entries for backup', async () => {
       const mockEntries = [
         { id: 1, iv: 'aa', encrypted_data: 'bb', auth_tag: 'cc', display_title: 'Secret' },
       ]
-      const decrypted = { title: 'Secret', username: 'user', password: 'pass' }
 
       mockGetActiveVaultId.mockReturnValue(1)
       vi.mocked(entriesQueries.getEntries).mockReturnValue(mockEntries as any)
-      mockGetPanicEncryptionKey.mockReturnValue(encKey)
-      mockDecryptJSON.mockReturnValue(decrypted as any)
 
       const result = await getPanicBackupEntries()
 
-      expect(result[0].decrypted).toEqual(decrypted)
+      expect(result).toEqual(mockEntries)
+      expect(result[0].decrypted).toBeUndefined()
     })
 
-    it('should return entries without decrypted data when no panic key', async () => {
-      const mockEntries = [{ id: 1, display_title: 'Secret' }]
-
+    it('should return empty array when no entries exist', async () => {
       mockGetActiveVaultId.mockReturnValue(1)
-      vi.mocked(entriesQueries.getEntries).mockReturnValue(mockEntries as any)
-      mockGetPanicEncryptionKey.mockReturnValue(null)
+      vi.mocked(entriesQueries.getEntries).mockReturnValue([])
 
       const result = await getPanicBackupEntries()
 
-      expect(result[0].decrypted).toBeUndefined()
+      expect(result).toEqual([])
     })
   })
 })

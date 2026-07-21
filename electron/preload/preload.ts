@@ -19,6 +19,7 @@ const channels: (keyof IPCChannels)[] = [
   'vault:change-alarm',
   'vault:remove-alarm',
   'vault:verify-password',
+  'vault:get-kdf-salt',
   'entries:list',
   'entries:get',
   'entries:create',
