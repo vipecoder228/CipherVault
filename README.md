@@ -75,6 +75,8 @@
 - **Encrypted Sync Password** — пароль синхронизации шифруется перед сохранением
 - **Memory Guard** — 3-проходное обнуление буферов (secureWipe)
 - **Key Zeroing** — обнуление ключей при блокировке / смене пароля
+- **HMAC Audit Log** — целостность аудит-лога через HMAC-SHA256 подписи
+- **Password Age Tracking** — отслеживание даты смены пароля
 
 ---
 
@@ -244,7 +246,7 @@ npx tsc --noEmit
 ## Архитектура
 
 ```
-CipherVault v14.0.3
+CipherVault v14.0.4
 ├── Desktop (Electron)
 │   ├── Security Module
 │   │   ├── Memory Guard
