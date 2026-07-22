@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { invoke } from '../../lib/ipc'
+import { invoke, copyWithTtl } from '../../lib/ipc'
 import { useToastStore } from '../ui/Toast'
 import { useI18n } from '../../i18n'
 import { Copy, RefreshCw, Save, Trash2, Download, Upload } from 'lucide-react'
@@ -70,7 +70,7 @@ export function PasswordGenerator({ onUsePassword }: { onUsePassword?: (pwd: str
   const strength = calculateStrength(password)
 
   const handleCopy = async () => {
-    await invoke('clipboard:copy', password, 30000)
+    await copyWithTtl(password)
     addToast(t('copied_toast'), 'success')
   }
 

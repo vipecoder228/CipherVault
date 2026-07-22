@@ -40,3 +40,23 @@ export function invoke<K extends keyof IPCChannels>(
     return handler(undefined, ...args)
   })() as ReturnType<IPCChannels[K]>
 }
+
+// ─── Clipboard Helper ────────────────────────────────────
+// Reads clipboard_ttl_ms setting and passes it to clipboard:copy
+let cachedClipboardTtl: number | null = null
+
+export async function copyWithTtl(text: string): Promise<void> {
+  if (cachedClipboardTtl === null) {
+    try {
+      const val = await invoke('settings:get', 'clipboard_ttl_ms')
+      cachedClipboardTtl = val ? Number(val) : 30000
+    } catch {
+      cachedClipboardTtl = 30000
+    }
+  }
+  return invoke('clipboard:copy', text, cachedClipboardTtl)
+}
+
+export function invalidateClipboardTtlCache(): void {
+  cachedClipboardTtl = null
+}

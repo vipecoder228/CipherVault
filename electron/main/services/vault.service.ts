@@ -7,6 +7,7 @@ import { ERRORS } from '../../../shared/errors'
 import { RATE_LIMIT } from '../crypto/constants'
 import { timingSafeEqual } from 'crypto'
 import { clearClipboard } from './clipboard.service'
+import { secureWipe } from '../security/memoryGuard'
 
 // Held in memory ONLY — never written to disk
 let derivedKey: Buffer | null = null
@@ -78,7 +79,7 @@ export function clearPanicKey(): void {
     panicKeyTimer = null
   }
   if (panicKey) {
-    panicKey.fill(0)
+    secureWipe(panicKey)
   }
   panicKey = null
 }
@@ -180,8 +181,8 @@ export async function setupVault(masterPassword: string, alarmPassword?: string,
 
     return { success: true, vaultId: actualVaultId }
   } finally {
-    if (key) key.fill(0)
-    if (aKey) aKey.fill(0)
+    if (key) secureWipe(key)
+    if (aKey) secureWipe(aKey)
     releaseOperation()
   }
 }
@@ -320,7 +321,7 @@ export function lockVault(): void {
   }
   // Zero the key buffer before releasing it
   if (derivedKey) {
-    derivedKey.fill(0)
+    secureWipe(derivedKey)
   }
   derivedKey = null
   clearPanicKey()
@@ -486,7 +487,7 @@ export async function changeMasterPassword(
     saveDatabase()
 
     // Zero old key before replacing
-    oldKey.fill(0)
+    secureWipe(oldKey)
     oldKey = null
     derivedKey = newKey
     newKey = null // prevent zeroing in finally
@@ -494,8 +495,8 @@ export async function changeMasterPassword(
 
     return { success: true }
   } finally {
-    if (oldKey) oldKey.fill(0)
-    if (newKey) newKey.fill(0)
+    if (oldKey) secureWipe(oldKey)
+    if (newKey) secureWipe(newKey)
     releaseOperation()
   }
 }
@@ -662,8 +663,8 @@ export async function changeAlarmPassword(oldAlarmPassword: string, newAlarmPass
 
     return { success: true }
   } finally {
-    if (oldKey) oldKey.fill(0)
-    if (newKey) newKey.fill(0)
+    if (oldKey) secureWipe(oldKey)
+    if (newKey) secureWipe(newKey)
     releaseOperation()
   }
 }

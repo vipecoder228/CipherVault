@@ -4,7 +4,7 @@ import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import { OtpInput } from '../ui/OtpInput'
 import { QRCodeSVG } from 'qrcode.react'
-import { invoke } from '../../lib/ipc'
+import { invoke, invalidateClipboardTtlCache } from '../../lib/ipc'
 import { useUIStore } from '../../store/uiStore'
 import { useToastStore } from '../ui/Toast'
 import { useI18n } from '../../i18n'
@@ -128,9 +128,11 @@ function SecurityTab() {
   const [showPanicBackupImport, setShowPanicBackupImport] = useState(false)
   const [showSecurityHealth, setShowSecurityHealth] = useState(false)
   const [showEmergencyAccess, setShowEmergencyAccess] = useState(false)
+  const [showTelegramSetup, setShowTelegramSetup] = useState(false)
   const [totpEnabled, setTotpEnabled] = useState(false)
   const [alarmEnabled, setAlarmEnabled] = useState(false)
   const [autoLockMs, setAutoLockMs] = useState('300000')
+  const [clipboardTtlMs, setClipboardTtlMs] = useState('30000')
   const [globalShortcut, setGlobalShortcut] = useState('CommandOrControl+Shift+Space')
   const [recordingShortcut, setRecordingShortcut] = useState(false)
   const addToast = useToastStore((s) => s.addToast)
@@ -145,6 +147,8 @@ function SecurityTab() {
       if (totpData === 'true' || totpData === '1') setTotpEnabled(true)
       const alarmData = await invoke('settings:get', 'alarm_enabled')
       if (alarmData === 'true' || alarmData === '1') setAlarmEnabled(true)
+      const ttlData = await invoke('settings:get', 'clipboard_ttl_ms')
+      if (ttlData) setClipboardTtlMs(ttlData)
       if (!isMobile) {
         const shortcut = await invoke('shortcut:get')
         if (shortcut) setGlobalShortcut(shortcut)
@@ -156,6 +160,13 @@ function SecurityTab() {
     setAutoLockMs(ms)
     await invoke('settings:set', 'auto_lock_ms', ms)
     addToast(t('settings_auto_lock_desc'), 'success')
+  }
+
+  const handleClipboardTtlChange = async (ms: string) => {
+    setClipboardTtlMs(ms)
+    await invoke('settings:set', 'clipboard_ttl_ms', ms)
+    invalidateClipboardTtlCache()
+    addToast('Время жизни буфера обновлено', 'success')
   }
 
   const handleRemoveAlarm = async () => {
@@ -194,6 +205,15 @@ function SecurityTab() {
     { value: '900000', label: t('settings_15min') },
     { value: '1800000', label: t('settings_30min') },
     { value: '3600000', label: t('settings_1hour') },
+  ]
+
+  const clipboardTtlOptions = [
+    { value: '10000', label: '10 сек' },
+    { value: '30000', label: '30 сек' },
+    { value: '60000', label: '1 мин' },
+    { value: '120000', label: '2 мин' },
+    { value: '300000', label: '5 мин' },
+    { value: '0', label: 'Не очищать' },
   ]
 
   const shortcutPresets = [
@@ -265,9 +285,20 @@ function SecurityTab() {
       {!isMobile && (
         <SettingsSection title={t('settings_group_data')}>
           <SettingsRow label={t('settings_clipboard')} description={t('settings_clipboard_desc')}>
-            <Button variant="secondary" size="sm" onClick={handleClearClipboard}>
-              {t('settings_clear_clipboard')}
-            </Button>
+            <div className="flex items-center gap-2">
+              <select
+                value={clipboardTtlMs}
+                onChange={(e) => handleClipboardTtlChange(e.target.value)}
+                className="h-8 px-2 rounded-lg bg-vault-bg border border-vault-border text-xs text-vault-text focus:outline-none focus:ring-2 focus:ring-vault-accent/50"
+              >
+                {clipboardTtlOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              <Button variant="secondary" size="sm" onClick={handleClearClipboard}>
+                {t('settings_clear_clipboard')}
+              </Button>
+            </div>
           </SettingsRow>
 
           <SettingsRow label={t('backup_export')} description={t('settings_backup_desc')}>
@@ -298,13 +329,35 @@ function SecurityTab() {
         </SettingsSection>
       )}
 
+      {/* ── Notifications Group ── */}
+      {!isMobile && (
+        <SettingsSection title="Уведомления">
+          <SettingsRow label="Telegram уведомления" description="Получайте уведомления о утечках паролей в Telegram">
+            <Button variant="secondary" size="sm" onClick={() => setShowTelegramSetup(true)}>
+              Настроить
+            </Button>
+          </SettingsRow>
+        </SettingsSection>
+      )}
+
       {/* ── Mobile: Clipboard only ── */}
       {isMobile && (
         <SettingsSection title={t('settings_group_misc')}>
           <SettingsRow label={t('settings_clipboard')} description={t('settings_clipboard_desc')}>
-            <Button variant="secondary" size="sm" onClick={handleClearClipboard}>
-              {t('settings_clear_clipboard')}
-            </Button>
+            <div className="flex items-center gap-2">
+              <select
+                value={clipboardTtlMs}
+                onChange={(e) => handleClipboardTtlChange(e.target.value)}
+                className="h-8 px-2 rounded-lg bg-vault-bg border border-vault-border text-xs text-vault-text focus:outline-none focus:ring-2 focus:ring-vault-accent/50"
+              >
+                {clipboardTtlOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              <Button variant="secondary" size="sm" onClick={handleClearClipboard}>
+                {t('settings_clear_clipboard')}
+              </Button>
+            </div>
           </SettingsRow>
         </SettingsSection>
       )}
@@ -366,6 +419,7 @@ function SecurityTab() {
       {showPanicBackupImport && <PanicBackupImportDialog open={showPanicBackupImport} onClose={() => setShowPanicBackupImport(false)} />}
       {showSecurityHealth && <SecurityHealth open={showSecurityHealth} onClose={() => setShowSecurityHealth(false)} />}
       {showEmergencyAccess && <EmergencyAccess open={showEmergencyAccess} onClose={() => setShowEmergencyAccess(false)} />}
+      {showTelegramSetup && <TelegramSetupModal onClose={() => setShowTelegramSetup(false)} />}
     </div>
   )
 }
@@ -589,6 +643,101 @@ function AlarmSetupModal({ onClose, onStatusChange }: { onClose: () => void; onS
         <div className="flex justify-end gap-3">
           <Button variant="secondary" onClick={onClose}>{t('settings_cancel')}</Button>
           <Button onClick={handleSubmit} disabled={loading}>{loading ? '...' : t('settings_set_duress')}</Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Telegram Setup Modal ────────────────────────────────
+
+function TelegramSetupModal({ onClose }: { onClose: () => void }) {
+  const [telegramToken, setTelegramToken] = useState('')
+  const [chatId, setChatId] = useState('')
+  const [botName, setBotName] = useState('')
+  const [testing, setTesting] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const addToast = useToastStore((s) => s.addToast)
+  const { t } = useI18n()
+
+  useEffect(() => {
+    // Load existing config
+    const loadConfig = async () => {
+      try {
+        const savedToken = await invoke('settings:get-secure', 'telegram_bot_token')
+        const savedChatId = await invoke('settings:get-secure', 'telegram_chat_id')
+        if (savedToken) setTelegramToken(savedToken)
+        if (savedChatId) setChatId(savedChatId)
+      } catch {}
+    }
+    loadConfig()
+  }, [])
+
+  const testTelegram = async () => {
+    if (!telegramToken) return
+    setTesting(true)
+    try {
+      const result = await invoke('email:test-telegram', telegramToken)
+      if (result?.ok) {
+        setBotName(result.botName || '')
+        const detected = await invoke('email:get-chat-id', telegramToken)
+        if (detected) setChatId(detected)
+        addToast(`Бот подключён: @${result.botName}`, 'success')
+      } else {
+        addToast(result?.error || 'Неверный токен', 'error')
+      }
+    } catch {
+      addToast('Ошибка подключения', 'error')
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  const handleSave = async () => {
+    if (!telegramToken || !chatId) {
+      addToast('Введите токен и Chat ID', 'warning')
+      return
+    }
+    setSaving(true)
+    try {
+      await invoke('email:save-telegram', telegramToken, chatId)
+      addToast('Telegram настроен', 'success')
+      onClose()
+    } catch {
+      addToast('Не удалось сохранить', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="w-full max-w-sm mx-4 bg-vault-surface border border-vault-border rounded-2xl p-6 space-y-4">
+        <h3 className="text-lg font-semibold text-vault-text">Telegram уведомления</h3>
+        <p className="text-xs text-vault-text-secondary">
+          Получайте уведомления о утечках паролей в Telegram.
+        </p>
+
+        <div className="space-y-3">
+          <p className="text-xs text-vault-text-secondary">
+            1. Создайте бота через @BotFather<br/>
+            2. Получите токен<br/>
+            3. Отправьте любое сообщение боту<br/>
+            4. Вставьте токен и нажмите Тест
+          </p>
+          <Input label="Bot Token" value={telegramToken} onChange={(e) => setTelegramToken(e.target.value)} placeholder="123456789:ABCdef..." />
+          <div className="flex gap-2">
+            <Button variant="secondary" size="sm" onClick={testTelegram} disabled={testing || !telegramToken} className="flex-1">
+              {testing ? '...' : 'Тест'}
+            </Button>
+          </div>
+          {botName && <p className="text-[10px] text-green-400">Подключён: @{botName}</p>}
+          <Input label="Chat ID" value={chatId} onChange={(e) => setChatId(e.target.value)} placeholder="Автоопределён или вставьте вручную" />
+        </div>
+
+        <div className="flex justify-end gap-3">
+          <Button variant="secondary" onClick={onClose}>{t('settings_cancel')}</Button>
+          <Button onClick={handleSave} disabled={saving}>{saving ? '...' : 'Сохранить'}</Button>
         </div>
       </div>
     </div>

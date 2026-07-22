@@ -4,7 +4,7 @@ import { Input } from '../ui/Input'
 import { Button } from '../ui/Button'
 import { useEntriesStore } from '../../store/entriesStore'
 import { useToastStore } from '../ui/Toast'
-import { invoke } from '../../lib/ipc'
+import { invoke, copyWithTtl } from '../../lib/ipc'
 import { useI18n } from '../../i18n'
 import { RefreshCw, Copy, Key, Shield, AlertTriangle, Plus, Trash2 } from 'lucide-react'
 import { calculateStrength, estimateCrackTime } from '../../lib/passwordStrength'
@@ -217,7 +217,7 @@ export function EditEntryModal({ open, onClose, entry }: Props) {
                 <div className="flex items-center gap-2">
                   <div className="flex-1 font-mono text-sm text-vault-accent break-all">{genPassword}</div>
                   <button onClick={doGenerate} className="p-1.5 rounded-lg text-vault-text-secondary hover:text-vault-text transition-colors" title={t('regenerate')}><RefreshCw size={14} /></button>
-                  <button onClick={async () => { await invoke('clipboard:copy', genPassword, 30000); addToast(t('copied'), 'success') }} className="p-1.5 rounded-lg text-vault-text-secondary hover:text-vault-accent transition-colors" title={t('copy')}><Copy size={14} /></button>
+                  <button onClick={async () => { await copyWithTtl(genPassword); addToast(t('copied'), 'success') }} className="p-1.5 rounded-lg text-vault-text-secondary hover:text-vault-accent transition-colors" title={t('copy')}><Copy size={14} /></button>
                 </div>
                 {strength && (
                   <div className="h-1 rounded-full bg-vault-border overflow-hidden">

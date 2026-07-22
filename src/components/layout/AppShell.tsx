@@ -9,7 +9,7 @@ import { useUIStore } from '../../store/uiStore'
 import { useVaultStore } from '../../store/vaultStore'
 import { useI18n } from '../../i18n'
 import { useToastStore } from '../ui/Toast'
-import { invoke } from '../../lib/ipc'
+import { invoke, copyWithTtl } from '../../lib/ipc'
 import { AlertTriangle, Search, Copy, Check, Shield } from 'lucide-react'
 import type { EntryType } from '@shared/types'
 
@@ -161,14 +161,14 @@ function EntryGrid() {
       // Ctrl+C - copy password
       if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selectedEntry?.password) {
         e.preventDefault()
-        invoke('clipboard:copy', selectedEntry.password, 30000)
+        copyWithTtl(selectedEntry.password)
         addToast(t('copied_to_clipboard'), 'success')
       }
 
       // Ctrl+U - copy username
       if ((e.ctrlKey || e.metaKey) && e.key === 'u' && selectedEntry?.username) {
         e.preventDefault()
-        invoke('clipboard:copy', selectedEntry.username, 30000)
+        copyWithTtl(selectedEntry.username)
         addToast(t('copied_to_clipboard'), 'success')
       }
 
@@ -191,7 +191,7 @@ function EntryGrid() {
     try {
       const entry = await invoke('entries:get', entryId)
       if (entry?.password) {
-        await invoke('clipboard:copy', entry.password, 30000)
+        await copyWithTtl(entry.password)
         setCopiedId(entryId)
         addToast(t('copied_to_clipboard'), 'success')
         setTimeout(() => setCopiedId(null), 2000)
@@ -217,7 +217,7 @@ function EntryGrid() {
       else if (action === 'password') text = entry.password || ''
       else if (action === 'url') text = entry.url || ''
       if (text) {
-        await invoke('clipboard:copy', text, 30000)
+        await copyWithTtl(text)
         addToast(t('copied_to_clipboard'), 'success')
       }
     } catch {

@@ -4,7 +4,7 @@ import { useVaultStore } from '../../store/vaultStore'
 import { getBiometric } from '../../services/biometricService'
 import { useToastStore } from '../ui/Toast'
 import { useI18n } from '../../i18n'
-import { invoke } from '../../lib/ipc'
+import { invoke, copyWithTtl } from '../../lib/ipc'
 import { EditEntryModal } from '../entries/EditEntryModal'
 import { useState, useEffect } from 'react'
 
@@ -119,7 +119,7 @@ export function MobileEntryDetail() {
 
   const handleCopy = async (text: string) => {
     try {
-      await invoke('clipboard:copy', text, 30000)
+      await copyWithTtl(text)
       addToast(t('copied_to_clipboard'), 'success')
     } catch {
       addToast(t('failed_to_copy'), 'error')

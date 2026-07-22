@@ -3,7 +3,7 @@
 // Full native autofill requires Android AutofillService (native development)
 
 import { isCapacitor, isElectron } from '../../shared/bridge'
-import { invoke } from '../lib/ipc'
+import { invoke, copyWithTtl } from '../lib/ipc'
 
 export interface AutofillEntry {
   id: string
@@ -238,7 +238,7 @@ const capacitorAutofill: AutofillService = {
       if (!entry) return false
 
       // Copy password to clipboard
-      await invoke('clipboard:copy', entry.password, 30) // 30 second timeout
+      await copyWithTtl(entry.password)
 
       // Update last used time
       invalidateCache()
@@ -254,7 +254,7 @@ const capacitorAutofill: AutofillService = {
       if (!entry) return false
 
       // Copy username to clipboard
-      await invoke('clipboard:copy', entry.username, 30)
+      await copyWithTtl(entry.username)
 
       return true
     } catch {

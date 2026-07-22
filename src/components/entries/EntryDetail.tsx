@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useEntriesStore } from '../../store/entriesStore'
 import { useVaultStore } from '../../store/vaultStore'
 import { getBiometric } from '../../services/biometricService'
-import { invoke } from '../../lib/ipc'
+import { invoke, copyWithTtl } from '../../lib/ipc'
 import { useToastStore } from '../ui/Toast'
 import { HistoryViewer } from './HistoryViewer'
 import { EditEntryModal } from './EditEntryModal'
@@ -135,7 +135,7 @@ export function EntryDetail() {
 
   const handleCopy = async (text: string, field: string) => {
     try {
-      await invoke('clipboard:copy', text, 30000)
+      await copyWithTtl(text)
       setCopiedField(field)
       addToast(t('copied_to_clipboard'), 'success')
       if (timeoutRef.current) clearTimeout(timeoutRef.current)

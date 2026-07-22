@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { invoke } from '../../lib/ipc'
+import { invoke, copyWithTtl } from '../../lib/ipc'
 import { useToastStore } from '../ui/Toast'
 import { useI18n } from '../../i18n'
 import {
@@ -130,7 +130,7 @@ export function DisposableEmailPanel() {
 
   const handleCopyAddress = async (address: string) => {
     try {
-      await invoke('clipboard:copy', address, 30000)
+      await copyWithTtl(address)
       addToast(t('copied_toast'), 'success')
     } catch {
       addToast(t('failed_copy'), 'error')

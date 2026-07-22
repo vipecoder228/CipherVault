@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { invoke, copyWithTtl } from '../../lib/ipc'
 import { useEntriesStore } from '../../store/entriesStore'
 import { useUIStore } from '../../store/uiStore'
 import { useVaultStore } from '../../store/vaultStore'
@@ -210,7 +211,7 @@ export function Header() {
                           else if (item.type === 'username') text = entry.username || ''
                           else if (item.type === 'url') text = entry.url || ''
                           if (text) {
-                            await invoke('clipboard:copy', text, 30000)
+                            await copyWithTtl(text)
                             addToast(t('copied_to_clipboard'), 'success')
                           }
                         }
