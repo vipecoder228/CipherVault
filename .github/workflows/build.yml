@@ -26,14 +26,12 @@ jobs:
       - name: Build Electron app
         run: npm run build
 
-      - name: Package Electron app
-        run: npm run dist
+      - name: Package Windows installer
+        run: npm run dist -- --win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          WIN_CERTIFICATE_FILE: ${{ secrets.WIN_CERTIFICATE_FILE }}
-          WIN_CERTIFICATE_PASSWORD: ${{ secrets.WIN_CERTIFICATE_PASSWORD }}
 
-      - name: Upload Windows builds to release
+      - name: Upload Windows installer to release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*.exe
@@ -57,15 +55,12 @@ jobs:
       - name: Build Electron app
         run: npm run build
 
-      - name: Package macOS app
-        run: npm run dist
+      - name: Package macOS DMG
+        run: npm run dist -- --mac
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
 
-      - name: Upload macOS builds to release
+      - name: Upload macOS DMG to release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*.dmg
@@ -89,17 +84,12 @@ jobs:
       - name: Build Electron app
         run: npm run build
 
-      - name: Package Linux packages
-        run: |
-          for i in 1 2 3; do
-            npm run dist && break
-            echo "Attempt $i failed, retrying..."
-            sleep 10
-          done
+      - name: Package Linux installers
+        run: npm run dist -- --linux AppImage deb rpm
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Linux builds to release
+      - name: Upload Linux installers to release
         uses: softprops/action-gh-release@v2
         with:
           files: |
@@ -124,42 +114,25 @@ jobs:
       - name: Build web assets
         run: npm run build:web
 
-      - name: Add Android platform (if not exists)
-        run: npx cap add android || true
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '21'
-
-      - name: Set version in build.gradle
-        run: |
-          VERSION=$(node -p "require('./package.json').version")
-          sed -i "s/versionCode 1/versionCode ${VERSION//./}/" android/app/build.gradle
-          sed -i "s/versionName \"1.0\"/versionName \"$VERSION\"/" android/app/build.gradle
-
       - name: Build Android APK
         working-directory: android
-        run: chmod +x gradlew && ./gradlew assembleDebug
+        run: ./gradlew assembleDebug
 
-      - name: Build Android AAB (for Play Store)
-        working-directory: android
-        run: chmod +x gradlew && ./gradlew bundleDebug
-
-      - name: Rename Android artifacts
-        run: |
-          VERSION=$(node -p "require('./package.json').version")
-          mv android/app/build/outputs/apk/debug/app-debug.apk "dist/CipherVault-${VERSION}-android.apk"
-          mv android/app/build/outputs/bundle/debug/app-debug.aab "dist/CipherVault-${VERSION}-android.aab"
-
-      - name: Upload Android builds to release
+      - name: Upload Android APK to release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            dist/CipherVault-*-android.apk
-            dist/CipherVault-*-android.aab
+          files: android/app/build/outputs/apk/debug/app-debug.apk
           draft: false
           prerelease: false
