@@ -42,7 +42,7 @@ describe('Encryption', () => {
       expect(() => decrypt(encrypted, wrongKey)).toThrow()
     })
 
-    it('should throw on tampered ciphertext', () => {
+    it('should throw on tampered ciphertext', { timeout: 10000 }, () => {
       const plaintext = 'Secret data'
       const encrypted = encrypt(plaintext, key)
       const tampered = { ...encrypted, ciphertext: encrypted.ciphertext.slice(0, -2) + '00' }

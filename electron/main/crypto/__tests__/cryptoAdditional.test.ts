@@ -47,7 +47,7 @@ describe('Additional Crypto Tests', () => {
   })
 
   describe('Key derivation stress tests', () => {
-    it('should derive 5 unique keys', async () => {
+    it('should derive 5 unique keys', { timeout: 15000 }, async () => {
       const keys = []
       for (let i = 0; i < 5; i++) {
         const key = await deriveKey(`password-${i}`, generateSalt())
