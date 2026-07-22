@@ -1,9 +1,12 @@
 // Passkey/FIDO2 Service
 // Manages WebAuthn passkeys for passwordless authentication
+// Stores passkey metadata in the encrypted vault
+
+import { invoke } from '../lib/ipc'
 
 export interface PasskeyCredential {
   id: string
-  publicKey: ArrayBuffer
+  publicKey: string // Base64 encoded
   counter: number
   rpName: string
   rpId: string
@@ -35,6 +38,26 @@ export interface PasskeyService {
   getCredential(credentialId: string): Promise<PasskeyCredential | null>
   listCredentials(): Promise<PasskeyCredential[]>
   deleteCredential(credentialId: string): Promise<boolean>
+}
+
+// ─── Helpers ──────────────────────────────────────────
+
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer)
+  let binary = ''
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i])
+  }
+  return btoa(binary)
+}
+
+function base64ToArrayBuffer(base64: string): ArrayBuffer {
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  return bytes.buffer
 }
 
 // ─── WebAuthn Implementation ──────────────────────────
@@ -75,10 +98,10 @@ const webAuthnPasskey: PasskeyService = {
 
       const attestationResponse = credential.response as AuthenticatorAttestationResponse
 
-      // Store credential
+      // Create passkey credential with base64 public key
       const passkey: PasskeyCredential = {
         id: credential.id,
-        publicKey: attestationResponse.getPublicKey()!,
+        publicKey: arrayBufferToBase64(attestationResponse.getPublicKey()!),
         counter: 0,
         rpName: options.rpName,
         rpId: options.rpId,
@@ -87,13 +110,8 @@ const webAuthnPasskey: PasskeyService = {
         createdAt: Date.now(),
       }
 
-      // Save to localStorage (in production, save to vault)
-      const credentials = getStoredCredentials()
-      credentials.push(passkey)
-      localStorage.setItem('passkey_credentials', JSON.stringify(credentials.map(c => ({
-        ...c,
-        publicKey: arrayBufferToBase64(c.publicKey),
-      }))))
+      // Save to vault via IPC
+      await invoke('passkey:save' as any, passkey)
 
       return passkey
     } catch (error) {
@@ -125,15 +143,10 @@ const webAuthnPasskey: PasskeyService = {
 
       const assertionResponse = assertion.response as AuthenticatorAssertionResponse
 
-      // Update counter
-      const credentials = getStoredCredentials()
-      const stored = credentials.find(c => c.id === assertion.id)
+      // Update counter in vault
+      const stored = await invoke('passkey:get' as any, assertion.id) as PasskeyCredential | null
       if (stored) {
-        stored.counter++
-        localStorage.setItem('passkey_credentials', JSON.stringify(credentials.map(c => ({
-          ...c,
-          publicKey: arrayBufferToBase64(c.publicKey),
-        }))))
+        await invoke('passkey:update-counter' as any, assertion.id, stored.counter + 1)
       }
 
       return {
@@ -149,58 +162,16 @@ const webAuthnPasskey: PasskeyService = {
   },
 
   async getCredential(credentialId: string): Promise<PasskeyCredential | null> {
-    const credentials = getStoredCredentials()
-    return credentials.find(c => c.id === credentialId) || null
+    return invoke('passkey:get' as any, credentialId) as Promise<PasskeyCredential | null>
   },
 
   async listCredentials(): Promise<PasskeyCredential[]> {
-    return getStoredCredentials()
+    return invoke('passkey:list' as any) as Promise<PasskeyCredential[]>
   },
 
   async deleteCredential(credentialId: string): Promise<boolean> {
-    const credentials = getStoredCredentials()
-    const index = credentials.findIndex(c => c.id === credentialId)
-    if (index === -1) return false
-    credentials.splice(index, 1)
-    localStorage.setItem('passkey_credentials', JSON.stringify(credentials.map(c => ({
-      ...c,
-      publicKey: arrayBufferToBase64(c.publicKey),
-    }))))
-    return true
+    return invoke('passkey:delete' as any, credentialId) as Promise<boolean>
   },
-}
-
-// ─── Helpers ──────────────────────────────────────────
-
-function getStoredCredentials(): PasskeyCredential[] {
-  try {
-    const stored = localStorage.getItem('passkey_credentials')
-    if (!stored) return []
-    return JSON.parse(stored).map((c: any) => ({
-      ...c,
-      publicKey: base64ToArrayBuffer(c.publicKey),
-    }))
-  } catch {
-    return []
-  }
-}
-
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer)
-  let binary = ''
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i])
-  }
-  return btoa(binary)
-}
-
-function base64ToArrayBuffer(base64: string): ArrayBuffer {
-  const binary = atob(base64)
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i)
-  }
-  return bytes.buffer
 }
 
 // ─── Fallback (no WebAuthn support) ───────────────────
@@ -231,5 +202,7 @@ export function getPasskey(): PasskeyService {
   }
   return passkeyService
 }
+
+export { base64ToArrayBuffer, arrayBufferToBase64 }
 
 export default getPasskey

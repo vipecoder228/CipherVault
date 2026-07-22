@@ -444,6 +444,31 @@ const handlers: Record<string, (...args: any[]) => any> = {
   // Integrity check
   'integrity:check': () => checkIntegrity(),
 
+  // Passkey management
+  'passkey:save': async (_: unknown, credential: any) => {
+    const { savePasskey, listPasskeys } = await import('../services/passkeyStorage')
+    const existing = await listPasskeys()
+    if (existing.some(c => c.id === credential.id)) return { success: true }
+    await savePasskey(credential)
+    return { success: true }
+  },
+  'passkey:get': async (_: unknown, credentialId: string) => {
+    const { getPasskey } = await import('../services/passkeyStorage')
+    return getPasskey(credentialId)
+  },
+  'passkey:list': async () => {
+    const { listPasskeys } = await import('../services/passkeyStorage')
+    return listPasskeys()
+  },
+  'passkey:delete': async (_: unknown, credentialId: string) => {
+    const { deletePasskey } = await import('../services/passkeyStorage')
+    return deletePasskey(credentialId)
+  },
+  'passkey:update-counter': async (_: unknown, credentialId: string, counter: number) => {
+    const { updatePasskeyCounter } = await import('../services/passkeyStorage')
+    return updatePasskeyCounter(credentialId, counter)
+  },
+
   // API Server
   'api:start': async () => {
     const { startApiServer } = require('../services/api.service')

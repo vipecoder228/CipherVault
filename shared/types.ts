@@ -316,6 +316,13 @@ export interface IPCChannels {
   'email:test-telegram': (token: string) => Promise<{ ok: boolean; botName?: string; error?: string }>
   'email:get-chat-id': (token: string) => Promise<string | null>
   'email:save-telegram': (token: string, chatId: string) => Promise<void>
+
+  // Passkeys
+  'passkey:save': (credential: any) => Promise<{ success: boolean }>
+  'passkey:get': (credentialId: string) => Promise<any | null>
+  'passkey:list': () => Promise<any[]>
+  'passkey:delete': (credentialId: string) => Promise<boolean>
+  'passkey:update-counter': (credentialId: string, counter: number) => Promise<boolean>
 }
 
 export type IPCChannel = keyof IPCChannels

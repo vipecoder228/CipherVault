@@ -80,6 +80,11 @@ const channels: (keyof IPCChannels)[] = [
   'integrity:check',
   'shortcut:get',
   'shortcut:set',
+  'passkey:save',
+  'passkey:get',
+  'passkey:list',
+  'passkey:delete',
+  'passkey:update-counter',
 ]
 
 for (const channel of channels) {
