@@ -30,11 +30,45 @@ jobs:
         run: npm run dist
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WIN_CERTIFICATE_FILE: ${{ secrets.WIN_CERTIFICATE_FILE }}
+          WIN_CERTIFICATE_PASSWORD: ${{ secrets.WIN_CERTIFICATE_PASSWORD }}
 
       - name: Upload Windows builds to release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*.exe
+          draft: false
+          prerelease: false
+
+  build-macos:
+    runs-on: macos-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Build Electron app
+        run: npm run build
+
+      - name: Package macOS app
+        run: npm run dist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+
+      - name: Upload macOS builds to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.dmg
           draft: false
           prerelease: false
 
