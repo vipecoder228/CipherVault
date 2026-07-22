@@ -1,22 +1,48 @@
-# CipherVault
+<p align="center">
+  <img src="https://raw.githubusercontent.com/vipecoder228/CipherVault/main/resources/icon.png" width="120" alt="CipherVault Logo">
+</p>
 
-Безопасный менеджер паролей с шифрованием AES-256-GCM и оценкой безопасности 12/10.
+<h1 align="center">CipherVault</h1>
 
-> **🔒 Безопасность: 12/10**
-> 
-> CipherVault v14.0.1 — enterprise-level безопасность с 300 тестами.
+<p align="center">
+  <strong>Безопасный менеджер паролей с шифрованием AES-256-GCM</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/vipecoder228/CipherVault/releases/latest">
+    <img src="https://img.shields.io/github/v/release/vipecoder228/CipherVault?style=flat-square&color=blue" alt="Version">
+  </a>
+  <a href="https://github.com/vipecoder228/CipherVault/actions">
+    <img src="https://img.shields.io/github/actions/workflow/status/vipecoder228/CipherVault/build.yml?branch=main&style=flat-square" alt="Build">
+  </a>
+  <a href="https://github.com/vipecoder228/CipherVault/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/vipecoder228/CipherVault?style=flat-square" alt="License">
+  </a>
+  <img src="https://img.shields.io/badge/tests-300%20passed-green?style=flat-square" alt="Tests">
+  <img src="https://img.shields.io/badge/security-12%2F10-red?style=flat-square" alt="Security">
+</p>
+
+<p align="center">
+  Windows / Linux / macOS / Android / iOS
+</p>
+
+---
 
 ## Скачать
 
-📥 [GitHub Releases](https://github.com/vipecoder228/CipherVault/releases/latest) — Windows (.exe), Linux (.AppImage/.deb/.rpm), macOS (.dmg)
+📥 [**GitHub Releases**](https://github.com/vipecoder228/CipherVault/releases/latest) — Windows (.exe), Linux (.AppImage / .deb / .rpm), macOS (.dmg)
 
-## Безопасность (12/10)
+---
+
+## Безопасность
 
 ### Шифрование
-- **AES-256-GCM** — authenticated encryption всех данных
-- **Argon2id** —内存-hard key derivation (OWASP рекомендация)
-- **Constant-time сравнение** — защита от timing attacks
-- **CSPRNG** — crypto.randomInt для генерации паролей
+| Метод | Описание |
+|-------|----------|
+| **AES-256-GCM** | Authenticated encryption всех данных |
+| **Argon2id** | Memory-hard key derivation (OWASP рекомендация) |
+| **Constant-time сравнение** | Защита от timing attacks |
+| **CSPRNG** | `crypto.randomInt` для генерации паролей |
 
 ### Защита в памяти
 - **Secure Memory Guard** — обнуление буферов после использования
@@ -32,7 +58,7 @@
 ### Защита сети
 - **Rate Limiting** — 4→6→8→10 попыток с задержками
 - **TLS API** — HTTPS для REST API (self-signed cert)
-- **CORS Restrictions** — только localhost
+- **CORS** — только localhost
 - **Security Headers** — X-Content-Type-Options, X-Frame-Options
 - **Input Validation** — валидация всех входных данных
 
@@ -43,6 +69,8 @@
 - **Clipboard Auto-Clear** — очистка через 30 секунд
 - **Push Notifications** — уведомления при обнаружении утечек
 
+---
+
 ## Функции
 
 ### Passkeys / FIDO2
@@ -52,12 +80,18 @@
 
 ### Кастомные поля
 - Текст, пароль, URL, email, телефон
-- Добавление/удаление в Create/Edit модалах
+- Добавление / удаление в Create / Edit модалах
 - Шифрование вместе с остальными данными
 
 ### Генератор паролей
-- Пресеты (PIN, Standard, Strong, Passphrase)
-- Экспорт/импорт пресетов в JSON
+| Режим | Описание |
+|-------|----------|
+| **Password** | Случайные символы |
+| **Passphrase** | BIP39 слова |
+| **Username** | Прилагательное + существительное + число |
+
+- Пресеты: PIN, Standard, Strong, Passphrase
+- Экспорт / импорт пресетов в JSON
 - Настраиваемая длина и типы символов
 
 ### Массовые операции
@@ -66,47 +100,67 @@
 - Панель действий при выборе
 
 ### Горячие клавиши
-- ↑↓ / j/k — навигация
-- Ctrl+C — копировать пароль
-- Ctrl+U — копировать логин
-- Delete — удалить
-- Escape — снять выделение
+| Комбинация | Действие |
+|------------|----------|
+| `↑` `↓` / `j` `k` | Навигация |
+| `Ctrl+C` | Копировать пароль |
+| `Ctrl+U` | Копировать логин |
+| `Delete` | Удалить запись |
+| `Escape` | Снять выделение |
 
 ### Здоровье паролей
-- Анализ слабых/повторяющихся/утёкших паролей
+- Анализ слабых / повторяющихся / утёкших паролей
 - Тренд здоровья (диаграмма)
 - Оценка времени взлома
 - Push-уведомления при утечках
 
 ### Сортировка
 - По дате, имени, типу
-- Переключение asc/desc
+- Переключение asc / desc
 
-### UI/UX
-- Настройка размера шрифта (small/normal/large)
+---
+
+## UI / UX
+
+- Настройка размера шрифта (small / normal / large)
 - Недавние копирования
-- Экспорт/импорт настроек
+- Экспорт / импорт настроек
 - Контекстное меню (правый клик)
 - Шаблоны записей (Email, Social, Banking...)
 - Автозаполнение URL из названия
+- Тёмная / светлая тема
 
-### Интеграции
-- Telegram уведомления о утечках
-- Push-уведомления (Capacitor LocalNotifications)
-- REST API для сторонних приложений
-- Google Drive синхронизация
-- Browser extension с автозаполнением
+---
 
-### Платформы
-- **Desktop** — Electron (Windows/Mac/Linux)
-- **Mobile** — Capacitor (Android/iOS)
-- **Browser** — Chrome extension
-- **API** — REST API на порту 19824 (HTTPS)
+## Интеграции
+
+| Сервис | Описание |
+|--------|----------|
+| **Telegram** | Уведомления о утечках |
+| **Push** | Capacitor LocalNotifications |
+| **REST API** | HTTPS, порт 19824 |
+| **Google Drive** | Синхронизация vault |
+| **Browser Extension** | Chrome, автозаполнение |
+
+---
+
+## Платформы
+
+| Платформа | Технология | Статус |
+|-----------|------------|--------|
+| **Windows** | Electron | ✅ Готово |
+| **macOS** | Electron | ✅ Готово |
+| **Linux** | Electron | ✅ Готово |
+| **Android** | Capacitor | ✅ Готово |
+| **iOS** | Capacitor | 🔄 В разработке |
+| **Chrome** | Extension | ✅ Готово |
+
+---
 
 ## Мобильное приложение
 
 ### Возможности
-- Биометрическая аутентификация (Face ID /指纹)
+- Биометрическая аутентификация (Face ID / Touch ID)
 - Autofill URL matching
 - Auto-lock при уходе в фон
 - Push-уведомления при утечках
@@ -114,9 +168,12 @@
 - Offline-first архитектура
 
 ### Сборка Android
+
 ```bash
 npm run dist:android
 ```
+
+---
 
 ## Тесты
 
@@ -133,6 +190,8 @@ npm run dist:android
 ```bash
 npm test  # 300/300 passed
 ```
+
+---
 
 ## Разработка
 
@@ -158,18 +217,22 @@ npm test
 npx tsc --noEmit
 ```
 
+---
+
 ## Технологии
 
 | Уровень | Технология |
-|---------|-----------|
+|---------|------------|
 | Десктоп | Electron 33 |
 | Мобильное | Capacitor 8 |
 | Интерфейс | React 19 + TypeScript |
 | Крипто | AES-256-GCM + Argon2id |
 | БД | sql.js (SQLite) |
 | Тесты | Vitest (300 tests) |
-| API | REST/HTTPS (port 19824) |
+| API | REST / HTTPS (port 19824) |
 | Passkeys | WebAuthn API |
+
+---
 
 ## Архитектура
 
@@ -195,6 +258,8 @@ CipherVault v14.0.1
 └── Cloud Sync (Google Drive)
 ```
 
+---
+
 ## Лицензия
 
-MIT
+[MIT](LICENSE)
