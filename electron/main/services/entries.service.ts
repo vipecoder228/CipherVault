@@ -76,6 +76,11 @@ export async function createEntry(data: CreateEntryPayload): Promise<EncryptedEn
     identity_passport: data.identity_passport || '',
     identity_birthdate: data.identity_birthdate || '',
     custom_fields: data.custom_fields || [],
+    passkey_id: data.passkey_id || '',
+    passkey_public_key: data.passkey_public_key || '',
+    passkey_rp_name: data.passkey_rp_name || '',
+    passkey_rp_id: data.passkey_rp_id || '',
+    passkey_counter: data.passkey_counter || 0,
   }
 
   const encrypted = encryptJSON(entryData, encKey)

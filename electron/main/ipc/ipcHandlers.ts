@@ -124,7 +124,7 @@ const handlers: Record<string, (...args: any[]) => any> = {
   },
   'entries:create': (_: unknown, data: any) => {
     if (!data || typeof data !== 'object' || !data.entry_type) throw new Error('Invalid entry data')
-    const allowedTypes = ['login', 'secure_note', 'card', 'identity']
+    const allowedTypes = ['login', 'secure_note', 'card', 'identity', 'passkey']
     if (!allowedTypes.includes(data.entry_type)) throw new Error('Invalid entry type')
     return entriesService.createEntry(data)
   },

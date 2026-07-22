@@ -10,6 +10,7 @@ import { MobileAppShell } from './components/mobile/MobileAppShell'
 import { ToastContainer } from './components/ui/Toast'
 import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { invoke } from './lib/ipc'
+import { isCapacitor } from '../shared/bridge'
 
 // Detect if we're on a mobile device
 function isMobileDevice(): boolean {
@@ -44,6 +45,19 @@ export function App() {
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])
+
+  // Auto-lock on Capacitor when app goes to background
+  useEffect(() => {
+    if (!isCapacitor) return
+
+    import('./capacitor/bridge').then(({ onAppStateChange }) => {
+      onAppStateChange((state) => {
+        if (state === 'background' && !locked) {
+          lockRef.current()
+        }
+      })
+    }).catch(() => {})
+  }, [locked])
 
   const handleBootComplete = useCallback(async () => {
     try {

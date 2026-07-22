@@ -1,6 +1,6 @@
 // ─── Entry Types ────────────────────────────────────────
 
-export type EntryType = 'login' | 'secure_note' | 'card' | 'identity'
+export type EntryType = 'login' | 'secure_note' | 'card' | 'identity' | 'passkey'
 
 export interface CustomField {
   id: string
@@ -35,6 +35,12 @@ export interface CreateEntryPayload {
   identity_birthdate?: string
   // Custom fields
   custom_fields?: CustomField[]
+  // Passkey fields
+  passkey_id?: string
+  passkey_public_key?: string
+  passkey_rp_name?: string
+  passkey_rp_id?: string
+  passkey_counter?: number
 }
 
 export interface UpdateEntryPayload {
@@ -59,6 +65,12 @@ export interface UpdateEntryPayload {
   identity_passport?: string
   identity_birthdate?: string
   custom_fields?: CustomField[]
+  // Passkey fields
+  passkey_id?: string
+  passkey_public_key?: string
+  passkey_rp_name?: string
+  passkey_rp_id?: string
+  passkey_counter?: number
 }
 
 export interface DecryptedEntry {
@@ -87,6 +99,12 @@ export interface DecryptedEntry {
   identity_passport: string
   identity_birthdate: string
   custom_fields: CustomField[]
+  // Passkey fields
+  passkey_id: string
+  passkey_public_key: string
+  passkey_rp_name: string
+  passkey_rp_id: string
+  passkey_counter: number
   created_at: string
   updated_at: string
 }

@@ -422,6 +422,11 @@ async function createEntry(data: CreateEntryPayload): Promise<EncryptedEntry> {
     identity_ssn: data.identity_ssn || '',
     identity_passport: data.identity_passport || '',
     identity_birthdate: data.identity_birthdate || '',
+    passkey_id: data.passkey_id || '',
+    passkey_public_key: data.passkey_public_key || '',
+    passkey_rp_name: data.passkey_rp_name || '',
+    passkey_rp_id: data.passkey_rp_id || '',
+    passkey_counter: data.passkey_counter || 0,
   }
 
   const encrypted = await encryptJSON(entryData, encKey)
@@ -495,6 +500,11 @@ async function updateEntry(id: number, data: UpdateEntryPayload): Promise<void> 
     identity_ssn: data.identity_ssn ?? existingData.identity_ssn,
     identity_passport: data.identity_passport ?? existingData.identity_passport,
     identity_birthdate: data.identity_birthdate ?? existingData.identity_birthdate,
+    passkey_id: data.passkey_id ?? existingData.passkey_id,
+    passkey_public_key: data.passkey_public_key ?? existingData.passkey_public_key,
+    passkey_rp_name: data.passkey_rp_name ?? existingData.passkey_rp_name,
+    passkey_rp_id: data.passkey_rp_id ?? existingData.passkey_rp_id,
+    passkey_counter: data.passkey_counter ?? existingData.passkey_counter,
   }
 
   // History before update
@@ -1567,7 +1577,7 @@ export const webHandlers: HandlerMap = {
   },
   'entries:create': (_: any, data: CreateEntryPayload) => {
     if (!data || typeof data !== 'object' || !data.entry_type) throw new Error('Invalid entry data')
-    const allowedTypes = ['login', 'secure_note', 'card', 'identity']
+    const allowedTypes = ['login', 'secure_note', 'card', 'identity', 'passkey']
     if (!allowedTypes.includes(data.entry_type)) throw new Error('Invalid entry type')
     return createEntry(data)
   },

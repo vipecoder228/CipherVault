@@ -171,6 +171,26 @@ const capacitorDatabase = {
   getDatabasePath(): string { return 'vault.db' },
 }
 
+// ─── App Lifecycle (auto-lock on background) ──────────
+
+let appStateCallback: ((state: 'active' | 'background') => void) | null = null
+
+export function onAppStateChange(callback: (state: 'active' | 'background') => void): void {
+  appStateCallback = callback
+
+  // Use Capacitor App plugin if available
+  import('@capacitor/app').then(({ App }) => {
+    App.addListener('appStateChange', ({ isActive }) => {
+      callback(isActive ? 'active' : 'background')
+    })
+  }).catch(() => {
+    // Fallback: use document visibilitychange
+    document.addEventListener('visibilitychange', () => {
+      callback(document.hidden ? 'background' : 'active')
+    })
+  })
+}
+
 // Create Capacitor platform bridge
 export const capacitorBridge: PlatformBridge = {
   clipboard: capacitorClipboard,
