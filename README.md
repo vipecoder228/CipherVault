@@ -4,7 +4,7 @@
 
 > **🔒 Безопасность: 12/10**
 > 
-> CipherVault v14.0.0 — enterprise-level безопасность с 300 тестами.
+> CipherVault v14.0.1 — enterprise-level безопасность с 300 тестами.
 
 ## Скачать
 
@@ -174,7 +174,7 @@ npx tsc --noEmit
 ## Архитектура
 
 ```
-CipherVault v14.0.0
+CipherVault v14.0.1
 ├── Desktop (Electron)
 │   ├── Security Module
 │   │   ├── Memory Guard
