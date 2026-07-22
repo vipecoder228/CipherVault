@@ -4,6 +4,7 @@ import { useToastStore } from '../ui/Toast'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import { useI18n } from '../../i18n'
+import { setSyncPasswordEncrypted } from '../../services/googleDriveSync'
 import { FolderOpen, RefreshCw, CloudOff, Cloud } from 'lucide-react'
 
 export function SyncSettings() {
@@ -51,6 +52,8 @@ export function SyncSettings() {
     }
     setSyncing(true)
     try {
+      // Store encrypted sync password
+      await setSyncPasswordEncrypted(password)
       await invoke('sync:set-password', password)
       const result = await invoke('sync:now')
       if (result.success) {

@@ -198,7 +198,18 @@ const handlers: Record<string, (...args: any[]) => any> = {
   'email:send-breach-notification': (_: unknown, entryTitle: string, breachCount: number) => sendBreachNotification(entryTitle, breachCount),
 
   // Password
-  'password:generate': (_: unknown, options: any) => generatePassword(options),
+  'password:generate': (_: unknown, options: any) => {
+    // Validate options structure
+    if (options && typeof options === 'object') {
+      if (typeof options.length === 'number') {
+        options.length = Math.max(8, Math.min(128, Math.floor(options.length)))
+      }
+      for (const key of ['uppercase', 'lowercase', 'numbers', 'symbols']) {
+        if (key in options) options[key] = !!options[key]
+      }
+    }
+    return generatePassword(options)
+  },
   'password:check-breach': (_: unknown, password: string) => checkBreach(password),
   'password:check-duplicate': (_: unknown, password: string) => checkDuplicatePassword(password),
   'password:check-all-breaches': () => checkAllPasswordsForBreaches(),
@@ -209,8 +220,11 @@ const handlers: Record<string, (...args: any[]) => any> = {
     return getCategories(db)
   },
   'categories:create': async (_: unknown, data: any) => {
+    if (!data || typeof data !== 'object') throw new Error('Invalid category data')
+    if (typeof data.name !== 'string' || data.name.trim().length === 0) throw new Error('Category name required')
+    if (data.name.length > 100) throw new Error('Category name too long')
     const db = await getDatabase()
-    return createCategory(db, data.name, data.icon, data.color)
+    return createCategory(db, data.name.trim(), data.icon || 'folder', data.color || '#6366f1')
   },
   'categories:update': async (_: unknown, id: number, data: any) => {
     if (typeof id !== 'number' || id <= 0 || id > 2147483647) throw new Error('Invalid category ID')
