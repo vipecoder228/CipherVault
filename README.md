@@ -19,7 +19,6 @@
     <img src="https://img.shields.io/github/license/vipecoder228/CipherVault?style=flat-square" alt="License">
   </a>
   <img src="https://img.shields.io/badge/tests-300%20passed-green?style=flat-square" alt="Tests">
-  <img src="https://img.shields.io/badge/security-12%2F10-red?style=flat-square" alt="Security">
 </p>
 
 <p align="center">
