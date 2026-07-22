@@ -79,5 +79,3 @@ jobs:
         run: npx electron-builder --publish always --${{ matrix.platform }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_LINK: ${{ matrix.platform == 'win' && secrets.CSC_LINK || '' }}
-          CSC_KEY_PASSWORD: ${{ matrix.platform == 'win' && secrets.CSC_KEY_PASSWORD || '' }}
