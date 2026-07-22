@@ -39,9 +39,9 @@ export function checkIntegrity(): { ok: boolean; current?: string; expected?: st
   try {
     const stored = getStoredHash()
 
-    // No hash file = no integrity check (dev mode, or installer didn't generate it)
+    // No hash file = integrity check fails (fail-closed)
     if (!stored) {
-      return { ok: true }
+      return { ok: false, current: getAppHash(), expected: undefined }
     }
 
     const current = getAppHash()

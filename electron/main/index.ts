@@ -8,7 +8,7 @@ import { closeDatabase } from './db/connection'
 import { lockVault } from './services/vault.service'
 import { startWebSocketServer, stopWebSocketServer } from './services/websocket.service'
 import { startBreachMonitor, stopBreachMonitor } from './services/breach-monitor.service'
-import { logAuditEvent, stopAuditLog } from './security/auditLog'
+import { logAuditEvent, stopAuditLog, initAuditLog } from './security/auditLog'
 import { verifyIntegrity } from './security/tamperDetection'
 import { loadSyncSettings, stopSync } from './services/sync.service'
 import { toggleWindow } from './utils/window'
@@ -45,7 +45,12 @@ function createWindow(): void {
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
+    try {
+      const parsed = new URL(details.url)
+      if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+        shell.openExternal(details.url)
+      }
+    } catch {}
     return { action: 'deny' }
   })
 
@@ -79,7 +84,7 @@ function createWindow(): void {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
-        'Content-Security-Policy': ["default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'"]
+        'Content-Security-Policy': ["default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'"]
       }
     })
   })
@@ -163,6 +168,9 @@ app.whenReady().then(async () => {
   if (!integrityCheck.ok) {
     console.warn('[CipherVault] Integrity check failed:', integrityCheck.tamperedFiles)
   }
+
+  // Initialize audit log system
+  await initAuditLog()
 
   registerIPC()
   await initShortcuts()

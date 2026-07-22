@@ -106,7 +106,8 @@ describe('WebSocketService', () => {
   describe('getSessionToken', () => {
     it('should return stored token if one exists', async () => {
       // Run this test first because sessionToken is cached at module level
-      vi.mocked(getSecret).mockResolvedValue('stored-token-123')
+      const storedData = JSON.stringify({ token: 'stored-token-123', createdAt: Date.now() })
+      vi.mocked(getSecret).mockResolvedValue(storedData)
 
       const token = await getSessionToken()
 

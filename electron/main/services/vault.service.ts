@@ -6,6 +6,7 @@ import { generateSecret, verifyTOTP, generateQRCodeUrl } from '../crypto/totp'
 import { ERRORS } from '../../../shared/errors'
 import { RATE_LIMIT } from '../crypto/constants'
 import { timingSafeEqual } from 'crypto'
+import { clearClipboard } from './clipboard.service'
 
 // Held in memory ONLY — never written to disk
 let derivedKey: Buffer | null = null
@@ -325,6 +326,7 @@ export function lockVault(): void {
   clearPanicKey()
   alarmMode = false
   pendingTotpSecret = null
+  clearClipboard()
   // Don't reset activeVaultId — keep it for re-unlock
   if (autoLockTimer) {
     clearTimeout(autoLockTimer)
@@ -479,7 +481,7 @@ export async function changeMasterPassword(
     }
 
     // Update master hash AFTER all re-encryption is complete
-    updateMasterHash(db, newHash, newSalt.toString('hex'), 'pbkdf2', activeVaultId)
+    updateMasterHash(db, newHash, newSalt.toString('hex'), 'argon2id', activeVaultId)
 
     saveDatabase()
 

@@ -29,7 +29,7 @@ export function createVault(
   db: Database,
   masterHash: string,
   kdfSalt: string,
-  kdfType: string = 'pbkdf2'
+  kdfType: string = 'argon2id'
 ): void {
   db.run(
     'INSERT INTO vault (master_hash, kdf_salt, kdf_type) VALUES (?, ?, ?)',
@@ -41,7 +41,7 @@ export function updateMasterHash(
   db: Database,
   masterHash: string,
   kdfSalt: string,
-  kdfType: string = 'pbkdf2',
+  kdfType: string = 'argon2id',
   vaultId: number = 1
 ): void {
   db.run(

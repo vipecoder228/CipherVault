@@ -6,8 +6,10 @@ import { saveSecret, getSecret } from './secretStorage'
 
 const PORT = 19823
 const MAX_CONNECTIONS = 3
+const TOKEN_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
 let wss: WebSocketServer | null = null
 let sessionToken: string | null = null
+let tokenCreatedAt: number = 0
 let connectionCount = 0
 
 function generateToken(): string {
@@ -15,18 +17,26 @@ function generateToken(): string {
 }
 
 async function getOrGenerateToken(): Promise<string> {
-  if (sessionToken) return sessionToken
+  if (sessionToken && Date.now() - tokenCreatedAt < TOKEN_TTL_MS) {
+    return sessionToken
+  }
 
   try {
     const stored = await getSecret('extension_token')
     if (stored) {
-      sessionToken = stored
-      return sessionToken!
+      const parsed = JSON.parse(stored)
+      if (parsed.token && parsed.createdAt && Date.now() - parsed.createdAt < TOKEN_TTL_MS) {
+        sessionToken = parsed.token
+        tokenCreatedAt = parsed.createdAt
+        return sessionToken!
+      }
     }
   } catch {}
 
+  // Token expired or missing — rotate
   sessionToken = generateToken()
-  await saveSecret('extension_token', sessionToken)
+  tokenCreatedAt = Date.now()
+  await saveSecret('extension_token', JSON.stringify({ token: sessionToken, createdAt: tokenCreatedAt }))
   return sessionToken!
 }
 

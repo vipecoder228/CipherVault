@@ -8,6 +8,30 @@ import {
   deleteDisposableEmail,
 } from '../db/queries/disposable-emails.queries'
 import type { DisposableEmailRow } from '../db/queries/disposable-emails.queries'
+import { encryptCredential, decryptCredential } from './credentialEncryption'
+
+// Detect if a value is already encrypted (JSON with iv/ciphertext/authTag)
+function isEncrypted(value: string): boolean {
+  try {
+    const parsed = JSON.parse(value)
+    return typeof parsed === 'object' && parsed !== null && 'iv' in parsed && 'ciphertext' in parsed && 'authTag' in parsed
+  } catch {
+    return false
+  }
+}
+
+// Decrypt credential, handling both encrypted and legacy plaintext
+function safeDecryptCredential(value: string): string {
+  if (!value) return value
+  if (isEncrypted(value)) {
+    try {
+      return decryptCredential(value)
+    } catch {
+      return value // Fallback if vault is locked
+    }
+  }
+  return value // Legacy plaintext
+}
 
 const MAIL_TM_BASE = 'https://api.mail.tm'
 
@@ -134,9 +158,10 @@ export async function createDisposableEmailAddress(): Promise<{ id: number; addr
   // Get token
   const token = await getToken(address, password)
 
-  // Save to local DB (password/token are mail.tm service credentials, not user vault data)
-  // TODO: Consider encrypting via saveSecret if higher assurance needed
-  const row = createDisposableEmail(db, address, password, token, account.id)
+  // Save to local DB with encrypted credentials
+  const encPassword = encryptCredential(password)
+  const encToken = encryptCredential(token)
+  const row = createDisposableEmail(db, address, encPassword, encToken, account.id)
   saveDatabase()
 
   return { id: row.id, address }
@@ -161,10 +186,12 @@ export async function getDisposableEmailMessages(emailId: number): Promise<Array
   if (!email) throw new Error('Email not found')
 
   // Refresh token if needed or if API call fails with 401
-  let token = email.token
+  let token = safeDecryptCredential(email.token || '')
+  const password = safeDecryptCredential(email.password)
   if (!token) {
-    token = await getToken(email.address, email.password)
-    updateDisposableEmailToken(db, emailId, token, email.account_id)
+    token = await getToken(email.address, password)
+    const encToken = encryptCredential(token)
+    updateDisposableEmailToken(db, emailId, encToken, email.account_id)
     saveDatabase()
   }
 
@@ -173,8 +200,9 @@ export async function getDisposableEmailMessages(emailId: number): Promise<Array
     messages = await getMessages(token)
   } catch {
     // Token may be expired — refresh and retry
-    token = await getToken(email.address, email.password)
-    updateDisposableEmailToken(db, emailId, token, email.account_id)
+    token = await getToken(email.address, password)
+    const encToken = encryptCredential(token)
+    updateDisposableEmailToken(db, emailId, encToken, email.account_id)
     saveDatabase()
     messages = await getMessages(token)
   }
@@ -200,10 +228,12 @@ export async function getDisposableEmailMessage(emailId: number, messageId: stri
   const email = getDisposableEmailById(db, emailId)
   if (!email) throw new Error('Email not found')
 
-  let token = email.token
+  let token = safeDecryptCredential(email.token || '')
+  const password = safeDecryptCredential(email.password)
   if (!token) {
-    token = await getToken(email.address, email.password)
-    updateDisposableEmailToken(db, emailId, token, email.account_id)
+    token = await getToken(email.address, password)
+    const encToken = encryptCredential(token)
+    updateDisposableEmailToken(db, emailId, encToken, email.account_id)
     saveDatabase()
   }
 
@@ -212,8 +242,9 @@ export async function getDisposableEmailMessage(emailId: number, messageId: stri
     msg = await getMessage(token, messageId)
   } catch {
     // Token may be expired — refresh and retry
-    token = await getToken(email.address, email.password)
-    updateDisposableEmailToken(db, emailId, token, email.account_id)
+    token = await getToken(email.address, password)
+    const encToken = encryptCredential(token)
+    updateDisposableEmailToken(db, emailId, encToken, email.account_id)
     saveDatabase()
     msg = await getMessage(token, messageId)
   }
@@ -232,9 +263,10 @@ export async function deleteDisposableEmailMessage(emailId: number, messageId: s
   const email = getDisposableEmailById(db, emailId)
   if (!email) throw new Error('Email not found')
 
-  let token = email.token
+  let token = safeDecryptCredential(email.token || '')
   if (!token) {
-    token = await getToken(email.address, email.password)
+    const password = safeDecryptCredential(email.password)
+    token = await getToken(email.address, password)
   }
 
   await deleteMessageApi(token, messageId)
@@ -248,7 +280,8 @@ export async function deleteDisposableEmailAccount(emailId: number): Promise<voi
   // Try to delete from mail.tm
   if (email.token && email.account_id) {
     try {
-      await deleteAccountApi(email.token, email.account_id)
+      const token = safeDecryptCredential(email.token)
+      await deleteAccountApi(token, email.account_id)
     } catch {
       // Account may already be deleted
     }

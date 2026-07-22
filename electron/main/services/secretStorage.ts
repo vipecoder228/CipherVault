@@ -11,15 +11,11 @@ function encrypt(plain: string): string {
 
 // Decrypt a string stored by encrypt()
 function decrypt(stored: string): string {
-  if (stored.startsWith('plain:')) {
-    return Buffer.from(stored.slice(6), 'base64').toString('utf-8')
-  }
   if (stored.startsWith('enc:')) {
     const buf = Buffer.from(stored.slice(4), 'base64')
     return safeStorage.decryptString(buf)
   }
-  // Legacy: assume plain text
-  return stored
+  throw new Error('Invalid secret format: expected enc: prefix')
 }
 
 export async function saveSecret(key: string, value: string): Promise<void> {

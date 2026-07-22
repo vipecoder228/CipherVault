@@ -256,8 +256,8 @@ export interface IPCChannels {
 
   // Backup
   'backup:export': (backupPassword: string) => Promise<{ success: boolean; path?: string; error?: string }>
-  'backup:import': (backupPassword: string, filePath?: string) => Promise<{ success: boolean; error?: string }>
-  'backup:import-panic': (backupPassword: string, masterPassword?: string, filePath?: string) => Promise<{ success: boolean; error?: string; imported?: number; skipped?: number; errors?: string[] }>
+  'backup:import': (backupPassword: string) => Promise<{ success: boolean; error?: string }>
+  'backup:import-panic': (backupPassword: string, masterPassword?: string) => Promise<{ success: boolean; error?: string; imported?: number; skipped?: number; errors?: string[] }>
 
   // Password Health
   'health:analyze': () => Promise<PasswordHealth>

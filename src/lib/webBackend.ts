@@ -1398,6 +1398,10 @@ export const webHandlers: HandlerMap = {
     )
 
     await saveWebDatabase()
+    // Zero old key material before replacing
+    if (oldKey && oldKey instanceof Uint8Array) {
+      oldKey.fill(0)
+    }
     derivedKey = newKey
     await startAutoLockTimer()
     return { success: true }
@@ -1493,15 +1497,39 @@ export const webHandlers: HandlerMap = {
 
   // Entries
   'entries:list': (_: any, filters?: EntryFilters) => listEntries(filters),
-  'entries:get': (_: any, id: number) => getEntry(id),
-  'entries:create': (_: any, data: CreateEntryPayload) => createEntry(data),
-  'entries:update': (_: any, id: number, data: UpdateEntryPayload) => updateEntry(id, data),
-  'entries:delete': (_: any, id: number) => deleteEntryById(id),
-  'entries:restore': (_: any, id: number) => restoreEntry(id),
-  'entries:permanent-delete': (_: any, id: number) => permanentDeleteEntry(id),
+  'entries:get': (_: any, id: number) => {
+    if (typeof id !== 'number' || id <= 0) throw new Error('Invalid entry ID')
+    return getEntry(id)
+  },
+  'entries:create': (_: any, data: CreateEntryPayload) => {
+    if (!data || typeof data !== 'object' || !data.entry_type) throw new Error('Invalid entry data')
+    const allowedTypes = ['login', 'secure_note', 'card', 'identity']
+    if (!allowedTypes.includes(data.entry_type)) throw new Error('Invalid entry type')
+    return createEntry(data)
+  },
+  'entries:update': (_: any, id: number, data: UpdateEntryPayload) => {
+    if (typeof id !== 'number' || id <= 0) throw new Error('Invalid entry ID')
+    if (!data || typeof data !== 'object') throw new Error('Invalid update data')
+    return updateEntry(id, data)
+  },
+  'entries:delete': (_: any, id: number) => {
+    if (typeof id !== 'number' || id <= 0) throw new Error('Invalid entry ID')
+    return deleteEntryById(id)
+  },
+  'entries:restore': (_: any, id: number) => {
+    if (typeof id !== 'number' || id <= 0) throw new Error('Invalid entry ID')
+    return restoreEntry(id)
+  },
+  'entries:permanent-delete': (_: any, id: number) => {
+    if (typeof id !== 'number' || id <= 0) throw new Error('Invalid entry ID')
+    return permanentDeleteEntry(id)
+  },
   'entries:deleted': () => getDeletedEntries(),
   'entries:cleanup-old': () => cleanupOldDeletedEntries(),
-  'entries:search': (_: any, query: string, filters?: EntryFilters) => searchEntries(query, filters),
+  'entries:search': (_: any, query: string, filters?: EntryFilters) => {
+    if (typeof query !== 'string' || query.length > 1000) throw new Error('Invalid search query')
+    return searchEntries(query, filters)
+  },
   'entries:toggle-favorite': (_: any, id: number) => toggleFavoriteEntry(id),
   'entries:get-history': (_: any, id: number) => getEntryHistoryList(id),
   'entries:get-decrypted-history': (_: any, id: number) => getDecryptedHistory(id),
@@ -1544,6 +1572,13 @@ export const webHandlers: HandlerMap = {
   },
   'settings:set': async (_: any, key: string, value: string) => {
     await getWebDatabase()
+    // Validate settings key against allowlist (same as Electron IPC)
+    const ALLOWED_SETTINGS = new Set([
+      'auto_lock_ms', 'clipboard_ttl_ms', 'theme', 'default_view', 'font_size',
+      'show_icons', 'global_shortcut', 'totp_enabled', 'alarm_enabled',
+      'default_vault_id', 'last_active_vault'
+    ])
+    if (!ALLOWED_SETTINGS.has(key)) throw new Error('Key not allowed')
     webRun('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, value])
     await saveWebDatabase()
   },

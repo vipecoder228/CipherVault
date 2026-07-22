@@ -57,27 +57,19 @@ const capacitorBiometric: BiometricService = {
   },
 }
 
-// Electron biometric implementation (placeholder)
+// Electron biometric implementation (not yet available)
 const electronBiometric: BiometricService = {
   async isAvailable(): Promise<boolean> {
     return false
   },
 
   async authenticate(title: string, subtitle: string, reason: string): Promise<BiometricResult> {
-    return { success: true }
+    return { success: false, error: 'Biometric authentication not available on Electron' }
   },
 
-  async enable(): Promise<void> {
-    localStorage.setItem('biometric_enabled', 'true')
-  },
-
-  async disable(): Promise<void> {
-    localStorage.removeItem('biometric_enabled')
-  },
-
-  async isEnabled(): Promise<boolean> {
-    return localStorage.getItem('biometric_enabled') === 'true'
-  },
+  async enable(): Promise<void> {},
+  async disable(): Promise<void> {},
+  async isEnabled(): Promise<boolean> { return false },
 }
 
 // Web fallback (no biometric support)
@@ -87,7 +79,7 @@ const webBiometric: BiometricService = {
   },
 
   async authenticate(title: string, subtitle: string, reason: string): Promise<BiometricResult> {
-    return { success: true }
+    return { success: false, error: 'Biometric authentication not available on web' }
   },
 
   async enable(): Promise<void> {},

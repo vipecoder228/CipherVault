@@ -6,7 +6,7 @@ const MIGRATIONS = [
     id            INTEGER PRIMARY KEY DEFAULT 1,
     master_hash   TEXT    NOT NULL,
     kdf_salt      TEXT    NOT NULL,
-    kdf_type      TEXT    NOT NULL DEFAULT 'pbkdf2',
+    kdf_type      TEXT    NOT NULL DEFAULT 'argon2id',
     kdf_ops       INTEGER NOT NULL DEFAULT 3,
     totp_secret   TEXT,
     totp_enabled  INTEGER NOT NULL DEFAULT 0,

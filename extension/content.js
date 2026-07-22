@@ -68,9 +68,12 @@
   }
 
   function createAutofillIcon(entry, passwordField) {
+    // Validate entry structure
+    if (!entry || typeof entry.id !== 'number' || typeof entry.title !== 'string') return;
+
     const wrapper = document.createElement('div');
     wrapper.className = CV_ICON_CLASS;
-    wrapper.setAttribute('data-cv-entry-id', entry.id);
+    wrapper.setAttribute('data-cv-entry-id', String(entry.id));
 
     const rect = passwordField.getBoundingClientRect();
     wrapper.style.position = 'absolute';
@@ -78,7 +81,8 @@
     wrapper.style.top = (rect.top + (rect.height - 22) / 2 + window.scrollY) + 'px';
     wrapper.style.zIndex = '2147483647';
 
-    wrapper.title = `CipherVault: ${entry.title}`;
+    // Set title as plain text (safe — no HTML injection)
+    wrapper.title = 'CipherVault: ' + entry.title;
 
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('width', '20');
@@ -117,6 +121,9 @@
   }
 
   function fillForm(username, password) {
+    // Validate inputs are strings
+    if (typeof username !== 'string' || typeof password !== 'string') return;
+
     const forms = findLoginForms();
     for (const form of forms) {
       if (username && form.usernameField) {
@@ -131,9 +138,11 @@
   }
 
   chrome.runtime.onMessage.addListener((msg) => {
-    if (!msg || !msg.action) return;
+    // Validate message structure
+    if (!msg || typeof msg !== 'object' || typeof msg.action !== 'string') return;
 
-    if (msg.action === 'search-result' && msg.entries) {
+    if (msg.action === 'search-result') {
+      if (!Array.isArray(msg.entries)) return;
       removeIcons();
       const forms = findLoginForms();
       for (const form of forms) {
@@ -143,18 +152,23 @@
       }
     }
 
-    if (msg.action === 'entry-result' && msg.entry) {
-      fillForm(msg.entry.username, msg.entry.password);
+    if (msg.action === 'entry-result') {
+      if (!msg.entry || typeof msg.entry !== 'object') return;
+      const { username, password } = msg.entry;
+      fillForm(username || '', password || '');
       removeIcons();
     }
 
-    if (msg.action === 'status' && !msg.unlocked) {
-      removeIcons();
+    if (msg.action === 'status') {
+      if (typeof msg.unlocked !== 'boolean' || !msg.unlocked) {
+        removeIcons();
+      }
     }
   });
 
   function onReady() {
     const domain = window.location.hostname;
+    if (typeof domain !== 'string' || !domain) return;
     chrome.runtime.sendMessage({
       type: 'FROM_CONTENT',
       payload: { action: 'search', domain }

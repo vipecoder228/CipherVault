@@ -1,7 +1,7 @@
 // ─── Anti-Tamper Detection ──────────────────────────────
 // Detects if the application binary has been modified
 
-import { createHash } from 'crypto'
+import { createHash, timingSafeEqual } from 'crypto'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { app } from 'electron'
@@ -15,31 +15,40 @@ export function hashFile(filePath: string): string {
 }
 
 /**
- * Check if critical files have been tampered with
+ * Check if critical files have been tampered with by verifying hashes
  */
 export function verifyIntegrity(): { ok: boolean; tamperedFiles: string[] } {
   const tamperedFiles: string[] = []
 
   try {
-    // Check main process files
     const mainDir = join(app.getAppPath(), 'out', 'main')
-    const criticalFiles = ['index.js']
 
-    for (const file of criticalFiles) {
+    // Known critical files and their expected hashes
+    // These are generated during the build process
+    const hashStorePath = join(app.getAppPath(), 'out', 'main', '.file-hashes.json')
+    let expectedHashes: Record<string, string> = {}
+
+    try {
+      const hashStore = readFileSync(hashStorePath, 'utf-8')
+      expectedHashes = JSON.parse(hashStore)
+    } catch {
+      // No hash store — skip verification (dev mode)
+      return { ok: true, tamperedFiles: [] }
+    }
+
+    for (const [file, expectedHash] of Object.entries(expectedHashes)) {
       const filePath = join(mainDir, file)
       try {
-        readFileSync(filePath) // Just verify it's readable
+        const currentHash = hashFile(filePath)
+        const hashBuf = Buffer.from(currentHash, 'hex')
+        const expectedBuf = Buffer.from(expectedHash, 'hex')
+
+        if (hashBuf.length !== expectedBuf.length || !timingSafeEqual(hashBuf, expectedBuf)) {
+          tamperedFiles.push(file)
+        }
       } catch {
         tamperedFiles.push(file)
       }
-    }
-
-    // Check if Electron ASAR is intact
-    const asarPath = join(app.getAppPath(), 'app.asar')
-    try {
-      readFileSync(asarPath)
-    } catch {
-      tamperedFiles.push('app.asar')
     }
 
     return {

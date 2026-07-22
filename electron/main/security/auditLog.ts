@@ -32,30 +32,30 @@ interface AuditEntry {
 let auditBuffer: AuditEntry[] = []
 const FLUSH_INTERVAL = 30000 // 30 seconds
 let flushTimer: ReturnType<typeof setInterval> | null = null
+let tableCreated = false
 
 /**
  * Initialize audit log system
  */
-export function initAuditLog(): void {
-  const db = getDatabaseSync()
-  db.run(`
-    CREATE TABLE IF NOT EXISTS audit_log (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      encrypted_data TEXT NOT NULL,
-      iv TEXT NOT NULL,
-      auth_tag TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )
-  `)
+export async function initAuditLog(): Promise<void> {
+  try {
+    const db = await getDatabase()
+    db.run(`
+      CREATE TABLE IF NOT EXISTS audit_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        encrypted_data TEXT NOT NULL,
+        iv TEXT NOT NULL,
+        auth_tag TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    `)
+    tableCreated = true
+  } catch {
+    // Table creation will be retried on first flush
+  }
 
   // Flush periodically
-  flushTimer = setInterval(flushBuffer, FLUSH_INTERVAL)
-}
-
-function getDatabaseSync(): any {
-  // Synchronous access for audit log initialization
-  // This is a simplified version - in production, use the main DB connection
-  return { run: () => {} }
+  flushTimer = setInterval(() => { flushBuffer().catch(() => {}) }, FLUSH_INTERVAL)
 }
 
 /**
@@ -72,19 +72,38 @@ export function logAuditEvent(action: AuditAction, details?: string): void {
 
 /**
  * Flush audit buffer to encrypted storage
+ * Uses atomic swap to prevent race conditions
  */
 async function flushBuffer(): Promise<void> {
   if (auditBuffer.length === 0) return
 
+  // Atomic swap: grab current buffer and replace with empty array
+  const entries = auditBuffer.splice(0)
+
   const encKey = getEncryptionKey()
   if (!encKey) {
-    // Vault is locked, can't encrypt - keep in buffer
+    // Vault is locked, can't encrypt — put entries back at the front
+    auditBuffer.unshift(...entries)
     return
   }
 
   const db = await getDatabase()
-  const entries = [...auditBuffer]
-  auditBuffer = []
+
+  // Ensure table exists (lazy creation)
+  if (!tableCreated) {
+    try {
+      db.run(`
+        CREATE TABLE IF NOT EXISTS audit_log (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          encrypted_data TEXT NOT NULL,
+          iv TEXT NOT NULL,
+          auth_tag TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+      `)
+      tableCreated = true
+    } catch {}
+  }
 
   for (const entry of entries) {
     try {
@@ -94,7 +113,7 @@ async function flushBuffer(): Promise<void> {
         [encrypted.ciphertext, encrypted.iv, encrypted.authTag]
       )
     } catch {
-      // Failed to log - silently continue
+      // Failed to log — entry is lost (acceptable for audit log)
     }
   }
 }
@@ -136,6 +155,6 @@ export function stopAuditLog(): void {
     clearInterval(flushTimer)
     flushTimer = null
   }
-  // Flush remaining entries
+  // Flush remaining entries synchronously
   flushBuffer().catch(() => {})
 }

@@ -108,26 +108,71 @@ const handlers: Record<string, (...args: any[]) => any> = {
   },
 
   // Entries
-  'entries:list': (_: unknown, filters?: any) => entriesService.listEntries(filters),
-  'entries:get': (_: unknown, id: number) => entriesService.getEntry(id),
+  'entries:list': (_: unknown, filters?: any) => {
+    // Validate filters structure
+    if (filters && typeof filters === 'object') {
+      const allowedKeys = ['category_id', 'is_favorite', 'entry_type', 'search']
+      for (const key of Object.keys(filters)) {
+        if (!allowedKeys.includes(key)) delete filters[key]
+      }
+    }
+    return entriesService.listEntries(filters)
+  },
+  'entries:get': (_: unknown, id: number) => {
+    if (typeof id !== 'number' || id <= 0 || id > 2147483647) throw new Error('Invalid entry ID')
+    return entriesService.getEntry(id)
+  },
   'entries:create': (_: unknown, data: any) => {
     if (!data || typeof data !== 'object' || !data.entry_type) throw new Error('Invalid entry data')
+    const allowedTypes = ['login', 'secure_note', 'card', 'identity']
+    if (!allowedTypes.includes(data.entry_type)) throw new Error('Invalid entry type')
     return entriesService.createEntry(data)
   },
   'entries:update': (_: unknown, id: number, data: any) => {
+    if (typeof id !== 'number' || id <= 0 || id > 2147483647) throw new Error('Invalid entry ID')
     if (!data || typeof data !== 'object') throw new Error('Invalid update data')
     return entriesService.updateEntry(id, data)
   },
-  'entries:delete': (_: unknown, id: number) => entriesService.deleteEntryById(id),
-  'entries:restore': (_: unknown, id: number) => entriesService.restoreEntry(id),
-  'entries:permanent-delete': (_: unknown, id: number) => entriesService.permanentDeleteEntry(id),
+  'entries:delete': (_: unknown, id: number) => {
+    if (typeof id !== 'number' || id <= 0 || id > 2147483647) throw new Error('Invalid entry ID')
+    return entriesService.deleteEntryById(id)
+  },
+  'entries:restore': (_: unknown, id: number) => {
+    if (typeof id !== 'number' || id <= 0 || id > 2147483647) throw new Error('Invalid entry ID')
+    return entriesService.restoreEntry(id)
+  },
+  'entries:permanent-delete': (_: unknown, id: number) => {
+    if (typeof id !== 'number' || id <= 0 || id > 2147483647) throw new Error('Invalid entry ID')
+    return entriesService.permanentDeleteEntry(id)
+  },
   'entries:deleted': () => entriesService.getDeletedEntries(),
   'entries:cleanup-old': () => entriesService.cleanupOldDeletedEntries(),
-  'entries:search': (_: unknown, query: string, filters?: any) => entriesService.searchEntries(query, filters),
-  'entries:toggle-favorite': (_: unknown, id: number) => entriesService.toggleFavoriteEntry(id),
-  'entries:get-history': (_: unknown, id: number) => entriesService.getEntryHistoryList(id),
-  'entries:get-decrypted-history': (_: unknown, id: number) => entriesService.getDecryptedHistory(id),
-  'entries:get-totp': (_: unknown, id: number) => entriesService.getEntryTOTP(id),
+  'entries:search': (_: unknown, query: string, filters?: any) => {
+    if (typeof query !== 'string' || query.length > 1000) throw new Error('Invalid search query')
+    if (filters && typeof filters === 'object') {
+      const allowedKeys = ['category_id', 'is_favorite', 'entry_type']
+      for (const key of Object.keys(filters)) {
+        if (!allowedKeys.includes(key)) delete filters[key]
+      }
+    }
+    return entriesService.searchEntries(query, filters)
+  },
+  'entries:toggle-favorite': (_: unknown, id: number) => {
+    if (typeof id !== 'number' || id <= 0 || id > 2147483647) throw new Error('Invalid entry ID')
+    return entriesService.toggleFavoriteEntry(id)
+  },
+  'entries:get-history': (_: unknown, id: number) => {
+    if (typeof id !== 'number' || id <= 0 || id > 2147483647) throw new Error('Invalid entry ID')
+    return entriesService.getEntryHistoryList(id)
+  },
+  'entries:get-decrypted-history': (_: unknown, id: number) => {
+    if (typeof id !== 'number' || id <= 0 || id > 2147483647) throw new Error('Invalid entry ID')
+    return entriesService.getDecryptedHistory(id)
+  },
+  'entries:get-totp': (_: unknown, id: number) => {
+    if (typeof id !== 'number' || id <= 0 || id > 2147483647) throw new Error('Invalid entry ID')
+    return entriesService.getEntryTOTP(id)
+  },
 
   // Alarm mode — bypass key check
   'entries:force-list': () => {
@@ -136,6 +181,7 @@ const handlers: Record<string, (...args: any[]) => any> = {
   },
   'entries:force-delete': (_: unknown, id: number) => {
     if (!vaultService.isAlarmMode()) throw new Error('Not in alarm mode')
+    if (typeof id !== 'number' || id <= 0 || id > 2147483647) throw new Error('Invalid entry ID')
     return entriesService.forcePermanentDeleteEntry(id)
   },
   'entries:panic-backup': () => {
@@ -167,10 +213,13 @@ const handlers: Record<string, (...args: any[]) => any> = {
     return createCategory(db, data.name, data.icon, data.color)
   },
   'categories:update': async (_: unknown, id: number, data: any) => {
+    if (typeof id !== 'number' || id <= 0 || id > 2147483647) throw new Error('Invalid category ID')
+    if (!data || typeof data !== 'object') throw new Error('Invalid category data')
     const db = await getDatabase()
     return updateCategory(db, id, data)
   },
   'categories:delete': async (_: unknown, id: number) => {
+    if (typeof id !== 'number' || id <= 0 || id > 2147483647) throw new Error('Invalid category ID')
     const db = await getDatabase()
     return deleteCategory(db, id)
   },
@@ -210,29 +259,41 @@ const handlers: Record<string, (...args: any[]) => any> = {
   // Disposable Emails
   'disposable:create': () => disposableEmailService.createDisposableEmailAddress(),
   'disposable:list': () => disposableEmailService.listDisposableEmails(),
-  'disposable:messages': (_: unknown, emailId: number) => disposableEmailService.getDisposableEmailMessages(emailId),
-  'disposable:message': (_: unknown, emailId: number, messageId: string) => disposableEmailService.getDisposableEmailMessage(emailId, messageId),
-  'disposable:delete-message': (_: unknown, emailId: number, messageId: string) => disposableEmailService.deleteDisposableEmailMessage(emailId, messageId),
-  'disposable:delete-account': (_: unknown, emailId: number) => disposableEmailService.deleteDisposableEmailAccount(emailId),
+  'disposable:messages': (_: unknown, emailId: number) => {
+    if (typeof emailId !== 'number' || emailId <= 0) throw new Error('Invalid email ID')
+    return disposableEmailService.getDisposableEmailMessages(emailId)
+  },
+  'disposable:message': (_: unknown, emailId: number, messageId: string) => {
+    if (typeof emailId !== 'number' || emailId <= 0) throw new Error('Invalid email ID')
+    if (typeof messageId !== 'string' || messageId.length > 100) throw new Error('Invalid message ID')
+    return disposableEmailService.getDisposableEmailMessage(emailId, messageId)
+  },
+  'disposable:delete-message': (_: unknown, emailId: number, messageId: string) => {
+    if (typeof emailId !== 'number' || emailId <= 0) throw new Error('Invalid email ID')
+    if (typeof messageId !== 'string' || messageId.length > 100) throw new Error('Invalid message ID')
+    return disposableEmailService.deleteDisposableEmailMessage(emailId, messageId)
+  },
+  'disposable:delete-account': (_: unknown, emailId: number) => {
+    if (typeof emailId !== 'number' || emailId <= 0) throw new Error('Invalid email ID')
+    return disposableEmailService.deleteDisposableEmailAccount(emailId)
+  },
 
   // Backup
   'backup:export': (_: unknown, backupPassword: string) => backupService.exportEncryptedBackup(backupPassword),
-  'backup:import': (_: unknown, backupPassword: string, filePath?: string) => backupService.importEncryptedBackup(backupPassword, filePath),
-  'backup:import-panic': async (_: unknown, backupPassword: string, masterPassword?: string, filePath?: string) => {
+  'backup:import': (_: unknown, backupPassword: string) => backupService.importEncryptedBackup(backupPassword),
+  'backup:import-panic': async (_: unknown, backupPassword: string, masterPassword?: string) => {
     const win = getWindow()
     if (!win) return { success: false, error: ERRORS.BACKUP_NO_WINDOW }
 
-    if (!filePath) {
-      const result = await dialog.showOpenDialog(win, {
-        title: 'Import Panic Backup',
-        filters: [{ name: 'Encrypted Backup', extensions: ['enc'] }],
-        properties: ['openFile'],
-      })
-      if (result.canceled || !result.filePaths[0]) {
-        return { success: false, error: ERRORS.BACKUP_CANCELLED }
-      }
-      filePath = result.filePaths[0]
+    const result = await dialog.showOpenDialog(win, {
+      title: 'Import Panic Backup',
+      filters: [{ name: 'Encrypted Backup', extensions: ['enc'] }],
+      properties: ['openFile'],
+    })
+    if (result.canceled || !result.filePaths[0]) {
+      return { success: false, error: ERRORS.BACKUP_CANCELLED }
     }
+    const filePath = result.filePaths[0]
 
     try {
       const { pbkdf2, createDecipheriv } = await import('crypto')
@@ -384,7 +445,7 @@ const handlers: Record<string, (...args: any[]) => any> = {
   'integrity:check': () => checkIntegrity(),
 
   // API Server
-  'api:start': () => {
+  'api:start': async () => {
     const { startApiServer } = require('../services/api.service')
     return startApiServer()
   },

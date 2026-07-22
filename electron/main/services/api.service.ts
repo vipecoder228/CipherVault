@@ -1,5 +1,7 @@
-import { createServer, Server } from 'http'
+import { createServer, Server } from 'https'
+import { timingSafeEqual } from 'crypto'
 import { getDatabase } from '../db/connection'
+import { getLocalhostCert } from './tlsCert'
 import { getEntries, getEntryById } from '../db/queries/entries.queries'
 import { decryptJSON } from '../crypto/encryption'
 import { getEncryptionKey, getActiveVaultId } from './vault.service'
@@ -41,7 +43,8 @@ function authenticateRequest(req: any): boolean {
   const authHeader = req.headers['authorization']
   if (!authHeader || !authHeader.startsWith('Bearer ')) return false
   const token = authHeader.slice(7)
-  return token === apiKey
+  if (!apiKey || token.length !== apiKey.length) return false
+  return timingSafeEqual(Buffer.from(token), Buffer.from(apiKey))
 }
 
 function parseBody(req: any): Promise<any> {
@@ -60,7 +63,7 @@ async function handleRequest(req: any, res: any): Promise<void> {
   // CORS headers — only allow localhost (local API)
   const origin = req.headers['origin'] || ''
   const isLocal = origin.includes('localhost') || origin.includes('127.0.0.1') || !origin
-  res.setHeader('Access-Control-Allow-Origin', isLocal ? origin : 'http://localhost:19824')
+  res.setHeader('Access-Control-Allow-Origin', isLocal ? 'https://localhost:19824' : 'https://localhost:19824')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type')
   res.setHeader('X-Content-Type-Options', 'nosniff')
@@ -235,20 +238,21 @@ async function handleRequest(req: any, res: any): Promise<void> {
 
     res.writeHead(404, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({ error: 'Not found' }))
-  } catch (err: any) {
+  } catch {
     res.writeHead(500, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify({ error: err.message || 'Internal error' }))
+    res.end(JSON.stringify({ error: 'Internal error' }))
   }
 }
 
-export function startApiServer(): { port: number; apiKey: string } {
+export async function startApiServer(): Promise<{ port: number; apiKey: string }> {
   if (apiServer) return { port: API_PORT, apiKey: apiKey! }
 
   apiKey = generateApiKey()
-  apiServer = createServer(handleRequest)
+  const { cert, key } = await getLocalhostCert()
+  apiServer = createServer({ cert, key }, handleRequest)
 
   apiServer.listen(API_PORT, '127.0.0.1', () => {
-    console.log(`[CipherVault] API server listening on http://127.0.0.1:${API_PORT}`)
+    console.log(`[CipherVault] API server listening on https://127.0.0.1:${API_PORT}`)
   })
 
   return { port: API_PORT, apiKey }

@@ -46,7 +46,7 @@ describe('Email/Telegram Service Logic', () => {
     })
 
     it('should handle multiple breaches', () => {
-      const count = 5
+      const count: number = 5
       const suffix = count !== 1 ? 'es' : ''
       expect(`breach${suffix}`).toBe('breaches')
     })

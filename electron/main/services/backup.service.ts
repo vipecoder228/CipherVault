@@ -56,22 +56,19 @@ export async function exportEncryptedBackup(
 }
 
 export async function importEncryptedBackup(
-  backupPassword: string,
-  filePath?: string
+  backupPassword: string
 ): Promise<{ success: boolean; error?: string }> {
-  if (!filePath) {
-    const win = getWindow()
-    if (!win) return { success: false, error: ERRORS.BACKUP_NO_WINDOW }
-    const result = await dialog.showOpenDialog(win, {
-      title: 'Import Encrypted Backup',
-      filters: [{ name: 'CipherVault Backup', extensions: ['ciphervault'] }],
-      properties: ['openFile'],
-    })
-    if (result.canceled || !result.filePaths[0]) {
-      return { success: false }
-    }
-    filePath = result.filePaths[0]
+  const win = getWindow()
+  if (!win) return { success: false, error: ERRORS.BACKUP_NO_WINDOW }
+  const result = await dialog.showOpenDialog(win, {
+    title: 'Import Encrypted Backup',
+    filters: [{ name: 'CipherVault Backup', extensions: ['ciphervault'] }],
+    properties: ['openFile'],
+  })
+  if (result.canceled || !result.filePaths[0]) {
+    return { success: false }
   }
+  const filePath = result.filePaths[0]
 
   const fileBuffer = readFileSync(filePath)
 

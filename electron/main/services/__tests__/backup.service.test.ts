@@ -118,10 +118,19 @@ describe('BackupService', () => {
 
   // ─── importEncryptedBackup ──────────────────────────────
   describe('importEncryptedBackup', () => {
+    beforeEach(() => {
+      // Mock dialog.showOpenDialog to return a file path
+      vi.mocked(dialog.showOpenDialog).mockResolvedValue({
+        canceled: false,
+        filePaths: ['/backup.ciphervault'],
+      })
+      vi.mocked(getWindow).mockReturnValue({} as any)
+    })
+
     it('should return error for file too small', async () => {
       vi.mocked(readFileSync).mockReturnValue(Buffer.alloc(10))
 
-      const result = await importEncryptedBackup('testpass', '/backup.ciphervault')
+      const result = await importEncryptedBackup('testpass')
 
       expect(result).toEqual({ success: false, error: 'Файл бэкапа слишком мал' })
     })
@@ -131,7 +140,7 @@ describe('BackupService', () => {
       buf.write('WRONGMAGIC00', 0, 'ascii')
       vi.mocked(readFileSync).mockReturnValue(buf)
 
-      const result = await importEncryptedBackup('testpass', '/backup.ciphervault')
+      const result = await importEncryptedBackup('testpass')
 
       expect(result).toEqual({ success: false, error: 'Неверный формат файла бэкапа' })
     })
@@ -142,7 +151,7 @@ describe('BackupService', () => {
       buf[11] = 99
       vi.mocked(readFileSync).mockReturnValue(buf)
 
-      const result = await importEncryptedBackup('testpass', '/backup.ciphervault')
+      const result = await importEncryptedBackup('testpass')
 
       expect(result).toEqual({ success: false, error: 'Неподдерживаемая версия бэкапа' })
     })
@@ -165,7 +174,7 @@ describe('BackupService', () => {
       const mockDecipher = makeMockDecipher()
       vi.mocked(createDecipheriv).mockReturnValue(mockDecipher as any)
 
-      const result = await importEncryptedBackup('testpass', '/backup.ciphervault')
+      const result = await importEncryptedBackup('testpass')
 
       expect(result).toEqual({ success: true })
       expect(splitDerivedKey).toHaveBeenCalled()
