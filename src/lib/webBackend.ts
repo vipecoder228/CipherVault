@@ -1668,6 +1668,13 @@ export const webHandlers: HandlerMap = {
     webRun('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, value])
     await saveWebDatabase()
   },
+  'settings:set-secure': async (_: any, key: string, value: string) => {
+    // On web, store in localStorage (no OS keychain available)
+    localStorage.setItem(`cv_secure_${key}`, value)
+  },
+  'settings:get-secure': async (_: any, key: string) => {
+    return localStorage.getItem(`cv_secure_${key}`)
+  },
 
   // Health
   'health:analyze': () => analyzePasswordHealthLocal(),
