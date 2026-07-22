@@ -1247,6 +1247,18 @@ async function analyzePasswordHealthLocal(): Promise<PasswordHealth> {
         if (breachResult.breached) {
           issues.push('breached')
           exposed++
+          // Send push notification for breach alert
+          try {
+            const { getPushNotification } = await import('../services/pushNotificationService')
+            const push = getPushNotification()
+            if (await push.hasPermission()) {
+              await push.sendLocalNotification({
+                title: '⚠️ Breach Detected',
+                body: `"${title}" was found in ${breachResult.count} data breaches. Change this password immediately.`,
+                data: { entryId: entry.id, breachCount: breachResult.count },
+              })
+            }
+          } catch {}
         }
       } catch {}
 
