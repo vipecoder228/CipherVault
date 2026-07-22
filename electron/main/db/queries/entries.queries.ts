@@ -1,6 +1,7 @@
 import type { Database } from 'sql.js'
 import type { EncryptedEntry, EntryFilters } from '../../../../shared/types'
 import { queryAll, queryOne } from '../helpers'
+import { encryptMetadata, decryptMetadata } from '../../services/metadataEncryption'
 
 export function getEntries(
   db: Database,
@@ -31,7 +32,14 @@ export function getEntries(
 
   query += ' ORDER BY updated_at DESC'
 
-  return queryAll<EncryptedEntry>(db, query, params)
+  const entries = queryAll<EncryptedEntry>(db, query, params)
+
+  // Decrypt metadata for display
+  return entries.map(entry => ({
+    ...entry,
+    display_title: decryptMetadata(entry.display_title),
+    display_url: decryptMetadata(entry.display_url),
+  }))
 }
 
 export function getEntryById(
@@ -77,10 +85,14 @@ export function createEntry(
   vaultId: number = 1,
   displayUrl: string = ''
 ): EncryptedEntry {
+  // Encrypt metadata before storing
+  const encTitle = encryptMetadata(displayTitle) ?? displayTitle
+  const encUrl = encryptMetadata(displayUrl) ?? displayUrl
+
   db.run(
     `INSERT INTO encrypted_entries (entry_type, encrypted_data, iv, auth_tag, display_title, category_id, is_favorite, vault_id, display_url)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [entryType, encryptedData, iv, authTag, displayTitle, categoryId, isFavorite ? 1 : 0, vaultId, displayUrl]
+    [entryType, encryptedData, iv, authTag, encTitle, categoryId, isFavorite ? 1 : 0, vaultId, encUrl]
   )
 
   const lastId = db.exec('SELECT last_insert_rowid()')[0].values[0][0] as number
@@ -101,11 +113,11 @@ export function updateEntry(
     const params: any[] = [encryptedData, iv, authTag]
     if (displayTitle !== undefined) {
       sets.push('display_title = ?')
-      params.push(displayTitle)
+      params.push(encryptMetadata(displayTitle) ?? displayTitle)
     }
     if (displayUrl !== undefined) {
       sets.push('display_url = ?')
-      params.push(displayUrl)
+      params.push(encryptMetadata(displayUrl) ?? displayUrl)
     }
     params.push(id)
     db.run(`UPDATE encrypted_entries SET ${sets.join(', ')} WHERE id = ?`, params)
@@ -172,9 +184,10 @@ export function searchEntries(
   vaultId?: number,
   filters?: EntryFilters
 ): EncryptedEntry[] {
-  const escapedQuery = query.replace(/\\/g, '\\\\').replace(/[%_]/g, '\\$&')
-  let sql = `SELECT * FROM encrypted_entries WHERE deleted_at IS NULL AND vault_id = ? AND (display_title LIKE ? ESCAPE '\\' OR entry_type LIKE ? ESCAPE '\\' OR display_url LIKE ? ESCAPE '\\' OR encrypted_data LIKE ? ESCAPE '\\')`
-  const params: any[] = [vaultId ?? 1, `%${escapedQuery}%`, `%${escapedQuery}%`, `%${escapedQuery}%`, `%${escapedQuery}%`]
+  // Since display_title is now encrypted, we can't use SQL LIKE.
+  // Fetch all entries and filter in memory after decryption.
+  let sql = `SELECT * FROM encrypted_entries WHERE deleted_at IS NULL AND vault_id = ?`
+  const params: any[] = [vaultId ?? 1]
 
   if (filters) {
     if (filters.category_id !== undefined && filters.category_id !== null) {
@@ -193,5 +206,15 @@ export function searchEntries(
 
   sql += ' ORDER BY updated_at DESC'
 
-  return queryAll<EncryptedEntry>(db, sql, params)
+  const allEntries = queryAll<EncryptedEntry>(db, sql, params)
+
+  // Filter by search query after decryption
+  if (!query) return allEntries
+
+  const lowerQuery = query.toLowerCase()
+  return allEntries.filter(entry => {
+    const title = decryptMetadata(entry.display_title).toLowerCase()
+    const url = decryptMetadata(entry.display_url).toLowerCase()
+    return title.includes(lowerQuery) || url.includes(lowerQuery) || entry.entry_type.toLowerCase().includes(lowerQuery)
+  })
 }

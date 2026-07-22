@@ -62,6 +62,40 @@ function clearPanicKey(): void {
   panicKey = null
 }
 
+// ─── Metadata Encryption ───────────────────────────────
+
+async function encryptMetadata(plaintext: string): Promise<string> {
+  if (!plaintext) return ''
+  const encKey = getEncryptionKey()
+  if (!encKey) return plaintext
+  try {
+    const result = await encryptJSON({ value: plaintext }, encKey)
+    return JSON.stringify(result)
+  } catch {
+    return plaintext
+  }
+}
+
+function decryptMetadata(encrypted: string): string {
+  if (!encrypted) return ''
+  const encKey = getEncryptionKey()
+  if (!encKey) return encrypted
+  try {
+    const parsed = JSON.parse(encrypted)
+    if (parsed && typeof parsed === 'object' && 'iv' in parsed && 'ciphertext' in parsed && 'authTag' in parsed) {
+      // Synchronous decrypt for web — decryptJSON is sync in web backend
+      const data = decryptJSON<{ value: string }>(
+        { iv: parsed.iv, ciphertext: parsed.ciphertext, authTag: parsed.authTag },
+        encKey
+      )
+      return data.value
+    }
+  } catch {
+    // Not encrypted — legacy plaintext
+  }
+  return encrypted
+}
+
 // ─── Rate Limiting ──────────────────────────────────────
 
 function cleanupOldAttempts(): void {
@@ -330,7 +364,14 @@ async function listEntries(filters?: EntryFilters): Promise<EncryptedEntry[]> {
   }
 
   query += ' ORDER BY updated_at DESC'
-  return webQueryAll<EncryptedEntry>(query, params)
+  const entries = webQueryAll<EncryptedEntry>(query, params)
+
+  // Decrypt metadata for display
+  return entries.map(entry => ({
+    ...entry,
+    display_title: decryptMetadata(entry.display_title),
+    display_url: decryptMetadata(entry.display_url),
+  }))
 }
 
 async function getEntry(id: number): Promise<DecryptedEntry | null> {
@@ -349,8 +390,8 @@ async function getEntry(id: number): Promise<DecryptedEntry | null> {
   )
   decrypted.id = row.id
   decrypted.entry_type = row.entry_type
-  decrypted.display_title = row.display_title
-  decrypted.display_url = row.display_url
+  decrypted.display_title = decryptMetadata(row.display_title)
+  decrypted.display_url = decryptMetadata(row.display_url)
   decrypted.category_id = row.category_id
   decrypted.is_favorite = !!row.is_favorite
   decrypted.created_at = row.created_at
@@ -385,6 +426,10 @@ async function createEntry(data: CreateEntryPayload): Promise<EncryptedEntry> {
 
   const encrypted = await encryptJSON(entryData, encKey)
 
+  // Encrypt metadata before storing
+  const encTitle = await encryptMetadata(data.title || data.entry_type)
+  const encUrl = await encryptMetadata(data.url || '')
+
   webRun(
     `INSERT INTO encrypted_entries (entry_type, encrypted_data, iv, auth_tag, display_title, category_id, is_favorite, vault_id, display_url)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -393,12 +438,11 @@ async function createEntry(data: CreateEntryPayload): Promise<EncryptedEntry> {
       encrypted.ciphertext,
       encrypted.iv,
       encrypted.authTag,
-      // TODO: Consider encrypting display_title for additional metadata protection
-      data.title || data.entry_type,
+      encTitle,
       data.category_id ?? null,
       data.is_favorite ? 1 : 0,
       activeVaultId,
-      data.url || '',
+      encUrl,
     ]
   )
 
@@ -461,12 +505,17 @@ async function updateEntry(id: number, data: UpdateEntryPayload): Promise<void> 
   )
 
   const encrypted = await encryptJSON(updatedData, encKey)
-  const displayTitle = data.title ?? existing.display_title
+  // Use new title if provided, otherwise decrypt existing
+  const displayTitle = data.title ?? decryptMetadata(existing.display_title)
   const displayUrl = data.url ?? updatedData.url
+
+  // Encrypt metadata before storing
+  const encTitle = await encryptMetadata(displayTitle)
+  const encUrl = await encryptMetadata(displayUrl)
 
   webRun(
     `UPDATE encrypted_entries SET encrypted_data = ?, iv = ?, auth_tag = ?, display_title = ?, display_url = ?, updated_at = datetime('now') WHERE id = ?`,
-    [encrypted.ciphertext, encrypted.iv, encrypted.authTag, displayTitle, displayUrl, id]
+    [encrypted.ciphertext, encrypted.iv, encrypted.authTag, encTitle, encUrl, id]
   )
 
   await saveWebDatabase()
@@ -520,9 +569,9 @@ async function searchEntries(query: string, filters?: EntryFilters): Promise<Enc
   const encKey = getEncryptionKey()
   if (!encKey) return []
 
-  const escapedQuery = query.replace(/\\/g, '\\\\').replace(/[%_]/g, '\\$&')
-  let sql = `SELECT * FROM encrypted_entries WHERE deleted_at IS NULL AND vault_id = ? AND (display_title LIKE ? ESCAPE '\\' OR entry_type LIKE ? ESCAPE '\\' OR display_url LIKE ? ESCAPE '\\')`
-  const params: any[] = [activeVaultId, `%${escapedQuery}%`, `%${escapedQuery}%`, `%${escapedQuery}%`]
+  // Since display_title is now encrypted, fetch all and filter in memory
+  let sql = `SELECT * FROM encrypted_entries WHERE deleted_at IS NULL AND vault_id = ?`
+  const params: any[] = [activeVaultId]
 
   if (filters) {
     if (filters.category_id !== undefined && filters.category_id !== null) {
@@ -540,7 +589,17 @@ async function searchEntries(query: string, filters?: EntryFilters): Promise<Enc
   }
 
   sql += ' ORDER BY updated_at DESC'
-  return webQueryAll<EncryptedEntry>(sql, params)
+  const allEntries = webQueryAll<EncryptedEntry>(sql, params)
+
+  // Filter by search query after decryption
+  if (!query) return allEntries
+
+  const lowerQuery = query.toLowerCase()
+  return allEntries.filter(entry => {
+    const title = decryptMetadata(entry.display_title).toLowerCase()
+    const url = decryptMetadata(entry.display_url).toLowerCase()
+    return title.includes(lowerQuery) || url.includes(lowerQuery) || entry.entry_type.toLowerCase().includes(lowerQuery)
+  })
 }
 
 async function toggleFavoriteEntry(id: number): Promise<void> {

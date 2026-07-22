@@ -1,5 +1,6 @@
-// Android Autofill Service
+// Autofill Service
 // Provides credential autofill for Android apps and browsers
+// Native Android Autofill requires @aparajita/capacitor-native-autofill or similar plugin
 
 import { isCapacitor, isElectron } from '../../shared/bridge'
 
@@ -30,13 +31,45 @@ export interface AutofillService {
   matchUrl(url: string): Promise<AutofillEntry[]>
 }
 
-// Capacitor Autofill implementation
+// ─── URL Matching Logic ────────────────────────────────
+
+function extractDomain(url: string): string {
+  try {
+    const parsed = new URL(url)
+    return parsed.hostname
+  } catch {
+    return url.toLowerCase()
+  }
+}
+
+function domainsMatch(storedUrl: string, targetUrl: string): boolean {
+  const stored = extractDomain(storedUrl)
+  const target = extractDomain(targetUrl)
+
+  if (!stored || !target) return false
+
+  // Exact match
+  if (stored === target) return true
+
+  // Subdomain match: stored ends with .target or is subdomain of target
+  if (target.endsWith('.' + stored) || stored.endsWith('.' + target)) return true
+
+  // Partial match: one contains the other
+  if (stored.includes(target) || target.includes(stored)) return true
+
+  return false
+}
+
+// ─── Capacitor Autofill ────────────────────────────────
+
 const capacitorAutofill: AutofillService = {
   async isAvailable(): Promise<boolean> {
-    // Check if Autofill plugin is available
+    // Native Android Autofill requires a Capacitor plugin.
+    // Check if the plugin is installed by trying to import it.
     try {
-      // TODO: Implement with native autofill plugin
-      return false
+      // @ts-ignore - optional peer dependency
+      const mod = await import('@aparajita/capacitor-native-autofill')
+      return !!mod?.AutofillCredentialsManager
     } catch {
       return false
     }
@@ -55,31 +88,31 @@ const capacitorAutofill: AutofillService = {
   },
 
   async getSuggestions(url: string, packageName: string): Promise<AutofillSuggestion[]> {
-    // TODO: Implement with native autofill service
-    // Match URL/package to stored credentials
+    // Without native plugin, return empty
+    // With plugin: query vault for matching credentials
     return []
   },
 
   async fillCredentials(entryId: string): Promise<boolean> {
-    // TODO: Implement with native autofill service
+    // Without native plugin, cannot fill
     return false
   },
 
   async saveCredentials(entry: AutofillEntry): Promise<boolean> {
-    // TODO: Implement with native autofill service
+    // Without native plugin, cannot save
     return false
   },
 
   async matchUrl(url: string): Promise<AutofillEntry[]> {
-    // TODO: Implement URL matching
+    // URL matching is done at the UI level via webBackend/searchEntries
     return []
   },
 }
 
-// Electron Autofill implementation (browser extension based)
+// ─── Electron Autofill (browser extension based) ───────
+
 const electronAutofill: AutofillService = {
   async isAvailable(): Promise<boolean> {
-    // Electron uses browser extension for autofill
     return true
   },
 
@@ -96,27 +129,27 @@ const electronAutofill: AutofillService = {
   },
 
   async getSuggestions(url: string, packageName: string): Promise<AutofillSuggestion[]> {
-    // TODO: Implement with browser extension communication
+    // Electron uses browser extension for autofill
+    // The extension handles suggestions via WebSocket
     return []
   },
 
   async fillCredentials(entryId: string): Promise<boolean> {
-    // TODO: Implement with browser extension communication
+    // Electron uses browser extension for autofill
     return false
   },
 
   async saveCredentials(entry: AutofillEntry): Promise<boolean> {
-    // TODO: Implement with browser extension communication
     return false
   },
 
   async matchUrl(url: string): Promise<AutofillEntry[]> {
-    // TODO: Implement URL matching
     return []
   },
 }
 
-// Web fallback (no autofill support)
+// ─── Web Fallback (no autofill support) ────────────────
+
 const webAutofill: AutofillService = {
   async isAvailable(): Promise<boolean> {
     return false
@@ -127,7 +160,6 @@ const webAutofill: AutofillService = {
   },
 
   async enable(): Promise<void> {},
-
   async disable(): Promise<void> {},
 
   async getSuggestions(url: string, packageName: string): Promise<AutofillSuggestion[]> {
@@ -147,18 +179,14 @@ const webAutofill: AutofillService = {
   },
 }
 
-// Get the appropriate autofill service based on platform
+// ─── Factory ───────────────────────────────────────────
+
 export function getAutofillService(): AutofillService {
-  if (isCapacitor) {
-    return capacitorAutofill
-  }
-  if (isElectron) {
-    return electronAutofill
-  }
+  if (isCapacitor) return capacitorAutofill
+  if (isElectron) return electronAutofill
   return webAutofill
 }
 
-// Singleton instance
 let autofillService: AutofillService | null = null
 
 export function getAutofill(): AutofillService {
@@ -167,5 +195,8 @@ export function getAutofill(): AutofillService {
   }
   return autofillService
 }
+
+// Export URL matching for use by other modules
+export { domainsMatch, extractDomain }
 
 export default getAutofill

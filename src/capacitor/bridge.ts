@@ -18,17 +18,32 @@ const capacitorClipboard = {
   },
 }
 
-// Biometric authentication (placeholder - needs native plugin)
+// Capacitor Biometric implementation via @capgo/capacitor-native-biometric
 const capacitorBiometric = {
   async isAvailable(): Promise<boolean> {
-    // TODO: Implement with native biometric plugin
-    return false
+    try {
+      const { NativeBiometric } = await import('@capgo/capacitor-native-biometric')
+      const result = await NativeBiometric.isAvailable({ useFallback: true })
+      return result.isAvailable
+    } catch {
+      return false
+    }
   },
 
   async authenticate(title: string, subtitle: string, reason: string): Promise<boolean> {
-    // TODO: Implement with native biometric plugin
-    // For now, return true (no biometric required)
-    return true
+    try {
+      const { NativeBiometric } = await import('@capgo/capacitor-native-biometric')
+      await NativeBiometric.verifyIdentity({
+        title,
+        subtitle,
+        reason,
+        negativeButtonText: 'Отмена',
+        useFallback: true,
+      })
+      return true
+    } catch {
+      return false
+    }
   },
 }
 
@@ -103,8 +118,6 @@ const capacitorDialog = {
     filters?: { name: string; extensions: string[] }[]
     properties?: string[]
   }): Promise<{ filePaths: string[] }> {
-    // Capacitor doesn't have a direct file picker like Electron
-    // We'll use a web-based file input as fallback
     return new Promise((resolve) => {
       const input = document.createElement('input')
       input.type = 'file'
@@ -130,7 +143,6 @@ const capacitorDialog = {
     defaultPath?: string
     filters?: { name: string; extensions: string[] }[]
   }): Promise<{ filePath: string }> {
-    // Use a web-based approach
     return new Promise((resolve) => {
       const input = document.createElement('input')
       input.type = 'file'
@@ -148,31 +160,15 @@ const capacitorDialog = {
   },
 }
 
-// Capacitor Database implementation (using Preferences as simple storage)
+// Capacitor Database — NOT USED
+// The app uses webDb.ts (sql.js + Capacitor Filesystem) for database operations.
+// This stub exists only to satisfy the PlatformBridge interface.
 const capacitorDatabase = {
-  async init(dbPath: string): Promise<void> {
-    // Initialize database storage
-    console.log('Database initialized at:', dbPath)
-  },
-
-  async run(sql: string, params?: any[]): Promise<void> {
-    // TODO: Implement SQLite with sql.js + Capacitor filesystem
-    console.log('SQL run:', sql, params)
-  },
-
-  async query(sql: string, params?: any[]): Promise<any[]> {
-    // TODO: Implement SQLite with sql.js + Capacitor filesystem
-    console.log('SQL query:', sql, params)
-    return []
-  },
-
-  async close(): Promise<void> {
-    // Close database
-  },
-
-  getDatabasePath(): string {
-    return 'vault.db'
-  },
+  async init(): Promise<void> {},
+  async run(): Promise<void> {},
+  async query(): Promise<any[]> { return [] },
+  async close(): Promise<void> {},
+  getDatabasePath(): string { return 'vault.db' },
 }
 
 // Create Capacitor platform bridge
