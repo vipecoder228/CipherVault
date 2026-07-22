@@ -1670,7 +1670,7 @@ export const webHandlers: HandlerMap = {
   },
   'settings:set-secure': async (_: any, key: string, value: string) => {
     // On web, encrypt before storing in localStorage (no OS keychain available)
-    const { encryptWithKey, getDeviceKey } = await import('../services/googleDriveSync')
+    const { encryptWithKey, getDeviceKey } = await import('./secureStorage')
     const deviceKey = await getDeviceKey()
     const encrypted = await encryptWithKey(value, deviceKey)
     localStorage.setItem(`cv_secure_${key}`, encrypted)
@@ -1678,7 +1678,7 @@ export const webHandlers: HandlerMap = {
   'settings:get-secure': async (_: any, key: string) => {
     const encrypted = localStorage.getItem(`cv_secure_${key}`)
     if (!encrypted) return null
-    const { decryptWithKey, getDeviceKey } = await import('../services/googleDriveSync')
+    const { decryptWithKey, getDeviceKey } = await import('./secureStorage')
     const deviceKey = await getDeviceKey()
     return decryptWithKey(encrypted, deviceKey)
   },

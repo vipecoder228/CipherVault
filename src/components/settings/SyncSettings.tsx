@@ -4,7 +4,7 @@ import { useToastStore } from '../ui/Toast'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import { useI18n } from '../../i18n'
-import { setSyncPasswordEncrypted } from '../../services/googleDriveSync'
+import { setSyncPasswordEncrypted } from '../../lib/secureStorage'
 import { FolderOpen, RefreshCw, CloudOff, Cloud } from 'lucide-react'
 
 export function SyncSettings() {

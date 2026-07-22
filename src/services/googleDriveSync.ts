@@ -44,6 +44,13 @@ const GOOGLE_SCOPES = ['https://www.googleapis.com/auth/drive.file']
 const VAULT_FILE_NAME = 'ciphervault.vault'
 
 // ─── Encryption Helpers ───────────────────────────────
+// Import from secureStorage to avoid Capacitor dependency in Electron builds
+import {
+  setSyncPasswordEncrypted as setSyncPasswordEnc,
+  getSyncPasswordDecrypted as getSyncPasswordDec,
+} from '../lib/secureStorage'
+
+export { setSyncPasswordEncrypted, getSyncPasswordDecrypted } from '../lib/secureStorage'
 
 async function deriveSyncKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
   const keyMaterial = await crypto.subtle.importKey(
@@ -60,185 +67,6 @@ async function deriveSyncKey(password: string, salt: Uint8Array): Promise<Crypto
     false,
     ['encrypt', 'decrypt']
   )
-}
-
-// ─── Secure Sync Password Storage ──────────────────────
-// Encrypt sync password before storing in localStorage
-
-async function encryptSyncPassword(password: string): Promise<string> {
-  const salt = crypto.getRandomValues(new Uint8Array(16))
-  const iv = crypto.getRandomValues(new Uint8Array(12))
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(password),
-    'PBKDF2',
-    false,
-    ['deriveKey']
-  )
-  const key = await crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
-    keyMaterial,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt']
-  )
-  const encrypted = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
-    key,
-    new TextEncoder().encode(password)
-  )
-  // Format: salt(16) + iv(12) + ciphertext
-  const result = new Uint8Array(16 + 12 + encrypted.byteLength)
-  result.set(salt, 0)
-  result.set(iv, 16)
-  result.set(new Uint8Array(encrypted), 28)
-  return btoa(String.fromCharCode(...result))
-}
-
-async function decryptSyncPassword(encryptedBase64: string, masterKey: string): Promise<string | null> {
-  try {
-    const data = Uint8Array.from(atob(encryptedBase64), c => c.charCodeAt(0))
-    if (data.length < 28 + 16) return null
-    const salt = data.slice(0, 16)
-    const iv = data.slice(16, 28)
-    const ciphertext = data.slice(28)
-    const keyMaterial = await crypto.subtle.importKey(
-      'raw',
-      new TextEncoder().encode(masterKey),
-      'PBKDF2',
-      false,
-      ['deriveKey']
-    )
-    const key = await crypto.subtle.deriveKey(
-      { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
-      keyMaterial,
-      { name: 'AES-GCM', length: 256 },
-      false,
-      ['decrypt']
-    )
-    const decrypted = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv },
-      key,
-      ciphertext
-    )
-    return new TextDecoder().decode(decrypted)
-  } catch {
-    return null
-  }
-}
-
-// Master password cached in memory only (never persisted)
-let cachedMasterKey: string | null = null
-
-export function setCachedMasterKey(key: string): void {
-  cachedMasterKey = key
-}
-
-export function clearCachedMasterKey(): void {
-  cachedMasterKey = null
-}
-
-export async function setSyncPasswordEncrypted(password: string): Promise<void> {
-  if (cachedMasterKey) {
-    const encrypted = await encryptSyncPassword(password)
-    localStorage.setItem('sync_password_enc', encrypted)
-    localStorage.removeItem('sync_password') // Remove old plaintext
-  } else {
-    // Fallback: store encrypted with device-specific key
-    const deviceKey = await getDeviceKey()
-    const encrypted = await encryptWithKey(password, deviceKey)
-    localStorage.setItem('sync_password_enc', encrypted)
-    localStorage.removeItem('sync_password')
-  }
-}
-
-export async function getSyncPasswordDecrypted(): Promise<string | null> {
-  // Try encrypted first
-  const enc = localStorage.getItem('sync_password_enc')
-  if (enc) {
-    if (cachedMasterKey) {
-      const dec = await decryptSyncPassword(enc, cachedMasterKey)
-      if (dec) return dec
-    }
-    const deviceKey = await getDeviceKey()
-    const dec = await decryptWithKey(enc, deviceKey)
-    if (dec) return dec
-  }
-  // Legacy: check old plaintext (will be re-encrypted on next set)
-  const legacy = localStorage.getItem('sync_password')
-  return legacy
-}
-
-// Device-specific key for encrypting secrets when master key is unavailable
-export async function getDeviceKey(): Promise<string> {
-  let deviceKey = localStorage.getItem('cv_device_key')
-  if (!deviceKey) {
-    const key = crypto.getRandomValues(new Uint8Array(32))
-    deviceKey = btoa(String.fromCharCode(...key))
-    localStorage.setItem('cv_device_key', deviceKey)
-  }
-  return deviceKey
-}
-
-export async function encryptWithKey(data: string, keyStr: string): Promise<string> {
-  const salt = crypto.getRandomValues(new Uint8Array(16))
-  const iv = crypto.getRandomValues(new Uint8Array(12))
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    Uint8Array.from(atob(keyStr), c => c.charCodeAt(0)),
-    'PBKDF2',
-    false,
-    ['deriveKey']
-  )
-  const key = await crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
-    keyMaterial,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt']
-  )
-  const encrypted = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
-    key,
-    new TextEncoder().encode(data)
-  )
-  const result = new Uint8Array(16 + 12 + encrypted.byteLength)
-  result.set(salt, 0)
-  result.set(iv, 16)
-  result.set(new Uint8Array(encrypted), 28)
-  return btoa(String.fromCharCode(...result))
-}
-
-export async function decryptWithKey(encryptedBase64: string, keyStr: string): Promise<string | null> {
-  try {
-    const data = Uint8Array.from(atob(encryptedBase64), c => c.charCodeAt(0))
-    if (data.length < 28 + 16) return null
-    const salt = data.slice(0, 16)
-    const iv = data.slice(16, 28)
-    const ciphertext = data.slice(28)
-    const keyMaterial = await crypto.subtle.importKey(
-      'raw',
-      Uint8Array.from(atob(keyStr), c => c.charCodeAt(0)),
-      'PBKDF2',
-      false,
-      ['deriveKey']
-    )
-    const key = await crypto.subtle.deriveKey(
-      { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
-      keyMaterial,
-      { name: 'AES-GCM', length: 256 },
-      false,
-      ['decrypt']
-    )
-    const decrypted = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv },
-      key,
-      ciphertext
-    )
-    return new TextDecoder().decode(decrypted)
-  } catch {
-    return null
-  }
 }
 
 async function encryptVault(data: Uint8Array, password: string): Promise<Uint8Array> {
