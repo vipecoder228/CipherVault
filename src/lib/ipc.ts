@@ -43,6 +43,7 @@ export function invoke<K extends keyof IPCChannels>(
 
 // ─── Clipboard Helper ────────────────────────────────────
 // Reads clipboard_ttl_ms setting and passes it to clipboard:copy
+// Clears previous clipboard content before copying new value
 let cachedClipboardTtl: number | null = null
 
 export async function copyWithTtl(text: string): Promise<void> {
@@ -54,6 +55,10 @@ export async function copyWithTtl(text: string): Promise<void> {
       cachedClipboardTtl = 30000
     }
   }
+  // Clear previous clipboard content first (defense in depth)
+  try {
+    await invoke('clipboard:clear')
+  } catch {}
   return invoke('clipboard:copy', text, cachedClipboardTtl)
 }
 

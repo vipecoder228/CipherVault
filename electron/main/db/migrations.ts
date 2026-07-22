@@ -94,6 +94,9 @@ const MIGRATIONS = [
 
   // v14: Add display_url for unencrypted URL display in list
   `ALTER TABLE encrypted_entries ADD COLUMN display_url TEXT NOT NULL DEFAULT '';`,
+
+  // v15: Add password_changed_at for password age tracking
+  `ALTER TABLE encrypted_entries ADD COLUMN password_changed_at TEXT;`,
 ]
 
 export function runMigrations(db: Database): void {

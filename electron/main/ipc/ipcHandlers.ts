@@ -73,6 +73,7 @@ const handlers: Record<string, (...args: any[]) => any> = {
   'vault:create': (_: unknown, masterPassword: string, displayName: string) => vaultService.setupVault(masterPassword, undefined, displayName),
   'vault:unlock': (_: unknown, masterPassword: string, totpCode?: string, vaultId?: number) => vaultService.unlockVault(masterPassword, totpCode, vaultId),
   'vault:lock': () => vaultService.lockVault(),
+  'vault:reset-timer': () => vaultService.resetAutoLockTimer(),
   'vault:switch': (_: unknown, vaultId: number) => vaultService.switchVault(vaultId),
   'vault:change-master-password': (_: unknown, oldPwd: string, newPwd: string, totpCode?: string) => vaultService.changeMasterPassword(oldPwd, newPwd, totpCode),
   'vault:enable-totp': () => {

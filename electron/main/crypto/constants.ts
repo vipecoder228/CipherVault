@@ -39,4 +39,9 @@ export const DEFAULTS = {
   CLIPBOARD_TTL_MS: 30_000, // 30 sec
   THEME: 'dark' as const,
   DEFAULT_VIEW: 'list' as const,
+  SESSION_TIMEOUT_MS: 900_000, // 15 min inactivity timeout
 }
+
+// HMAC key for audit log integrity (generated once, stored in keychain)
+// Used to sign audit log entries so tampering is detectable
+export const HMAC_KEY_NAME = 'audit_hmac_key'

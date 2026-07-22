@@ -90,8 +90,8 @@ export function createEntry(
   const encUrl = encryptMetadata(displayUrl) ?? displayUrl
 
   db.run(
-    `INSERT INTO encrypted_entries (entry_type, encrypted_data, iv, auth_tag, display_title, category_id, is_favorite, vault_id, display_url)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO encrypted_entries (entry_type, encrypted_data, iv, auth_tag, display_title, category_id, is_favorite, vault_id, display_url, password_changed_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
     [entryType, encryptedData, iv, authTag, encTitle, categoryId, isFavorite ? 1 : 0, vaultId, encUrl]
   )
 
@@ -109,7 +109,7 @@ export function updateEntry(
   displayUrl?: string
 ): void {
   if (displayTitle !== undefined || displayUrl !== undefined) {
-    const sets: string[] = ['encrypted_data = ?', 'iv = ?', 'auth_tag = ?', "updated_at = datetime('now')"]
+    const sets: string[] = ['encrypted_data = ?', 'iv = ?', 'auth_tag = ?', "updated_at = datetime('now')", "password_changed_at = datetime('now')"]
     const params: any[] = [encryptedData, iv, authTag]
     if (displayTitle !== undefined) {
       sets.push('display_title = ?')
@@ -123,7 +123,7 @@ export function updateEntry(
     db.run(`UPDATE encrypted_entries SET ${sets.join(', ')} WHERE id = ?`, params)
   } else {
     db.run(
-      `UPDATE encrypted_entries SET encrypted_data = ?, iv = ?, auth_tag = ?, updated_at = datetime('now') WHERE id = ?`,
+      `UPDATE encrypted_entries SET encrypted_data = ?, iv = ?, auth_tag = ?, updated_at = datetime('now'), password_changed_at = datetime('now') WHERE id = ?`,
       [encryptedData, iv, authTag, id]
     )
   }

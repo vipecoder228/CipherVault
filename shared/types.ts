@@ -216,6 +216,7 @@ export interface IPCChannels {
   'vault:create': (masterPassword: string, displayName: string) => Promise<VaultSetupResult>
   'vault:unlock': (masterPassword: string, totpCode?: string, vaultId?: number) => Promise<VaultUnlockResult>
   'vault:lock': () => Promise<void>
+  'vault:reset-timer': () => Promise<void>
   'vault:switch': (vaultId: number) => Promise<{ success: boolean; error?: string }>
   'vault:change-master-password': (oldPassword: string, newPassword: string, totpCode?: string) => Promise<VaultSetupResult>
   'vault:enable-totp': () => Promise<{ secret: string; qrCodeUrl: string }>

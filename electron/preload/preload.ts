@@ -10,6 +10,7 @@ const channels: (keyof IPCChannels)[] = [
   'vault:create',
   'vault:unlock',
   'vault:lock',
+  'vault:reset-timer',
   'vault:switch',
   'vault:change-master-password',
   'vault:enable-totp',
