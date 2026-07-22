@@ -246,7 +246,7 @@ npx tsc --noEmit
 ## Архитектура
 
 ```
-CipherVault v14.0.4
+CipherVault v14.0.5
 ├── Desktop (Electron)
 │   ├── Security Module
 │   │   ├── Memory Guard
