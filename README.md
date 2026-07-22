@@ -45,9 +45,10 @@
 | **CSPRNG** | `crypto.randomInt` для генерации паролей |
 
 ### Защита в памяти
-- **Secure Memory Guard** — обнуление буферов после использования
-- **Key Zeroing** — обнуление ключей при блокировке
+- **Secure Memory Guard** — 3-проходное обнуление буферов (0x00 → 0xFF → 0x00)
+- **Key Zeroing** — обнуление ключей при блокировке / смене пароля
 - **Forward Secrecy** — сессионные ephemeral keys
+- **No Plaintext Keys** — ключи хранятся только в памяти, nunca на диске
 
 ### Защита приложения
 - **Anti-Tamper Detection** — проверка целостности бинарников
@@ -66,8 +67,14 @@
 - **k-anonymity** — HIBP API (SHA-1 prefix only)
 - **Duplicate Detection** — детекция повторяющихся паролей
 - **Crack Time Estimation** — оценка времени взлома
-- **Clipboard Auto-Clear** — очистка через 30 секунд
+- **Clipboard Auto-Clear** — настраиваемое время (10с / 30с / 1-5мин / отключено)
 - **Push Notifications** — уведомления при обнаружении утечек
+
+### Защита данных
+- **Secure Storage** — шифрование секретов в localStorage (PBKDF2 + AES-GCM)
+- **Encrypted Sync Password** — пароль синхронизации шифруется перед сохранением
+- **Memory Guard** — 3-проходное обнуление буферов (secureWipe)
+- **Key Zeroing** — обнуление ключей при блокировке / смене пароля
 
 ---
 
