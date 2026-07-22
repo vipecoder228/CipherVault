@@ -545,10 +545,15 @@ async function permanentDeleteEntry(id: number): Promise<void> {
 async function getDeletedEntries(): Promise<EncryptedEntry[]> {
   const encKey = getEncryptionKey()
   if (!encKey) return []
-  return webQueryAll<EncryptedEntry>(
+  const entries = webQueryAll<EncryptedEntry>(
     'SELECT * FROM encrypted_entries WHERE deleted_at IS NOT NULL AND vault_id = ? ORDER BY deleted_at DESC',
     [activeVaultId]
   )
+  return entries.map(entry => ({
+    ...entry,
+    display_title: decryptMetadata(entry.display_title),
+    display_url: decryptMetadata(entry.display_url),
+  }))
 }
 
 async function cleanupOldDeletedEntries(): Promise<number> {
@@ -1174,7 +1179,7 @@ async function analyzePasswordHealthLocal(): Promise<PasswordHealth> {
       if (!decrypted.password) continue
 
       const pwd = decrypted.password
-      const title = decrypted.title || entry.display_title
+      const title = decrypted.title || decryptMetadata(entry.display_title)
       const issues: string[] = []
 
       // Length check
@@ -1265,7 +1270,7 @@ async function analyzePasswordHealthLocal(): Promise<PasswordHealth> {
         } else {
           const entry = entries.find(e => e.id === id)
           if (entry) {
-            details.push({ entryId: id, title: entry.display_title, issues: ['reused'] })
+            details.push({ entryId: id, title: decryptMetadata(entry.display_title), issues: ['reused'] })
           }
         }
       }

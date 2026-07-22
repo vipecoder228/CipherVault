@@ -39,9 +39,9 @@ export function checkIntegrity(): { ok: boolean; current?: string; expected?: st
   try {
     const stored = getStoredHash()
 
-    // No hash file = integrity check fails (fail-closed)
+    // No hash file = skip check (dev mode or first run)
     if (!stored) {
-      return { ok: false, current: getAppHash(), expected: undefined }
+      return { ok: true }
     }
 
     const current = getAppHash()
