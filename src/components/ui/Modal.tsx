@@ -61,16 +61,22 @@ export function Modal({ open, onClose, title, children, className, maxWidth = 'm
   // Mobile: full-screen layout
   if (isMobile) {
     return (
-      <div className="fixed inset-0 z-50 flex flex-col bg-vault-surface animate-slide-up">
+      <div
+        className="fixed inset-0 z-50 flex flex-col bg-vault-surface animate-slide-up"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={title ? 'modal-title' : undefined}
+      >
         {title && (
           <div className="flex items-center gap-3 px-4 py-3 border-b border-vault-border bg-vault-surface flex-shrink-0">
             <button
               onClick={onClose}
               className="p-1.5 rounded-lg text-vault-text-secondary hover:text-vault-text hover:bg-vault-surface-hover transition-colors"
+              aria-label="Close"
             >
               <ArrowLeft size={20} />
             </button>
-            <h2 className="text-lg font-semibold text-vault-text">{title}</h2>
+            <h2 id="modal-title" className="text-lg font-semibold text-vault-text">{title}</h2>
           </div>
         )}
         <div className="flex-1 overflow-y-auto p-4">{children}</div>
@@ -86,6 +92,9 @@ export function Modal({ open, onClose, title, children, className, maxWidth = 'm
       onClick={(e) => {
         if (e.target === overlayRef.current) onClose()
       }}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={title ? 'modal-title' : undefined}
     >
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" />
       <div
@@ -97,10 +106,11 @@ export function Modal({ open, onClose, title, children, className, maxWidth = 'm
       >
         {title && (
           <div className="flex items-center justify-between px-6 py-4 border-b border-vault-border flex-shrink-0">
-            <h2 className="text-lg font-semibold text-vault-text">{title}</h2>
+            <h2 id="modal-title" className="text-lg font-semibold text-vault-text">{title}</h2>
             <button
               onClick={onClose}
               className="p-1 rounded-lg text-vault-text-secondary hover:text-vault-text hover:bg-vault-surface-hover transition-colors"
+              aria-label="Close"
             >
               <X size={18} />
             </button>

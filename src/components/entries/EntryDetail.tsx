@@ -9,7 +9,7 @@ import { EditEntryModal } from './EditEntryModal'
 import { useI18n } from '../../i18n'
 import {
   X, Copy, ExternalLink, Star, Trash2, Clock, Shield, Pencil,
-  Eye, EyeOff, Lock, Fingerprint
+  Eye, EyeOff, Lock, Fingerprint, Key
 } from 'lucide-react'
 
 export function EntryDetail() {
@@ -364,6 +364,38 @@ export function EntryDetail() {
             </div>
           )}
 
+          {/* Passkey fields */}
+          {entry.entry_type === 'passkey' && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-vault-text">
+                <Key size={16} className="text-vault-accent" />
+                Passkey Details
+              </div>
+              {entry.passkey_rp_name && (
+                <FieldRow label="Relying Party" value={entry.passkey_rp_name} />
+              )}
+              {entry.passkey_rp_id && (
+                <FieldRow label="Relying Party ID" value={entry.passkey_rp_id} />
+              )}
+              {entry.passkey_id && (
+                <FieldRow
+                  label="Credential ID"
+                  value={entry.passkey_id.substring(0, 32) + '...'}
+                  copied={copiedField === 'passkey_id'}
+                  onCopy={() => handleCopy(entry.passkey_id, 'passkey_id')}
+                />
+              )}
+              {entry.passkey_counter !== undefined && entry.passkey_counter !== null && (
+                <FieldRow label="Usage Count" value={String(entry.passkey_counter)} />
+              )}
+              <div className="p-3 rounded-lg bg-vault-accent/5 border border-vault-accent/20">
+                <p className="text-xs text-vault-text-secondary">
+                  Private key is stored securely on this device. It never leaves your device.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Metadata */}
           <div className="pt-4 border-t border-vault-border space-y-2">
             <div className="flex items-center gap-2 text-xs text-vault-text-secondary">
@@ -500,6 +532,7 @@ function getEntryEmoji(type: string): string {
     case 'card': return '💳'
     case 'secure_note': return '📝'
     case 'identity': return '👤'
+    case 'passkey': return '🔐'
     default: return '🔐'
   }
 }

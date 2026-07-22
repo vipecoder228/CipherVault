@@ -71,6 +71,7 @@ const TYPE_LABELS: Record<EntryType, string> = {
   card: 'Card',
   secure_note: 'Secure Note',
   identity: 'Identity',
+  passkey: 'Passkey',
 }
 
 function EntryGrid() {
@@ -252,7 +253,7 @@ function EntryGrid() {
     <div>
       {/* Type filter tabs */}
       <div className="flex items-center gap-2 mb-4">
-        {([null, 'login', 'card', 'secure_note', 'identity'] as const).map((type) => (
+        {([null, 'login', 'card', 'secure_note', 'identity', 'passkey'] as const).map((type) => (
           <button
             key={type ?? 'all'}
             onClick={() => handleTypeFilter(type)}
@@ -482,6 +483,7 @@ function getEntryIcon(type: string) {
     case 'card': return '💳'
     case 'secure_note': return '📝'
     case 'identity': return '👤'
+    case 'passkey': return '🔐'
     default: return '🔐'
   }
 }

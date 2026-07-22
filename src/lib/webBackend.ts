@@ -2094,3 +2094,76 @@ function hexToUint8Array(hex: string): Uint8Array {
   }
   return bytes
 }
+
+// ─── Breach Monitor for Capacitor ─────────────────────
+
+let breachMonitorInterval: ReturnType<typeof setInterval> | null = null
+const BREACH_CHECK_INTERVAL = 24 * 60 * 60 * 1000 // 24 hours
+
+export async function checkAllPasswordsForBreachesLocal(): Promise<{ checked: number; breached: number }> {
+  const encKey = getEncryptionKey()
+  if (!encKey) return { checked: 0, breached: 0 }
+
+  const entries = webQueryAll<EncryptedEntry>(
+    'SELECT * FROM encrypted_entries WHERE deleted_at IS NULL AND entry_type = ?',
+    ['login']
+  )
+
+  let checked = 0
+  let breached = 0
+
+  for (const entry of entries) {
+    try {
+      const decrypted = await decryptJSON<Record<string, string>>(
+        { iv: entry.iv, ciphertext: entry.encrypted_data, authTag: entry.auth_tag },
+        encKey
+      )
+
+      if (!decrypted.password) continue
+
+      const breachResult = await checkBreachLocal(decrypted.password)
+      checked++
+
+      if (breachResult.breached) {
+        breached++
+        const title = decryptMetadata(entry.display_title)
+
+        // Send push notification
+        try {
+          const { getPushNotification } = await import('../services/pushNotificationService')
+          const push = getPushNotification()
+          if (await push.hasPermission()) {
+            await push.sendLocalNotification({
+              title: '⚠️ Breach Detected',
+              body: `"${title}" was found in ${breachResult.count} data breaches. Change this password immediately.`,
+              data: { entryId: entry.id, breachCount: breachResult.count },
+            })
+          }
+        } catch {}
+      }
+    } catch {}
+  }
+
+  return { checked, breached }
+}
+
+export function startBreachMonitorLocal(): void {
+  if (breachMonitorInterval) return
+
+  // Check immediately on start (after short delay)
+  setTimeout(() => {
+    checkAllPasswordsForBreachesLocal().catch(() => {})
+  }, 5000)
+
+  // Then check every 24 hours
+  breachMonitorInterval = setInterval(() => {
+    checkAllPasswordsForBreachesLocal().catch(() => {})
+  }, BREACH_CHECK_INTERVAL)
+}
+
+export function stopBreachMonitorLocal(): void {
+  if (breachMonitorInterval) {
+    clearInterval(breachMonitorInterval)
+    breachMonitorInterval = null
+  }
+}

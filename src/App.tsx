@@ -121,6 +121,15 @@ export function App() {
     }
   }, [locked])
 
+  // Start breach monitor on Capacitor when unlocked
+  useEffect(() => {
+    if (!isCapacitor || locked) return
+
+    import('./lib/webBackend').then(({ startBreachMonitorLocal }) => {
+      startBreachMonitorLocal()
+    }).catch(() => {})
+  }, [locked])
+
   if (booting) {
     return (
       <div className={`${theme}`}>

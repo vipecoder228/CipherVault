@@ -43,6 +43,10 @@ export function CreateEntryModal({ open, onClose, initialPassword }: Props) {
   })
   const [duplicateWarning, setDuplicateWarning] = useState<{ count: number; titles: string[] } | null>(null)
   const [customFields, setCustomFields] = useState<CustomField[]>([])
+  const [passkeyRpName, setPasskeyRpName] = useState('')
+  const [passkeyRpId, setPasskeyRpId] = useState('')
+  const [passkeyUserName, setPasskeyUserName] = useState('')
+  const [creatingPasskey, setCreatingPasskey] = useState(false)
   const { createEntry } = useEntriesStore()
   const addToast = useToastStore((s) => s.addToast)
   const { t } = useI18n()
@@ -204,6 +208,46 @@ export function CreateEntryModal({ open, onClose, initialPassword }: Props) {
         data.identity_address = identityAddress.trim() || undefined
         data.identity_passport = identityPassport.trim() || undefined
         data.identity_birthdate = identityBirthdate.trim() || undefined
+      } else if (entryType === 'passkey') {
+        // Passkey creation requires WebAuthn
+        if (!passkeyRpName.trim() || !passkeyRpId.trim()) {
+          addToast('Relying Party name and ID are required', 'warning')
+          setLoading(false)
+          return
+        }
+
+        setCreatingPasskey(true)
+        try {
+          const { getPasskey } = await import('../../services/passkeyService')
+          const passkey = await getPasskey().createCredential({
+            rpName: passkeyRpName.trim(),
+            rpId: passkeyRpId.trim(),
+            userName: passkeyUserName.trim() || title.trim(),
+            userDisplayName: title.trim(),
+            challenge: crypto.getRandomValues(new Uint8Array(32)),
+          })
+
+          if (!passkey) {
+            addToast('Passkey creation cancelled or failed', 'error')
+            setLoading(false)
+            setCreatingPasskey(false)
+            return
+          }
+
+          data.passkey_id = passkey.id
+          data.passkey_public_key = passkey.publicKey
+          data.passkey_rp_name = passkey.rpName
+          data.passkey_rp_id = passkey.rpId
+          data.passkey_counter = passkey.counter
+        } catch (e: any) {
+          console.error('Passkey creation failed:', e)
+          addToast(e?.message || 'Failed to create passkey', 'error')
+          setLoading(false)
+          setCreatingPasskey(false)
+          return
+        } finally {
+          setCreatingPasskey(false)
+        }
       }
 
       await createEntry(data)
@@ -223,6 +267,7 @@ export function CreateEntryModal({ open, onClose, initialPassword }: Props) {
     setCardNumber(''); setCardHolder(''); setCardExpiry('')
     setIdentityFirstName(''); setIdentityLastName(''); setIdentityPhone('')
     setIdentityEmail(''); setIdentityAddress(''); setIdentityPassport(''); setIdentityBirthdate('')
+    setPasskeyRpName(''); setPasskeyRpId(''); setPasskeyUserName('')
     setShowGen(false); setGenPassword('')
     onClose()
   }
@@ -272,6 +317,7 @@ export function CreateEntryModal({ open, onClose, initialPassword }: Props) {
               { type: 'card' as EntryType, emoji: '💳', label: t('type_card') },
               { type: 'secure_note' as EntryType, emoji: '📝', label: t('type_note') },
               { type: 'identity' as EntryType, emoji: '👤', label: t('type_identity') },
+              { type: 'passkey' as EntryType, emoji: '🔐', label: 'Passkey' },
             ]).map(({ type, emoji, label }) => (
               <button
                 key={type}
@@ -520,6 +566,36 @@ export function CreateEntryModal({ open, onClose, initialPassword }: Props) {
                 value={identityBirthdate}
                 onChange={(e) => setIdentityBirthdate(e.target.value)}
               />
+            </div>
+          </>
+        )}
+
+        {/* Passkey fields */}
+        {entryType === 'passkey' && (
+          <>
+            <Input
+              label="Relying Party Name"
+              placeholder="e.g. Google, GitHub"
+              value={passkeyRpName}
+              onChange={(e) => setPasskeyRpName(e.target.value)}
+            />
+            <Input
+              label="Relying Party ID"
+              placeholder="e.g. google.com, github.com"
+              value={passkeyRpId}
+              onChange={(e) => setPasskeyRpId(e.target.value)}
+            />
+            <Input
+              label="Username"
+              placeholder="e.g. user@example.com"
+              value={passkeyUserName}
+              onChange={(e) => setPasskeyUserName(e.target.value)}
+            />
+            <div className="p-3 rounded-lg bg-vault-accent/5 border border-vault-accent/20">
+              <p className="text-xs text-vault-text-secondary">
+                Passkey will be created using your device's biometric or security key.
+                The private key never leaves your device.
+              </p>
             </div>
           </>
         )}

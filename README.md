@@ -4,7 +4,7 @@
 
 > **🔒 Безопасность: 12/10**
 > 
-> CipherVault v14.0.0 — enterprise-level безопасность с 303 тестами.
+> CipherVault v14.0.0 — enterprise-level безопасность с 300 тестами.
 
 ## Скачать
 
@@ -14,7 +14,7 @@
 
 ### Шифрование
 - **AES-256-GCM** — authenticated encryption всех данных
-- **PBKDF2 600K** — итераций для защиты от brute-force
+- **Argon2id** —内存-hard key derivation (OWASP рекомендация)
 - **Constant-time сравнение** — защита от timing attacks
 - **CSPRNG** — crypto.randomInt для генерации паролей
 
@@ -27,9 +27,11 @@
 - **Anti-Tamper Detection** — проверка целостности бинарников
 - **Screenshot Protection** — защита от скриншотов (macOS)
 - **Encrypted Audit Log** — логирование всех действий (зашифровано)
+- **Encrypted Metadata** — title и URL зашифрованы в БД
 
 ### Защита сети
 - **Rate Limiting** — 4→6→8→10 попыток с задержками
+- **TLS API** — HTTPS для REST API (self-signed cert)
 - **CORS Restrictions** — только localhost
 - **Security Headers** — X-Content-Type-Options, X-Frame-Options
 - **Input Validation** — валидация всех входных данных
@@ -39,8 +41,14 @@
 - **Duplicate Detection** — детекция повторяющихся паролей
 - **Crack Time Estimation** — оценка времени взлома
 - **Clipboard Auto-Clear** — очистка через 30 секунд
+- **Push Notifications** — уведомления при обнаружении утечек
 
 ## Функции
+
+### Passkeys / FIDO2
+- Создание passkeys через WebAuthn API
+- Хранение метаданных в зашифрованном vault
+- Поддержка биометрической аутентификации
 
 ### Кастомные поля
 - Текст, пароль, URL, email, телефон
@@ -68,6 +76,7 @@
 - Анализ слабых/повторяющихся/утёкших паролей
 - Тренд здоровья (диаграмма)
 - Оценка времени взлома
+- Push-уведомления при утечках
 
 ### Сортировка
 - По дате, имени, типу
@@ -83,6 +92,7 @@
 
 ### Интеграции
 - Telegram уведомления о утечках
+- Push-уведомления (Capacitor LocalNotifications)
 - REST API для сторонних приложений
 - Google Drive синхронизация
 - Browser extension с автозаполнением
@@ -90,12 +100,27 @@
 ### Платформы
 - **Desktop** — Electron (Windows/Mac/Linux)
 - **Mobile** — Capacitor (Android/iOS)
-- **Browser** — Chrome/Edge/Firefox extension
-- **API** — REST API на порту 19824
+- **Browser** — Chrome extension
+- **API** — REST API на порту 19824 (HTTPS)
+
+## Мобильное приложение
+
+### Возможности
+- Биометрическая аутентификация (Face ID /指纹)
+- Autofill URL matching
+- Auto-lock при уходе в фон
+- Push-уведомления при утечках
+- Google Drive синхронизация
+- Offline-first архитектура
+
+### Сборка Android
+```bash
+npm run dist:android
+```
 
 ## Тесты
 
-**303 теста** across 27 файлов:
+**300 тестов** across 27 файлов:
 
 | Модуль | Тестов |
 |--------|:------:|
@@ -106,7 +131,7 @@
 | IPC | 13 |
 
 ```bash
-npm test  # 303/303 passed
+npm test  # 300/300 passed
 ```
 
 ## Разработка
@@ -115,8 +140,13 @@ npm test  # 303/303 passed
 # Установка
 npm install
 
-# Запуск
+# Запуск (Desktop)
 npm run dev
+
+# Запуск (Mobile)
+npm run build:web
+npx cap sync android
+npx cap open android
 
 # Сборка
 npm run build
@@ -135,10 +165,11 @@ npx tsc --noEmit
 | Десктоп | Electron 33 |
 | Мобильное | Capacitor 8 |
 | Интерфейс | React 19 + TypeScript |
-| Крипто | AES-256-GCM + PBKDF2 600K |
+| Крипто | AES-256-GCM + Argon2id |
 | БД | sql.js (SQLite) |
-| Тесты | Vitest (303 tests) |
-| API | REST (port 19824) |
+| Тесты | Vitest (300 tests) |
+| API | REST/HTTPS (port 19824) |
+| Passkeys | WebAuthn API |
 
 ## Архитектура
 
@@ -151,10 +182,15 @@ CipherVault v14.0.0
 │   │   ├── Audit Log
 │   │   ├── Key Rotation
 │   │   └── Ephemeral Keys
-│   ├── Crypto (AES-256-GCM)
-│   ├── REST API (port 19824)
-│   └── WebSocket (port 19823)
+│   ├── Crypto (AES-256-GCM + Argon2id)
+│   ├── REST API (HTTPS, port 19824)
+│   ├── WebSocket (port 19823)
+│   └── Passkey Storage
 ├── Mobile (Capacitor)
+│   ├── Biometric Auth
+│   ├── Push Notifications
+│   ├── Auto-lock
+│   └── Google Drive Sync
 ├── Browser Extension
 └── Cloud Sync (Google Drive)
 ```
