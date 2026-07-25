@@ -6,7 +6,7 @@ import { useVaultStore } from '../../store/vaultStore'
 import { useI18n } from '../../i18n'
 
 export function MobileNav() {
-  const { setShowPasswordGenerator, setShowSettings } = useUIStore()
+  const { setShowCreateEntry, setShowSettings } = useUIStore()
   const { selectEntry, selectedEntry } = useEntriesStore()
   const { lock } = useVaultStore()
   const { t } = useI18n()
@@ -53,7 +53,7 @@ export function MobileNav() {
             <span className="text-xs mt-1">{t('search_placeholder').split('...')[0]}</span>
           </button>
           <button
-            onClick={() => setShowPasswordGenerator(true)}
+            onClick={() => setShowCreateEntry(true)}
             className="flex flex-col items-center justify-center w-16 h-full text-vault-accent transition-colors"
           >
             <Plus size={28} />

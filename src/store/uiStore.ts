@@ -8,6 +8,7 @@ interface UIState {
   sidebarCollapsed: boolean
   activeCategoryId: number | null
   showPasswordGenerator: boolean
+  showCreateEntry: boolean
   showSettings: boolean
   showDisposableEmail: boolean
   showTrash: boolean
@@ -18,6 +19,7 @@ interface UIState {
   toggleSidebar: () => void
   setActiveCategory: (id: number | null) => void
   setShowPasswordGenerator: (show: boolean) => void
+  setShowCreateEntry: (show: boolean) => void
   setShowSettings: (show: boolean) => void
   setShowDisposableEmail: (show: boolean) => void
   setShowTrash: (show: boolean) => void
@@ -29,6 +31,7 @@ export const useUIStore = create<UIState>((set) => ({
   sidebarCollapsed: false,
   activeCategoryId: null,
   showPasswordGenerator: false,
+  showCreateEntry: false,
   showSettings: false,
   showDisposableEmail: false,
   showTrash: false,
@@ -52,6 +55,7 @@ export const useUIStore = create<UIState>((set) => ({
   toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
   setActiveCategory: (id) => set({ activeCategoryId: id }),
   setShowPasswordGenerator: (show) => set({ showPasswordGenerator: show }),
+  setShowCreateEntry: (show) => set({ showCreateEntry: show }),
   setShowSettings: (show) => set({ showSettings: show }),
   setShowDisposableEmail: (show) => set({ showDisposableEmail: show }),
   setShowTrash: (show) => set({ showTrash: show }),

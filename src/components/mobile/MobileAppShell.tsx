@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { MobileNav } from './MobileNav'
 import { MobileEntryDetail } from './MobileEntryDetail'
 import { PasswordGenerator } from '../password-gen/PasswordGenerator'
+import { CreateEntryModal } from '../entries/CreateEntryModal'
 import { SettingsPanel } from '../settings/SettingsPanel'
 import { ImportDialog } from '../import-export/ImportDialog'
 import { Modal } from '../ui/Modal'
@@ -23,7 +24,7 @@ function getTypeLabels(t: (key: string) => string): Record<EntryType, string> {
 
 export function MobileAppShell() {
   const { entries, loading, selectEntry, selectedEntry, toggleFavorite, filters, setFilters, loadEntries } = useEntriesStore()
-  const { setShowPasswordGenerator, showPasswordGenerator, showSettings, setShowSettings } = useUIStore()
+  const { setShowPasswordGenerator, showPasswordGenerator, setShowCreateEntry, showCreateEntry, showSettings, setShowSettings } = useUIStore()
   const { alarmMode } = useVaultStore()
   const { t } = useI18n()
   const TYPE_LABELS = getTypeLabels(t)
@@ -190,6 +191,9 @@ export function MobileAppShell() {
       <Modal open={showPasswordGenerator} onClose={() => setShowPasswordGenerator(false)} title={t('password_generator')}>
         <PasswordGenerator onUsePassword={() => setShowPasswordGenerator(false)} />
       </Modal>
+
+      {/* Create Entry */}
+      <CreateEntryModal open={showCreateEntry} onClose={() => setShowCreateEntry(false)} />
 
       {/* Settings */}
       <SettingsPanel

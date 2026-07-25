@@ -26,6 +26,7 @@ export default defineConfig({
   define: {
     'process.env.IS_WEB': 'true',
     'process.platform': JSON.stringify('web'),
-    'global': 'globalThis'
+    'global': 'globalThis',
+    '__APP_VERSION__': JSON.stringify(require('./package.json').version)
   }
 })
