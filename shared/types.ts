@@ -317,6 +317,7 @@ export interface IPCChannels {
   'email:test-telegram': (token: string) => Promise<{ ok: boolean; botName?: string; error?: string }>
   'email:get-chat-id': (token: string) => Promise<string | null>
   'email:save-telegram': (token: string, chatId: string) => Promise<void>
+  'email:send-breach-notification': (entryTitle: string, breachCount: number) => Promise<boolean>
 
   // Passkeys
   'passkey:save': (credential: any) => Promise<{ success: boolean }>

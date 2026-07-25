@@ -43,6 +43,7 @@ const channels: (keyof IPCChannels)[] = [
   'email:test-telegram',
   'email:get-chat-id',
   'email:save-telegram',
+  'email:send-breach-notification',
   'password:generate',
   'password:check-breach',
   'categories:list',

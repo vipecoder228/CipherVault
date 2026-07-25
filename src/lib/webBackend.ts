@@ -1629,9 +1629,59 @@ export const webHandlers: HandlerMap = {
 
   // Email
   'email:send-backup': (_: any, backupData: string) => sendBackupWeb(backupData),
-  'email:test-telegram': async () => ({ ok: false, error: 'Not available in web version' }),
-  'email:get-chat-id': async () => null,
-  'email:save-telegram': async () => {},
+  'email:test-telegram': async (_: any, token: string) => {
+    try {
+      const res = await fetch(`https://api.telegram.org/bot${token}/getMe`)
+      const data = await res.json()
+      if (data.ok) return { ok: true, botName: data.result.username }
+      return { ok: false, error: data.description || 'Invalid token' }
+    } catch (err: any) {
+      return { ok: false, error: err.message }
+    }
+  },
+  'email:get-chat-id': async (_: any, token: string) => {
+    try {
+      const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates`)
+      const data = await res.json()
+      if (data.ok && data.result?.length > 0) {
+        const lastUpdate = data.result[data.result.length - 1]
+        const chatId = lastUpdate.message?.chat?.id || lastUpdate.my_chat_member?.chat?.id
+        return chatId ? String(chatId) : null
+      }
+      return null
+    } catch {
+      return null
+    }
+  },
+  'email:save-telegram': async (_: any, token: string, chatId: string) => {
+    const { encryptWithKey, getDeviceKey } = await import('./secureStorage')
+    const deviceKey = await getDeviceKey()
+    localStorage.setItem('cv_secure_telegram_bot_token', await encryptWithKey(token, deviceKey))
+    localStorage.setItem('cv_secure_telegram_chat_id', await encryptWithKey(chatId, deviceKey))
+  },
+  'email:send-breach-notification': async (_: any, entryTitle: string, breachCount: number) => {
+    try {
+      const { decryptWithKey, getDeviceKey } = await import('./secureStorage')
+      const deviceKey = await getDeviceKey()
+      const encToken = localStorage.getItem('cv_secure_telegram_bot_token')
+      const encChatId = localStorage.getItem('cv_secure_telegram_chat_id')
+      if (!encToken || !encChatId) return false
+      const token = await decryptWithKey(encToken, deviceKey)
+      const chatId = await decryptWithKey(encChatId, deviceKey)
+      if (!token || !chatId) return false
+      await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: `\u26a0\ufe0f CipherVault Breach Alert\n\nEntry: ${entryTitle}\nFound in ${breachCount} data breach${breachCount > 1 ? 'es' : ''}\n\nPlease change this password immediately.`,
+        }),
+      })
+      return true
+    } catch {
+      return false
+    }
+  },
 
   // Password
   'password:generate': (_: any, options: PasswordOptions) => Promise.resolve(generatePasswordLocal(options)),
