@@ -34,7 +34,9 @@ jobs:
       - name: Upload Windows installer to release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.exe
+          files: |
+            dist/*.exe
+            dist/latest.yml
           draft: false
           prerelease: false
 
@@ -63,7 +65,9 @@ jobs:
       - name: Upload macOS DMG to release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.dmg
+          files: |
+            dist/*.dmg
+            dist/latest-mac.yml
           draft: false
           prerelease: false
 
@@ -96,6 +100,7 @@ jobs:
             dist/*.AppImage
             dist/*.deb
             dist/*.rpm
+            dist/latest-linux.yml
           draft: false
           prerelease: false
 
