@@ -1,106 +1,84 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useI18n } from '../../i18n'
 import { invoke } from '../../lib/ipc'
-import { AlertTriangle, Trash2, Shield, Mail } from 'lucide-react'
-import { Button } from '../ui/Button'
+import { AlertTriangle, Trash2, Mail } from 'lucide-react'
 import { useToastStore } from '../ui/Toast'
 
 interface Props {
-  onChoice: (action: 'empty' | 'wipe') => void
+  onDone: () => void
 }
 
-export function PanicChoiceScreen({ onChoice }: Props) {
+// Duress mode gives no choice: the moment it activates, real data is
+// backed up (best-effort) to Telegram and then permanently deleted.
+// A missing/failed backup must never block the wipe — losing the backup
+// is an acceptable tradeoff, leaving the real data behind under duress is not.
+export function PanicChoiceScreen({ onDone }: Props) {
   const { t } = useI18n()
-  const [loading, setLoading] = useState(false)
   const [backupResult, setBackupResult] = useState<{ emailed?: boolean; filePath?: string } | null>(null)
   const addToast = useToastStore((s) => s.addToast)
+  const startedRef = useRef(false)
 
-  const handleWipeAndBackup = async () => {
-    if (loading) return
-    setLoading(true)
+  useEffect(() => {
+    if (startedRef.current) return
+    startedRef.current = true
+    void wipeAndBackup()
+  }, [])
+
+  const wipeAndBackup = async () => {
+    let entries: any[] = []
     try {
-      // 1. Get backup password
-      const backupPassword = await invoke('settings:get-secure', 'panic_backup_password')
-      if (!backupPassword) {
-        addToast('Пароль бэкапа не настроен', 'error')
-        setLoading(false)
-        return
-      }
-
-      // 2. Get entries (encrypted — duress mode can't decrypt with panic key)
-      const entries = await invoke('entries:panic-backup')
-
-      if (!entries || entries.length === 0) {
-        addToast('Нет записей для удаления', 'warning')
-        onChoice('wipe')
-        return
-      }
-
-      // 3. Get vault's kdf_salt for import restoration
-      const vaultStatus = await invoke('vault:status') as { activeVaultId: number }
-      const kdfSalt = await invoke('vault:get-kdf-salt', vaultStatus.activeVaultId) as string | null
-
-      // 4. Create backup JSON with encrypted entries + salt for restoration
-      const backupJson = JSON.stringify({
-        format: 'ciphervault-panic-backup',
-        version: '2.0',
-        timestamp: new Date().toISOString(),
-        entryCount: entries.length,
-        kdf_salt: kdfSalt,
-        entries: entries.map((e) => ({
-          id: e.id,
-          entry_type: e.entry_type,
-          display_title: e.display_title,
-          iv: e.iv,
-          encrypted_data: e.encrypted_data,
-          auth_tag: e.auth_tag,
-        })),
-      }, null, 2)
-
-      // 6. Encrypt backup with password
-      const encrypted = await encryptText(backupJson, backupPassword)
-
-      // 7. Send via Telegram or save to file
-      const sendResult = await invoke('email:send-backup', encrypted)
-
-      setBackupResult({ emailed: sendResult?.sent || false, filePath: sendResult?.filePath })
-
-      // 8. Delete all entries (track success)
-      let deleted = 0
-      for (const entry of entries) {
-        try {
-          await invoke('entries:force-delete', entry.id)
-          deleted++
-        } catch {
-          // Continue deleting other entries
-        }
-      }
-
-      // 9. Clear panic key
-      await invoke('entries:complete-panic')
-
-      const msg = sendResult?.sent
-        ? `Encrypted backup sent to Telegram`
-        : `Encrypted backup saved${sendResult?.filePath ? '' : ''}`
-      addToast(msg + '. Все данные удалены.', 'success')
-    } catch (err: any) {
-      console.error('Panic backup failed:', err)
-      addToast('Ошибка бэкапа: ' + (err.message || 'Неизвестная ошибка'), 'error')
-      try {
-        const entries = await invoke('entries:panic-backup')
-        for (const entry of entries) {
-          await invoke('entries:force-delete', entry.id)
-        }
-        await invoke('entries:complete-panic')
-        addToast('Данные удалены (бэкап не удался)', 'warning')
-      } catch (deleteErr) {
-        console.error('Fallback delete also failed:', deleteErr)
-        addToast('Не удалось удалить записи. Попробуйте снова.', 'error')
-      }
-      onChoice('wipe')
-    } finally {
-      setLoading(false)
+      entries = await invoke('entries:panic-backup')
+    } catch {
+      entries = []
     }
+
+    try {
+      if (entries && entries.length > 0) {
+        const backupPassword = await invoke('settings:get-secure', 'panic_backup_password')
+        if (backupPassword) {
+          const vaultStatus = await invoke('vault:status') as { activeVaultId: number }
+          const kdfSalt = await invoke('vault:get-kdf-salt', vaultStatus.activeVaultId) as string | null
+
+          const backupJson = JSON.stringify({
+            format: 'ciphervault-panic-backup',
+            version: '2.0',
+            timestamp: new Date().toISOString(),
+            entryCount: entries.length,
+            kdf_salt: kdfSalt,
+            entries: entries.map((e) => ({
+              id: e.id,
+              entry_type: e.entry_type,
+              display_title: e.display_title,
+              iv: e.iv,
+              encrypted_data: e.encrypted_data,
+              auth_tag: e.auth_tag,
+            })),
+          }, null, 2)
+
+          const encrypted = await encryptText(backupJson, backupPassword)
+          const sendResult = await invoke('email:send-backup', encrypted)
+          setBackupResult({ emailed: sendResult?.sent || false, filePath: sendResult?.filePath })
+        }
+      }
+    } catch (err) {
+      console.error('Panic backup failed, deleting data anyway:', err)
+    }
+
+    // Delete everything regardless of whether the backup succeeded.
+    for (const entry of entries) {
+      try {
+        await invoke('entries:force-delete', entry.id)
+      } catch {
+        // Continue deleting other entries
+      }
+    }
+
+    try {
+      await invoke('entries:complete-panic')
+    } catch {}
+
+    addToast(t('panic_wipe_done'), 'success')
+    setTimeout(onDone, 1500)
   }
 
   return (
@@ -111,54 +89,23 @@ export function PanicChoiceScreen({ onChoice }: Props) {
         </div>
         <div>
           <h1 className="text-xl font-bold text-vault-text mb-2">{t('panic_choice_title')}</h1>
-          <p className="text-sm text-vault-text-secondary">
-            {t('duress_description')}
-          </p>
+          <div className="flex items-center justify-center gap-2 text-sm text-vault-text-secondary">
+            <div className="w-4 h-4 border-2 border-vault-text-secondary border-t-transparent rounded-full animate-spin" />
+            <Trash2 size={16} />
+            {t('panic_wiping_status')}
+          </div>
         </div>
 
-        <div className="space-y-3">
-          <Button
-            variant="secondary"
-            onClick={() => onChoice('empty')}
-            className="w-full h-12"
-          >
-            <div className="flex items-center justify-center gap-2">
-              <Shield size={18} />
-              {t('panic_choice_empty')}
-            </div>
-          </Button>
-
-          <Button
-            variant="danger"
-            onClick={handleWipeAndBackup}
-            disabled={loading}
-            className="w-full h-12"
-          >
-            {loading ? (
-              <div className="flex items-center justify-center gap-2">
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Processing...
-              </div>
-            ) : (
-              <div className="flex items-center justify-center gap-2">
-                <Trash2 size={18} />
-                {t('panic_choice_wipe')}
-              </div>
-            )}
-          </Button>
-        </div>
-
-        {/* Show result after backup */}
         {backupResult && (
           <div className="bg-vault-surface border border-vault-border rounded-xl p-4 space-y-3 text-left">
             {backupResult.emailed ? (
               <div className="flex items-center gap-2 text-green-400">
                 <Mail size={16} />
-                <p className="text-xs font-medium">Encrypted backup sent to Telegram</p>
+                <p className="text-xs font-medium">{t('panic_backup_sent')}</p>
               </div>
             ) : (
               <>
-                <p className="text-xs font-medium text-vault-text-secondary">Backup saved. Decrypt with your backup password.</p>
+                <p className="text-xs font-medium text-vault-text-secondary">{t('panic_backup_saved')}</p>
                 {backupResult.filePath && (
                   <p className="text-[10px] text-vault-text-secondary break-all">{backupResult.filePath}</p>
                 )}

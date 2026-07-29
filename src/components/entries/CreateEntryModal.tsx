@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Modal } from '../ui/Modal'
 import { Input } from '../ui/Input'
 import { Button } from '../ui/Button'
@@ -126,14 +126,16 @@ export function CreateEntryModal({ open, onClose, initialPassword }: Props) {
   }, [showGen, doGenerate])
 
   // Breach check when password changes
+  const notifiedBreachPasswordRef = useRef<string | null>(null)
   useEffect(() => {
     if (!password || password.length < 4) { setBreachWarning(null); return }
     const timer = setTimeout(async () => {
       try {
         const result = await invoke('password:check-breach', password)
         setBreachWarning(result.breached ? result : null)
-        // Send Telegram notification if breach detected
-        if (result.breached && title) {
+        // Send Telegram notification once per newly-detected breached password
+        if (result.breached && title && notifiedBreachPasswordRef.current !== password) {
+          notifiedBreachPasswordRef.current = password
           try {
             await invoke('email:send-breach-notification', title, result.count)
           } catch {}
@@ -141,7 +143,7 @@ export function CreateEntryModal({ open, onClose, initialPassword }: Props) {
       } catch { setBreachWarning(null) }
     }, 500)
     return () => clearTimeout(timer)
-  }, [password, title])
+  }, [password])
 
   // Duplicate password check
   useEffect(() => {

@@ -164,13 +164,10 @@ export function App() {
           {locked ? (
             <UnlockScreen />
           ) : alarmMode && panicChoice === null ? (
-            <PanicChoiceScreen onChoice={(choice) => {
-              if (choice === 'empty') {
-                // Lock vault to properly exit alarm mode
-                useVaultStore.getState().lock()
-              } else {
-                setPanicChoice(choice)
-              }
+            <PanicChoiceScreen onDone={() => {
+              setPanicChoice('wipe')
+              // Lock to exit alarm mode once the wipe finishes
+              useVaultStore.getState().lock()
             }} />
           ) : (
             isMobile ? <MobileAppShell /> : <AppShell />

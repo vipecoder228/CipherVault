@@ -1,3 +1,4 @@
+import { createHash } from 'crypto'
 import { getDatabase } from '../db/connection'
 import { getEntries } from '../db/queries/entries.queries'
 import { decryptJSON } from '../crypto/encryption'
@@ -7,6 +8,15 @@ import { sendBreachNotification } from './email.service'
 
 let monitorInterval: ReturnType<typeof setInterval> | null = null
 const CHECK_INTERVAL = 24 * 60 * 60 * 1000 // 24 hours
+
+// Tracks the password hash last notified per entry, so an already-known
+// breach doesn't re-alert every 24h — only newly-breached or changed
+// passwords trigger a fresh notification.
+const notifiedBreaches = new Map<number, string>()
+
+function hashPassword(password: string): string {
+  return createHash('sha256').update(password).digest('hex')
+}
 
 export async function checkAllPasswordsForBreaches(): Promise<{ checked: number; breached: number }> {
   const encKey = getEncryptionKey()
@@ -33,8 +43,14 @@ export async function checkAllPasswordsForBreaches(): Promise<{ checked: number;
 
       if (result.breached) {
         breached++
-        const title = decrypted.title || entry.display_title
-        await sendBreachNotification(title, result.count)
+        const pwdHash = hashPassword(decrypted.password)
+        if (notifiedBreaches.get(entry.id) !== pwdHash) {
+          notifiedBreaches.set(entry.id, pwdHash)
+          const title = decrypted.title || entry.display_title
+          await sendBreachNotification(title, result.count)
+        }
+      } else {
+        notifiedBreaches.delete(entry.id)
       }
     } catch {}
   }

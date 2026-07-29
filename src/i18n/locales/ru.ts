@@ -73,8 +73,10 @@ export default {
   panic_backup_email: 'Email для экстренного бэкапа',
   panic_backup_email_hint: 'При вводе кода принуждения реальные данные будут зашифрованы и отправлены на эту почту. Email НЕЛЬЗЯ изменить после настройки.',
   panic_choice_title: 'Режим принуждения',
-  panic_choice_empty: 'Показать пустой сейф',
-  panic_choice_wipe: 'Удалить данные и отправить бэкап',
+  panic_wiping_status: 'Удаление данных и отправка бэкапа...',
+  panic_wipe_done: 'Данные удалены',
+  panic_backup_sent: 'Зашифрованный бэкап отправлен в Telegram',
+  panic_backup_saved: 'Бэкап сохранён. Расшифруйте паролем бэкапа.',
   settings_clipboard_desc: 'Очистить буфер обмена. Автоочистка через 30 секунд.',
   settings_clear_clipboard: 'Очистить буфер',
   settings_backup_desc: 'Экспорт хранилища в зашифрованный файл .ciphervault.',
@@ -470,6 +472,7 @@ export default {
   search_placeholder: 'Поиск записей... (Ctrl+K)',
   import: 'Импорт',
   add: 'Добавить',
+  more: 'Ещё',
 
   // Vault Switcher
   main_vault: 'Основное хранилище',

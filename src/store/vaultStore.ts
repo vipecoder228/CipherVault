@@ -23,7 +23,7 @@ interface VaultState {
   setup: (masterPassword: string, alarmPassword?: string, displayName?: string) => Promise<boolean>
   unlock: (masterPassword: string, totpCode?: string, vaultId?: number) => Promise<boolean>
   lock: () => Promise<void>
-  switchVault: (vaultId: number) => void
+  switchVault: (vaultId: number) => Promise<void>
   clearError: () => void
   resetTotpState: () => void
   verifySecureNote: (noteId: number, password: string) => Promise<boolean>
@@ -126,8 +126,24 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     useEntriesStore.setState({ entries: [], selectedEntry: null })
   },
 
-  switchVault: (vaultId: number) => {
-    set({ activeVaultId: vaultId })
+  switchVault: async (vaultId: number) => {
+    if (vaultId === get().activeVaultId) return
+    // Backend requires the vault to be locked before switching, and re-derives
+    // the encryption key for the new vault on next unlock — so lock first and
+    // let the UnlockScreen handle re-authentication for the target vault.
+    if (!get().locked) {
+      await get().lock()
+    }
+    try {
+      const result = await invoke('vault:switch', vaultId)
+      if (result.success) {
+        set({ activeVaultId: vaultId })
+      } else {
+        set({ error: result.error || 'Failed to switch vault' })
+      }
+    } catch (err: any) {
+      set({ error: err?.message || 'Failed to switch vault' })
+    }
   },
 
   clearError: () => set({ error: null }),

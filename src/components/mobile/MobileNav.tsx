@@ -72,7 +72,7 @@ export function MobileNav() {
               className="flex flex-col items-center justify-center w-16 h-full text-vault-text-secondary hover:text-vault-accent transition-colors"
             >
               <MoreVertical size={24} />
-              <span className="text-xs mt-1">Ещё</span>
+              <span className="text-xs mt-1">{t('more')}</span>
             </button>
             {showMore && (
               <div className="absolute bottom-full right-0 mb-2 w-48 bg-vault-surface border border-vault-border rounded-xl shadow-xl overflow-hidden z-50">

@@ -54,9 +54,9 @@ export function VaultSwitcher() {
               {vaults.map(vault => (
                 <button
                   key={vault.id}
-                  onClick={() => {
-                    switchVault(vault.id)
+                  onClick={async () => {
                     setShowDropdown(false)
+                    await switchVault(vault.id)
                   }}
                   className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-vault-surface-hover transition-colors ${
                     vault.id === activeVaultId ? 'bg-vault-accent/10 text-vault-accent' : 'text-vault-text'

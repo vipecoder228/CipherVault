@@ -73,8 +73,10 @@ export default {
   panic_backup_email: 'Panic Backup Email',
   panic_backup_email_hint: 'If duress code is entered, real data will be encrypted and sent to this email. This email CANNOT be changed after setup.',
   panic_choice_title: 'Duress Mode Activated',
-  panic_choice_empty: 'Show Empty Vault',
-  panic_choice_wipe: 'Wipe Data & Send Backup',
+  panic_wiping_status: 'Wiping data and sending backup...',
+  panic_wipe_done: 'Data wiped',
+  panic_backup_sent: 'Encrypted backup sent to Telegram',
+  panic_backup_saved: 'Backup saved. Decrypt with your backup password.',
   settings_clipboard_desc: 'Clear clipboard contents immediately. Copies auto-clear after 30 seconds.',
   settings_clear_clipboard: 'Clear Clipboard',
   settings_backup_desc: 'Export your vault as an encrypted .ciphervault file. Store it safely as a backup.',
@@ -470,6 +472,7 @@ export default {
   search_placeholder: 'Search entries... (Ctrl+K)',
   import: 'Import',
   add: 'Add',
+  more: 'More',
 
   // Vault Switcher
   main_vault: 'Main Vault',

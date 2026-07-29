@@ -6,7 +6,7 @@ import { useToastStore } from '../ui/Toast'
 import { useI18n } from '../../i18n'
 import { invoke, copyWithTtl } from '../../lib/ipc'
 import { EditEntryModal } from '../entries/EditEntryModal'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 export function MobileEntryDetail() {
   const { selectedEntry, selectEntry, toggleFavorite, deleteEntry } = useEntriesStore()
@@ -251,12 +251,7 @@ export function MobileEntryDetail() {
 
           {/* TOTP */}
           {selectedEntry.totp_secret && (
-            <div className="p-3 bg-vault-surface rounded-xl border border-vault-border">
-              <div className="text-xs text-vault-text-secondary mb-1">TOTP</div>
-              <div className="text-sm text-vault-text font-mono">
-                {selectedEntry.totp_secret || '••••••••'}
-              </div>
-            </div>
+            <MobileTOTPField entryId={selectedEntry.id} onCopy={handleCopy} />
           )}
         </div>
 
@@ -275,6 +270,43 @@ export function MobileEntryDetail() {
         onClose={() => setShowEdit(false)}
         entry={selectedEntry}
       />
+    </div>
+  )
+}
+
+function MobileTOTPField({ entryId, onCopy }: { entryId: number; onCopy: (text: string) => void }) {
+  const [code, setCode] = useState('------')
+
+  const fetchCode = useCallback(async () => {
+    try {
+      const totpCode = await invoke('entries:get-totp', entryId)
+      setCode(typeof totpCode === 'string' && totpCode ? totpCode : '------')
+    } catch {
+      setCode('------')
+    }
+  }, [entryId])
+
+  useEffect(() => {
+    fetchCode()
+    const interval = setInterval(fetchCode, 30000)
+    return () => clearInterval(interval)
+  }, [fetchCode])
+
+  return (
+    <div className="p-3 bg-vault-surface rounded-xl border border-vault-border">
+      <div className="text-xs text-vault-text-secondary mb-1">TOTP</div>
+      <div className="flex items-center justify-between">
+        <span className="text-lg text-vault-accent font-mono font-bold tracking-[0.2em]">
+          {code}
+        </span>
+        <button
+          onClick={() => onCopy(code)}
+          disabled={code === '------'}
+          className="p-1 text-vault-text-secondary hover:text-vault-accent disabled:opacity-50"
+        >
+          <Copy size={16} />
+        </button>
+      </div>
     </div>
   )
 }

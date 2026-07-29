@@ -2164,6 +2164,17 @@ function hexToUint8Array(hex: string): Uint8Array {
 let breachMonitorInterval: ReturnType<typeof setInterval> | null = null
 const BREACH_CHECK_INTERVAL = 24 * 60 * 60 * 1000 // 24 hours
 
+// Tracks the password hash last notified per entry, so an already-known
+// breach doesn't re-alert every 24h — only newly-breached or changed
+// passwords trigger a fresh notification.
+const notifiedBreachesLocal = new Map<number, string>()
+
+async function hashPasswordLocal(password: string): Promise<string> {
+  const data = new TextEncoder().encode(password)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
 export async function checkAllPasswordsForBreachesLocal(): Promise<{ checked: number; breached: number }> {
   const encKey = getEncryptionKey()
   if (!encKey) return { checked: 0, breached: 0 }
@@ -2190,20 +2201,26 @@ export async function checkAllPasswordsForBreachesLocal(): Promise<{ checked: nu
 
       if (breachResult.breached) {
         breached++
-        const title = decryptMetadata(entry.display_title)
+        const pwdHash = await hashPasswordLocal(decrypted.password)
+        if (notifiedBreachesLocal.get(entry.id) !== pwdHash) {
+          notifiedBreachesLocal.set(entry.id, pwdHash)
+          const title = decryptMetadata(entry.display_title)
 
-        // Send push notification
-        try {
-          const { getPushNotification } = await import('../services/pushNotificationService')
-          const push = getPushNotification()
-          if (await push.hasPermission()) {
-            await push.sendLocalNotification({
-              title: '⚠️ Breach Detected',
-              body: `"${title}" was found in ${breachResult.count} data breaches. Change this password immediately.`,
-              data: { entryId: entry.id, breachCount: breachResult.count },
-            })
-          }
-        } catch {}
+          // Send push notification
+          try {
+            const { getPushNotification } = await import('../services/pushNotificationService')
+            const push = getPushNotification()
+            if (await push.hasPermission()) {
+              await push.sendLocalNotification({
+                title: '⚠️ Breach Detected',
+                body: `"${title}" was found in ${breachResult.count} data breaches. Change this password immediately.`,
+                data: { entryId: entry.id, breachCount: breachResult.count },
+              })
+            }
+          } catch {}
+        }
+      } else {
+        notifiedBreachesLocal.delete(entry.id)
       }
     } catch {}
   }

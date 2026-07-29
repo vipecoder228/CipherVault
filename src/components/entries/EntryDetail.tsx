@@ -273,7 +273,11 @@ export function EntryDetail() {
 
           {/* TOTP */}
           {entry.totp_secret && (
-            <TOTPField entryId={entry.id} />
+            <TOTPField
+              entryId={entry.id}
+              copied={copiedField === 'totp_code'}
+              onCopy={(code) => handleCopy(code, 'totp_code')}
+            />
           )}
 
           {/* Card fields */}
@@ -459,7 +463,7 @@ function FieldRow({
   )
 }
 
-function TOTPField({ entryId }: { entryId: number }) {
+function TOTPField({ entryId, copied, onCopy }: { entryId: number; copied: boolean; onCopy: (code: string) => void }) {
   const { t } = useI18n()
   const [code, setCode] = useState('------')
   const [timeLeft, setTimeLeft] = useState(30)
@@ -504,6 +508,17 @@ function TOTPField({ entryId }: { entryId: number }) {
             {code}
           </span>
         </div>
+        <button
+          onClick={() => onCopy(code)}
+          disabled={code === '------'}
+          className={`h-12 px-3 rounded-lg border transition-colors disabled:opacity-50 ${
+            copied
+              ? 'bg-vault-success/10 border-vault-success/30 text-vault-success'
+              : 'bg-vault-surface border-vault-border text-vault-text-secondary hover:text-vault-text'
+          }`}
+        >
+          <Copy size={14} />
+        </button>
         <div className="relative w-10 h-10">
           <svg className="w-10 h-10 -rotate-90" viewBox="0 0 40 40">
             <circle cx="20" cy="20" r="18" fill="none" stroke="var(--vault-border)" strokeWidth="2" />
