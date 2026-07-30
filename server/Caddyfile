@@ -1,0 +1,29 @@
+# Reverse proxy for the CipherVault sync server, with automatic HTTPS.
+#
+# You have a VPS but no domain yet. Two ways to run this:
+#
+# 1) No domain yet (test over the VPS's public IP): replace the domain below
+#    with ":443" and Caddy issues a self-signed local certificate — clients
+#    must explicitly trust it (Electron: not by default; browsers will warn).
+#    Only use this for your own manual testing, not real users.
+#
+# 2) Once you point a domain's A/AAAA record at the VPS: replace
+#    "sync.example.com" below with that domain. Caddy then requests a real
+#    Let's Encrypt certificate automatically on first request — nothing else
+#    to configure. This is the path to use before any real user connects.
+
+sync.example.com {
+	# "Maximum data protection" hardening beyond Caddy's TLS defaults
+	# (Caddy already: TLS 1.2+ only, strong cipher suites, auto-renews certs).
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	encode gzip
+
+	reverse_proxy sync-server:8787
+}

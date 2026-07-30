@@ -47,6 +47,21 @@ export const ERRORS = {
   SYNC_DISABLE_FAILED: 'Не удалось отключить синхронизацию',
   SYNC_PASSWORD_FIRST: 'Сначала введите пароль синхронизации',
 
+  // Sync — remote server
+  SYNC_SERVER_NOT_CONFIGURED: 'Сервер синхронизации не настроен',
+  SYNC_SERVER_NOT_LOGGED_IN: 'Вы не авторизованы на сервере синхронизации',
+  SYNC_SERVER_INVALID_URL: 'Неверный адрес сервера',
+  SYNC_SERVER_USERNAME_TAKEN: 'Это имя пользователя уже занято',
+  SYNC_SERVER_INVALID_CREDENTIALS: 'Неверное имя пользователя или пароль',
+  SYNC_SERVER_REGISTER_FAILED: 'Не удалось зарегистрироваться на сервере',
+  SYNC_SERVER_LOGIN_FAILED: 'Не удалось войти на сервер синхронизации',
+  SYNC_SERVER_NETWORK_ERROR: 'Не удалось связаться с сервером синхронизации',
+  SYNC_SERVER_PUSH_FAILED: 'Не удалось отправить вейлт на сервер',
+  SYNC_SERVER_PULL_FAILED: 'Не удалось получить вейлт с сервера',
+  SYNC_SERVER_CONFLICT: 'Вейлт был обновлён на другом устройстве',
+  SYNC_SERVER_NO_REMOTE_VAULT: 'На сервере пока нет вейлта',
+  SYNC_SERVER_DELETE_ACCOUNT_FAILED: 'Не удалось удалить аккаунт на сервере',
+
   // Shortcut
   SHORTCUT_INVALID_FORMAT: 'Неверный формат горячей клавиши',
   SHORTCUT_REGISTER_FAILED: 'Не удалось зарегистрировать горячую клавишу. Возможно, она занята другим приложением.',

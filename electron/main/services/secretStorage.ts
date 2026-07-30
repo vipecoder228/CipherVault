@@ -36,6 +36,11 @@ export async function getSecret(key: string): Promise<string | null> {
   }
 }
 
+export async function clearSecret(key: string): Promise<void> {
+  const db = await getDatabase()
+  db.run('DELETE FROM settings WHERE key = ?', [key])
+}
+
 export async function hasSecret(key: string): Promise<boolean> {
   try {
     const db = await getDatabase()

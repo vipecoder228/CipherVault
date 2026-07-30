@@ -11,6 +11,7 @@ import { startBreachMonitor, stopBreachMonitor } from './services/breach-monitor
 import { logAuditEvent, stopAuditLog, initAuditLog } from './security/auditLog'
 import { verifyIntegrity } from './security/tamperDetection'
 import { loadSyncSettings, stopSync } from './services/sync.service'
+import { loadSyncServerSettings } from './services/syncServer.service'
 import { toggleWindow } from './utils/window'
 import { initUpdater } from './updater'
 
@@ -179,6 +180,7 @@ app.whenReady().then(async () => {
   createTray()
   startWebSocketServer()
   loadSyncSettings()
+  loadSyncServerSettings()
   startBreachMonitor()
 
   // Log app start

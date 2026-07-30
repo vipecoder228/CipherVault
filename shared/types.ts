@@ -207,6 +207,33 @@ export interface EntryHistoryItem {
   changed_at: string
 }
 
+// ─── Remote Sync Server ─────────────────────────────────
+
+export interface SyncServerStatus {
+  configured: boolean
+  serverUrl: string | null
+  loggedIn: boolean
+  username: string | null
+  deviceId: string | null
+  deviceName: string | null
+  lastSeenVersion: number
+  lastSyncTime: number
+}
+
+// 'conflict' means the server rejected the push because another device
+// pushed a newer version in the meantime — the caller must show the
+// conflict-resolution UI instead of silently retrying.
+export interface SyncServerPushResult {
+  success: boolean
+  error?: string
+  conflict?: {
+    currentVersion: number
+    updatedAt: number
+    deviceId: string
+    deviceName: string
+  }
+}
+
 // ─── IPC Channels ───────────────────────────────────────
 
 export interface IPCChannels {
@@ -292,6 +319,16 @@ export interface IPCChannels {
   'sync:now': () => Promise<{ success: boolean; error?: string }>
   'sync:disable': () => Promise<void>
   'sync:load-settings': () => Promise<{ enabled: boolean; folder: string | null }>
+
+  // Sync — remote server provider
+  'syncServer:configure': (url: string) => Promise<void>
+  'syncServer:register': (username: string, syncPassword: string) => Promise<{ success: boolean; error?: string }>
+  'syncServer:login': (username: string, syncPassword: string, deviceName: string) => Promise<{ success: boolean; error?: string }>
+  'syncServer:logout': () => Promise<void>
+  'syncServer:push': (syncPassword: string, forceVersion?: number) => Promise<SyncServerPushResult>
+  'syncServer:pull': (syncPassword: string) => Promise<{ success: boolean; error?: string; imported?: boolean }>
+  'syncServer:status': () => Promise<SyncServerStatus>
+  'syncServer:delete-account': () => Promise<{ success: boolean; error?: string }>
 
   // Import/Export
   'import:csv': () => Promise<ImportResult>

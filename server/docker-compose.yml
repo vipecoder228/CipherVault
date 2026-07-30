@@ -1,0 +1,45 @@
+# Self-hosted sync server + Caddy reverse proxy (automatic HTTPS via Let's
+# Encrypt once a domain is set in Caddyfile). Build context is the repo root
+# because the server image also needs shared/syncProtocol.ts.
+#
+# Usage:
+#   cd server && docker compose up -d --build
+#
+# The sqlite db lives in the `sync-data` named volume — back it up with:
+#   docker run --rm -v server_sync-data:/data -v "$PWD":/backup alpine \
+#     cp /data/sync.db /backup/sync.db.bak
+
+services:
+  sync-server:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    restart: unless-stopped
+    environment:
+      - PORT=8787
+      - DATA_DIR=/data
+    volumes:
+      - sync-data:/data
+    # Not published to the host — only Caddy talks to it, over the compose
+    # network. Remove this line only for local testing without a proxy.
+    expose:
+      - "8787"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - sync-server
+
+volumes:
+  sync-data:
+  caddy-data:
+  caddy-config:

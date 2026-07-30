@@ -11,12 +11,15 @@ import {
 import { encryptJSON, decryptJSON, encrypt } from '../../shared/crypto/encryption'
 import {
   deriveKey,
+  deriveKeyArgon2id32,
   splitDerivedKey,
   computeVerificationHash,
   generateSalt,
+  type KdfType,
 } from '../../shared/crypto/keyderivation'
 import { RATE_LIMIT } from '../../shared/crypto/constants'
 import { mapColumns, mapEntryType } from '../../shared/importMapper'
+import * as syncServerClient from './syncServerClient'
 import type {
   IPCChannels,
   VaultStatus,
@@ -219,7 +222,7 @@ async function setupVault(
 
   webRun(
     'INSERT INTO vault (master_hash, kdf_salt, kdf_type) VALUES (?, ?, ?)',
-    [masterHash, arrayToHex(salt), 'pbkdf2']
+    [masterHash, arrayToHex(salt), 'argon2id']
   )
 
   const lastIdResult = webQueryAll<any>('SELECT last_insert_rowid() as id')
@@ -280,8 +283,13 @@ async function unlockVault(
     return { success: false, error: 'Vault not initialized' }
   }
 
+  // kdf_type selects which KDF verifies the stored hash. There's no separate
+  // alarm_kdf_type column, so the alarm password is assumed to have been
+  // derived with the same KDF the vault used at the time it was set up.
+  const kdfType = (vault.kdf_type as KdfType) ?? 'pbkdf2'
+
   const salt = hexToArray(vault.kdf_salt)
-  const key = await deriveKey(masterPassword, salt)
+  const key = await deriveKey(masterPassword, salt, kdfType)
   const { encryptionKey } = splitDerivedKey(key)
   const computedHash = await computeVerificationHash(encryptionKey)
 
@@ -291,7 +299,7 @@ async function unlockVault(
     isAlarm = false
   } else if (vault.alarm_hash && vault.alarm_salt) {
     const alarmSalt = hexToArray(vault.alarm_salt)
-    const alarmKey = await deriveKey(masterPassword, alarmSalt)
+    const alarmKey = await deriveKey(masterPassword, alarmSalt, kdfType)
     const { encryptionKey: alarmEncKey } = splitDerivedKey(alarmKey)
     const alarmHash = await computeVerificationHash(alarmEncKey)
 
@@ -328,7 +336,14 @@ async function unlockVault(
     }
   }
 
-  derivedKey = isAlarm ? null : key
+  // Transparent migration: a legacy PBKDF2 vault that just unlocked successfully
+  // is upgraded to Argon2id in place, using the same master password.
+  let unlockedKey = key
+  if (!isAlarm && kdfType !== 'argon2id') {
+    unlockedKey = await migrateVaultToArgon2id(masterPassword, encryptionKey, vault, targetVaultId)
+  }
+
+  derivedKey = isAlarm ? null : unlockedKey
   panicKey = isAlarm ? key : null
   alarmMode = isAlarm
   activeVaultId = targetVaultId
@@ -337,6 +352,99 @@ async function unlockVault(
   await startAutoLockTimer()
 
   return { success: true, alarmMode: isAlarm }
+}
+
+// Re-derives the vault key with Argon2id (fresh salt) and re-encrypts everything
+// that was encrypted with the old key, then flips kdf_type in the DB. Best-effort:
+// if anything fails, the vault stays on its current KDF and unlock still succeeds.
+async function migrateVaultToArgon2id(
+  masterPassword: string,
+  oldEncKey: Uint8Array,
+  vault: any,
+  vaultId: number
+): Promise<Uint8Array> {
+  try {
+    const newSalt = generateSalt()
+    const newKey = await deriveKey(masterPassword, newSalt, 'argon2id')
+    const { encryptionKey: newEncKey } = splitDerivedKey(newKey)
+    const newHash = await computeVerificationHash(newEncKey)
+
+    if (vault.totp_enabled && vault.totp_secret) {
+      const parsed = parseTotpSecret(vault.totp_secret)
+      if (parsed) {
+        const decryptedSecret = await decryptJSON<string>(parsed, oldEncKey)
+        const reEncrypted = await encrypt(decryptedSecret, newEncKey)
+        const reEncryptedStr = `${reEncrypted.iv}:${reEncrypted.ciphertext}:${reEncrypted.authTag}`
+        webRun(`UPDATE vault SET totp_secret = ?, updated_at = datetime('now') WHERE id = ?`, [reEncryptedStr, vaultId])
+      }
+    }
+
+    await reencryptEntriesAndHistory(oldEncKey, newEncKey, vaultId)
+
+    webRun(
+      `UPDATE vault SET master_hash = ?, kdf_salt = ?, kdf_type = 'argon2id', updated_at = datetime('now') WHERE id = ?`,
+      [newHash, arrayToHex(newSalt), vaultId]
+    )
+
+    return newKey
+  } catch (err) {
+    console.error('KDF migration to Argon2id failed, vault remains on legacy KDF:', err)
+    return await deriveKey(masterPassword, hexToArray(vault.kdf_salt), (vault.kdf_type as KdfType) ?? 'pbkdf2')
+  }
+}
+
+// Shared re-encryption pass used both by explicit password changes and by the
+// transparent PBKDF2 → Argon2id migration on unlock.
+async function reencryptEntriesAndHistory(
+  oldEncKey: Uint8Array,
+  newEncKey: Uint8Array,
+  vaultId: number
+): Promise<void> {
+  try {
+    webRun('BEGIN TRANSACTION')
+
+    const entries = webQueryAll<any>(
+      'SELECT id, encrypted_data, iv, auth_tag FROM encrypted_entries WHERE vault_id = ?',
+      [vaultId]
+    )
+    for (const row of entries) {
+      const decrypted = await decryptJSON<Record<string, string>>(
+        { iv: row.iv, ciphertext: row.encrypted_data, authTag: row.auth_tag },
+        oldEncKey
+      )
+      const reEncrypted = await encryptJSON(decrypted, newEncKey)
+      webRun(
+        `UPDATE encrypted_entries SET encrypted_data = ?, iv = ?, auth_tag = ?, updated_at = datetime('now') WHERE id = ?`,
+        [reEncrypted.ciphertext, reEncrypted.iv, reEncrypted.authTag, row.id]
+      )
+    }
+
+    const historyRows = webQueryAll<any>(
+      `SELECT h.id, h.encrypted_snapshot, h.iv, h.auth_tag
+       FROM entry_history h
+       JOIN encrypted_entries e ON h.entry_id = e.id
+       WHERE e.vault_id = ?`,
+      [vaultId]
+    )
+    for (const row of historyRows) {
+      try {
+        const decrypted = await decryptJSON<Record<string, string>>(
+          { iv: row.iv, ciphertext: row.encrypted_snapshot, authTag: row.auth_tag },
+          oldEncKey
+        )
+        const reEncrypted = await encryptJSON(decrypted, newEncKey)
+        webRun(
+          `UPDATE entry_history SET encrypted_snapshot = ?, iv = ?, auth_tag = ? WHERE id = ?`,
+          [reEncrypted.ciphertext, reEncrypted.iv, reEncrypted.authTag, row.id]
+        )
+      } catch {}
+    }
+
+    webRun('COMMIT')
+  } catch (err) {
+    webRun('ROLLBACK')
+    throw err
+  }
 }
 
 // ─── Entry Operations ───────────────────────────────────
@@ -656,8 +764,10 @@ function completePanic(): void {
   clearPanicKey()
 }
 
-// Save backup as downloadable file (web version)
-async function sendBackupWeb(backupData: string): Promise<{ success: boolean; error?: string; filePath?: string; sent?: boolean }> {
+// Save backup as downloadable file (web version). Web/mobile has no Telegram
+// path (no filesystem access to attach a document from) — always a direct
+// browser download, so `reason` is fixed to explain that to the UI.
+async function sendBackupWeb(backupData: string): Promise<{ success: boolean; error?: string; filePath?: string; sent?: boolean; reason?: string }> {
   try {
     const blob = new Blob([backupData], { type: 'application/octet-stream' })
     const url = URL.createObjectURL(blob)
@@ -670,7 +780,7 @@ async function sendBackupWeb(backupData: string): Promise<{ success: boolean; er
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
 
-    return { success: true, sent: false }
+    return { success: true, sent: false, reason: 'web_download_only' }
   } catch (err: any) {
     return { success: false, error: err.message }
   }
@@ -1405,8 +1515,9 @@ export const webHandlers: HandlerMap = {
       if (!await verifyTOTP(decryptedSecret, totpCode)) return { success: false, error: 'Invalid TOTP code' }
     }
 
+    const oldKdfType = (vault.kdf_type as KdfType) ?? 'pbkdf2'
     const oldSalt = hexToArray(vault.kdf_salt)
-    const oldKey = await deriveKey(oldPassword, oldSalt)
+    const oldKey = await deriveKey(oldPassword, oldSalt, oldKdfType)
     const { encryptionKey: oldEncKey } = splitDerivedKey(oldKey)
     const oldHash = await computeVerificationHash(oldEncKey)
 
@@ -1414,8 +1525,10 @@ export const webHandlers: HandlerMap = {
       return { success: false, error: 'Current password is incorrect' }
     }
 
+    // Password changes always upgrade the vault to Argon2id, regardless of
+    // what KDF it was on before.
     const newSalt = generateSalt()
-    const newKey = await deriveKey(newPassword, newSalt)
+    const newKey = await deriveKey(newPassword, newSalt, 'argon2id')
     const { encryptionKey: newEncKey } = splitDerivedKey(newKey)
     const newHash = await computeVerificationHash(newEncKey)
 
@@ -1430,56 +1543,10 @@ export const webHandlers: HandlerMap = {
       }
     }
 
-    try {
-      webRun('BEGIN TRANSACTION')
-
-      // Re-encrypt all entries
-      const entries = webQueryAll<any>(
-        'SELECT id, encrypted_data, iv, auth_tag FROM encrypted_entries WHERE vault_id = ?',
-        [activeVaultId]
-      )
-      for (const row of entries) {
-        const decrypted = await decryptJSON<Record<string, string>>(
-          { iv: row.iv, ciphertext: row.encrypted_data, authTag: row.auth_tag },
-          oldEncKey
-        )
-        const reEncrypted = await encryptJSON(decrypted, newEncKey)
-        webRun(
-          `UPDATE encrypted_entries SET encrypted_data = ?, iv = ?, auth_tag = ?, updated_at = datetime('now') WHERE id = ?`,
-          [reEncrypted.ciphertext, reEncrypted.iv, reEncrypted.authTag, row.id]
-        )
-      }
-
-      // Re-encrypt history
-      const historyRows = webQueryAll<any>(
-        `SELECT h.id, h.encrypted_snapshot, h.iv, h.auth_tag
-         FROM entry_history h
-         JOIN encrypted_entries e ON h.entry_id = e.id
-         WHERE e.vault_id = ?`,
-        [activeVaultId]
-      )
-      for (const row of historyRows) {
-        try {
-          const decrypted = await decryptJSON<Record<string, string>>(
-            { iv: row.iv, ciphertext: row.encrypted_snapshot, authTag: row.auth_tag },
-            oldEncKey
-          )
-          const reEncrypted = await encryptJSON(decrypted, newEncKey)
-          webRun(
-            `UPDATE entry_history SET encrypted_snapshot = ?, iv = ?, auth_tag = ? WHERE id = ?`,
-            [reEncrypted.ciphertext, reEncrypted.iv, reEncrypted.authTag, row.id]
-          )
-        } catch {}
-      }
-
-      webRun('COMMIT')
-    } catch (err) {
-      webRun('ROLLBACK')
-      throw err
-    }
+    await reencryptEntriesAndHistory(oldEncKey, newEncKey, activeVaultId)
 
     webRun(
-      `UPDATE vault SET master_hash = ?, kdf_salt = ?, kdf_type = 'pbkdf2', updated_at = datetime('now') WHERE id = ?`,
+      `UPDATE vault SET master_hash = ?, kdf_salt = ?, kdf_type = 'argon2id', updated_at = datetime('now') WHERE id = ?`,
       [newHash, arrayToHex(newSalt), activeVaultId]
     )
 
@@ -1529,8 +1596,13 @@ export const webHandlers: HandlerMap = {
   'vault:setup-alarm': async (_: any, alarmPassword: string, backupEmail?: string) => {
     const encKey = getEncryptionKey()
     if (!encKey) return { success: false, error: 'Vault is locked' }
+    const vault = webQueryOne<any>('SELECT * FROM vault WHERE id = ?', [activeVaultId])
+    // The alarm password shares the vault's kdf_type — there's no separate
+    // alarm_kdf_type column, and unlockVault verifies the alarm hash using
+    // vault.kdf_type, so this must match.
+    const kdfType = (vault?.kdf_type as KdfType) ?? 'argon2id'
     const salt = generateSalt()
-    const key = await deriveKey(alarmPassword, salt)
+    const key = await deriveKey(alarmPassword, salt, kdfType)
     const { encryptionKey } = splitDerivedKey(key)
     const alarmHash = await computeVerificationHash(encryptionKey)
     webRun(`UPDATE vault SET alarm_hash = ?, alarm_salt = ?, updated_at = datetime('now') WHERE id = ?`, [alarmHash, arrayToHex(salt), activeVaultId])
@@ -1545,14 +1617,15 @@ export const webHandlers: HandlerMap = {
     const vault = webQueryOne<any>('SELECT * FROM vault WHERE id = ?', [activeVaultId])
     if (!vault || !vault.alarm_hash || !vault.alarm_salt) return { success: false, error: 'Alarm password not set' }
 
+    const kdfType = (vault.kdf_type as KdfType) ?? 'pbkdf2'
     const oldSalt = hexToArray(vault.alarm_salt)
-    const oldKey = await deriveKey(oldAlarm, oldSalt)
+    const oldKey = await deriveKey(oldAlarm, oldSalt, kdfType)
     const { encryptionKey: oldEncKey } = splitDerivedKey(oldKey)
     const oldHash = await computeVerificationHash(oldEncKey)
     if (!timingSafeStringEqual(oldHash, vault.alarm_hash)) return { success: false, error: 'Invalid alarm password' }
 
     const newSalt = generateSalt()
-    const newKey = await deriveKey(newAlarm, newSalt)
+    const newKey = await deriveKey(newAlarm, newSalt, kdfType)
     const { encryptionKey: newEncKey } = splitDerivedKey(newKey)
     const newHash = await computeVerificationHash(newEncKey)
     webRun(`UPDATE vault SET alarm_hash = ?, alarm_salt = ?, updated_at = datetime('now') WHERE id = ?`, [newHash, arrayToHex(newSalt), activeVaultId])
@@ -1571,8 +1644,9 @@ export const webHandlers: HandlerMap = {
     const vault = webQueryOne<any>('SELECT * FROM vault WHERE id = ?', [activeVaultId])
     if (!vault) return false
     try {
+      const kdfType = (vault.kdf_type as KdfType) ?? 'pbkdf2'
       const salt = hexToArray(vault.kdf_salt)
-      const key = await deriveKey(password, salt)
+      const key = await deriveKey(password, salt, kdfType)
       const { encryptionKey } = splitDerivedKey(key)
       const computedHash = await computeVerificationHash(encryptionKey)
       return timingSafeStringEqual(computedHash, vault.master_hash)
@@ -1748,6 +1822,19 @@ export const webHandlers: HandlerMap = {
   'sync:now': () => Promise.resolve({ success: false, error: 'Not supported on mobile' }),
   'sync:disable': () => Promise.resolve(),
   'sync:load-settings': () => Promise.resolve({ enabled: false, folder: null }),
+
+  // Sync — remote server provider
+  'syncServer:configure': (_: any, url: string) => syncServerClient.configureServer(url),
+  'syncServer:register': (_: any, username: string, syncPassword: string) =>
+    syncServerClient.registerAccount(username, syncPassword),
+  'syncServer:login': (_: any, username: string, syncPassword: string, deviceName: string) =>
+    syncServerClient.loginAccount(username, syncPassword, deviceName),
+  'syncServer:logout': () => syncServerClient.logoutAccount(),
+  'syncServer:push': (_: any, syncPassword: string, forceVersion?: number) =>
+    syncServerClient.pushVault(syncPassword, forceVersion),
+  'syncServer:pull': (_: any, syncPassword: string) => syncServerClient.pullVault(syncPassword),
+  'syncServer:status': () => syncServerClient.getSyncServerStatus(),
+  'syncServer:delete-account': () => syncServerClient.deleteAccount(),
   'backup:export': () => Promise.resolve({ success: false, error: 'Not supported on mobile' }),
   'backup:import': () => Promise.resolve({ success: false, error: 'Not supported on mobile' }),
   'backup:import-panic': () => importPanicBackup(),
@@ -2007,29 +2094,40 @@ async function importPanicBackup(): Promise<{ success: boolean; error?: string; 
 
   try {
     const fileContent = await file.text()
-    const combined = Uint8Array.from(atob(fileContent.trim()), c => c.charCodeAt(0))
+    const raw = Uint8Array.from(atob(fileContent.trim()), c => c.charCodeAt(0))
+
+    // New envelopes (Argon2id) are prefixed with "CVP2"; older backups have
+    // no prefix and were encrypted with PBKDF2 — see PanicChoiceScreen.tsx.
+    const magic = new TextEncoder().encode('CVP2')
+    const isArgon2Envelope = magic.every((b, i) => raw[i] === b)
+    const combined = isArgon2Envelope ? raw.slice(4) : raw
 
     // salt(32) + iv(12) + ciphertext+authTag
     const salt = combined.slice(0, 32)
     const iv = combined.slice(32, 44)
     const encryptedData = combined.slice(44)
 
-    // Derive key via PBKDF2
-    const keyMaterial = await crypto.subtle.importKey(
-      'raw',
-      new TextEncoder().encode(backupPassword),
-      'PBKDF2',
-      false,
-      ['deriveKey']
-    )
+    let key: CryptoKey
+    if (isArgon2Envelope) {
+      const rawKey = await deriveKeyArgon2id32(backupPassword, salt)
+      key = await crypto.subtle.importKey('raw', rawKey, 'AES-GCM', false, ['decrypt'])
+    } else {
+      const keyMaterial = await crypto.subtle.importKey(
+        'raw',
+        new TextEncoder().encode(backupPassword),
+        'PBKDF2',
+        false,
+        ['deriveKey']
+      )
 
-    const key = await crypto.subtle.deriveKey(
-      { name: 'PBKDF2', salt, iterations: 600000, hash: 'SHA-256' },
-      keyMaterial,
-      { name: 'AES-GCM', length: 256 },
-      false,
-      ['decrypt']
-    )
+      key = await crypto.subtle.deriveKey(
+        { name: 'PBKDF2', salt, iterations: 600000, hash: 'SHA-256' },
+        keyMaterial,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['decrypt']
+      )
+    }
 
     const decrypted = await crypto.subtle.decrypt(
       { name: 'AES-GCM', iv },

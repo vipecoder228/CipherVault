@@ -13,7 +13,10 @@ import { PanicBackupImportDialog } from '../import-export/PanicBackupImportDialo
 import { SecurityHealth } from '../health/SecurityHealth'
 import { SyncSettings } from './SyncSettings'
 import { EmergencyAccess } from '../health/EmergencyAccess'
-import { Shield, Palette, Info, ChevronRight } from 'lucide-react'
+import { Shield, Palette, Info, ChevronRight, Heart } from 'lucide-react'
+
+// Change this to update the "Support the project" link everywhere.
+const SUPPORT_PROJECT_URL = 'https://boosty.to/vibecoder228'
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(false)
@@ -614,6 +617,9 @@ function AlarmSetupModal({ onClose, onStatusChange }: { onClose: () => void; onS
       <div className="w-full max-w-sm mx-4 bg-vault-surface border border-vault-border rounded-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <h3 className="text-lg font-semibold text-vault-text">{t('setup_duress')}</h3>
         <p className="text-sm text-vault-text-secondary">{t('duress_description')}</p>
+        <div className="bg-vault-warning/10 border border-vault-warning/30 rounded-lg p-3">
+          <p className="text-xs text-vault-warning">{t('duress_wipe_warning')}</p>
+        </div>
         <Input label={t('duress_password')} type="password" value={alarmPassword} onChange={(e) => setAlarmPassword(e.target.value)} showPasswordToggle />
         <Input label={t('confirm_password')} type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} showPasswordToggle />
 
@@ -878,6 +884,15 @@ function AboutTab() {
       <div className="p-4 rounded-xl bg-vault-bg border border-vault-border text-left">
         <p className="text-xs text-vault-text-secondary leading-relaxed">{t('about_description')}</p>
       </div>
+      <a
+        href={SUPPORT_PROJECT_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-vault-accent/10 border border-vault-accent/30 text-xs font-medium text-vault-accent hover:bg-vault-accent/20 transition-colors"
+      >
+        <Heart size={14} />
+        {t('support_project')}
+      </a>
       <div className="flex gap-3">
         <button
           onClick={exportSettings}

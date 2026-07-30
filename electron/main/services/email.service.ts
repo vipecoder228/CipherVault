@@ -29,9 +29,9 @@ async function getTelegramChatId(): Promise<string | null> {
   return getSecret('telegram_chat_id')
 }
 
-async function sendViaTelegram(chatId: string, _backupData: string, filePath: string): Promise<boolean> {
+async function sendViaTelegram(chatId: string, _backupData: string, filePath: string): Promise<{ sent: boolean; reason?: string }> {
   const token = await getTelegramToken()
-  if (!token) return false
+  if (!token) return { sent: false, reason: 'no_token' }
 
   try {
     const timestamp = new Date().toISOString()
@@ -58,9 +58,9 @@ async function sendViaTelegram(chatId: string, _backupData: string, filePath: st
       body: formData,
     })
 
-    return res.ok
+    return res.ok ? { sent: true } : { sent: false, reason: 'telegram_rejected' }
   } catch {
-    return false
+    return { sent: false, reason: 'network_error' }
   }
 }
 
@@ -125,7 +125,7 @@ export async function sendBreachNotification(entryTitle: string, breachCount: nu
 
 export async function sendBackup(
   backupData: string
-): Promise<{ success: boolean; error?: string; filePath?: string; sent?: boolean; sentVia?: string }> {
+): Promise<{ success: boolean; error?: string; filePath?: string; sent?: boolean; sentVia?: string; reason?: string }> {
   try {
     // 1. Always save to file (guaranteed)
     const filePath = saveBackupToFile(backupData)
@@ -133,10 +133,18 @@ export async function sendBackup(
     // 2. Try Telegram if configured
     const chatId = await getTelegramChatId()
     if (chatId) {
-      const sent = await sendViaTelegram(chatId, backupData, filePath)
+      const { sent, reason } = await sendViaTelegram(chatId, backupData, filePath)
       if (sent) {
         return { success: true, filePath, sent: true, sentVia: 'telegram' }
       }
+      // Telegram configured but failed — still fall through to the mailto
+      // fallback below, but keep the failure reason so the UI can explain why.
+      const timestamp = new Date().toISOString()
+      const mailtoBody = encodeURIComponent(
+        `CipherVault Encrypted Backup\n\nEncrypted backup saved to:\n${filePath}\n\nAttach the file and send it.`
+      )
+      shell.openExternal(`mailto:?subject=${encodeURIComponent(`CipherVault Backup — ${timestamp}`)}&body=${mailtoBody}`)
+      return { success: true, filePath, sent: false, reason }
     }
 
     // 3. Fallback: open email client
@@ -146,7 +154,7 @@ export async function sendBackup(
     )
     shell.openExternal(`mailto:?subject=${encodeURIComponent(`CipherVault Backup — ${timestamp}`)}&body=${mailtoBody}`)
 
-    return { success: true, filePath, sent: false }
+    return { success: true, filePath, sent: false, reason: 'no_telegram_configured' }
   } catch (err: any) {
     return { success: false, error: err.message || 'Failed to save backup' }
   }

@@ -11,6 +11,7 @@ import { checkAllPasswordsForBreaches } from '../services/breach-monitor.service
 import * as backupService from '../services/backup.service'
 import { analyzePasswordHealth } from '../services/health.service'
 import * as syncService from '../services/sync.service'
+import * as syncServerService from '../services/syncServer.service'
 import { sendBackup, testTelegramConnection, getTelegramChatIdFromToken, saveTelegramConfig, sendBreachNotification } from '../services/email.service'
 import { saveSecret, getSecret } from '../services/secretStorage'
 import { getDatabase } from '../db/connection'
@@ -316,19 +317,27 @@ const handlers: Record<string, (...args: any[]) => any> = {
       const { decryptJSON } = await import('../crypto/encryption')
 
       const fileContent = readFileSync(filePath, 'utf-8').trim()
-      const combined = Buffer.from(fileContent, 'base64')
+      const raw = Buffer.from(fileContent, 'base64')
+
+      // New envelopes (Argon2id) are prefixed with "CVP2"; older backups have
+      // no prefix and were encrypted with PBKDF2 — see PanicChoiceScreen.tsx.
+      const magic = Buffer.from('CVP2', 'utf-8')
+      const isArgon2Envelope = raw.subarray(0, 4).equals(magic)
+      const combined = isArgon2Envelope ? raw.subarray(4) : raw
 
       // salt(32) + iv(12) + ciphertext+authTag
       const salt = combined.subarray(0, 32)
       const iv = combined.subarray(32, 44)
       const encryptedData = combined.subarray(44)
 
-      const key = await new Promise<Buffer>((resolve, reject) => {
-        pbkdf2(backupPassword, salt, 600000, 32, 'sha256', (err, derivedKey) => {
-          if (err) reject(err)
-          else resolve(derivedKey)
-        })
-      })
+      const key = isArgon2Envelope
+        ? (await deriveKey(backupPassword, salt))
+        : await new Promise<Buffer>((resolve, reject) => {
+            pbkdf2(backupPassword, salt, 600000, 32, 'sha256', (err, derivedKey) => {
+              if (err) reject(err)
+              else resolve(derivedKey)
+            })
+          })
       const decipher = createDecipheriv('aes-256-gcm', key, iv, { authTagLength: 16 })
       decipher.setAuthTag(encryptedData.subarray(encryptedData.length - 16))
       const decrypted = Buffer.concat([
@@ -448,6 +457,19 @@ const handlers: Record<string, (...args: any[]) => any> = {
   'sync:now': () => syncService.syncNow(),
   'sync:disable': () => syncService.disableSync(),
   'sync:load-settings': () => syncService.loadSyncSettings(),
+
+  // Sync — remote server
+  'syncServer:configure': (_: unknown, url: string) => syncServerService.configureServer(url),
+  'syncServer:register': (_: unknown, username: string, syncPassword: string) =>
+    syncServerService.registerAccount(username, syncPassword),
+  'syncServer:login': (_: unknown, username: string, syncPassword: string, deviceName: string) =>
+    syncServerService.loginAccount(username, syncPassword, deviceName),
+  'syncServer:logout': () => syncServerService.logoutAccount(),
+  'syncServer:push': (_: unknown, syncPassword: string, forceVersion?: number) =>
+    syncServerService.pushVault(syncPassword, forceVersion),
+  'syncServer:pull': (_: unknown, syncPassword: string) => syncServerService.pullVault(syncPassword),
+  'syncServer:status': () => syncServerService.getSyncServerStatus(),
+  'syncServer:delete-account': () => syncServerService.deleteAccount(),
 
   // Global Shortcut
   'shortcut:get': async () => {

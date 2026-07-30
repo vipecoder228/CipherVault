@@ -134,7 +134,7 @@ function runMigrations(database: Database): void {
 
 const SQLITE_MAGIC = 'SQLite format 3'
 
-function arrayToBase64(bytes: Uint8Array): string {
+export function arrayToBase64(bytes: Uint8Array): string {
   let binary = ''
   for (let i = 0; i < bytes.length; i++) {
     binary += String.fromCharCode(bytes[i])
@@ -142,7 +142,7 @@ function arrayToBase64(bytes: Uint8Array): string {
   return btoa(binary)
 }
 
-function base64ToArray(b64: string): Uint8Array {
+export function base64ToArray(b64: string): Uint8Array {
   const binaryString = atob(b64)
   const bytes = new Uint8Array(binaryString.length)
   for (let i = 0; i < binaryString.length; i++) {
@@ -153,7 +153,9 @@ function base64ToArray(b64: string): Uint8Array {
 
 function isValidSqlite(bytes: Uint8Array): boolean {
   if (bytes.length < 16) return false
-  const header = new TextDecoder().decode(bytes.slice(0, 16))
+  // The real SQLite header is "SQLite format 3\000" (16 bytes, NUL-terminated),
+  // so decode only the 15 magic bytes rather than requiring an exact 16-byte match.
+  const header = new TextDecoder().decode(bytes.slice(0, SQLITE_MAGIC.length))
   return header === SQLITE_MAGIC
 }
 
@@ -315,4 +317,17 @@ export function webRun(sql: string, params: any[] = []): void {
 export function getRawDb(): Database {
   if (!db) throw new Error('Database not initialized')
   return db
+}
+
+// Replaces the entire local database with `bytes` (a full sqlite file, e.g.
+// pulled from the remote sync server) and persists it. Used for whole-vault
+// pull, as opposed to the per-table merge in src/services/googleDriveSync.ts.
+export async function replaceWebDatabase(bytes: Uint8Array): Promise<void> {
+  if (!isValidSqlite(bytes)) throw new Error('Invalid database file')
+  const SQL = await initSql()
+  const newDb = new SQL.Database(bytes)
+  newDb.run('PRAGMA foreign_keys = ON')
+  if (db) db.close()
+  db = newDb
+  await saveDbToDisk(db)
 }

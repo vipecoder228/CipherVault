@@ -39,7 +39,7 @@
 | Метод | Описание |
 |-------|----------|
 | **AES-256-GCM** | Authenticated encryption всех данных |
-| **Argon2id** | Memory-hard key derivation (OWASP рекомендация) |
+| **Argon2id** | Memory-hard key derivation (OWASP рекомендация). Desktop — нативный addon, Web/Mobile — WASM (`hash-wasm`). Старые вейлты на PBKDF2 мигрируют на Argon2id автоматически при следующей разблокировке |
 | **Constant-time сравнение** | Защита от timing attacks |
 | **CSPRNG** | `crypto.randomInt` для генерации паролей |
 
@@ -76,6 +76,11 @@
 - **Key Zeroing** — обнуление ключей при блокировке / смене пароля
 - **HMAC Audit Log** — целостность аудит-лога через HMAC-SHA256 подписи
 - **Password Age Tracking** — отслеживание даты смены пароля
+
+### Duress-режим (аварийный код)
+- Отдельный "паник"-пароль разблокирует vault в режиме принуждения
+- При активации: попытка отправить бэкап (Telegram / файл), затем **безусловное** безвозвратное удаление всех записей — удаление происходит даже если бэкап не настроен, не отправился или упал с ошибкой
+- Это осознанный tradeoff: под угрозой принуждения откладывать удаление до подтверждения бэкапа недопустимо
 
 ---
 
@@ -234,7 +239,7 @@ npx tsc --noEmit
 | Десктоп | Electron 33 |
 | Мобильное | Capacitor 8 |
 | Интерфейс | React 19 + TypeScript |
-| Крипто | AES-256-GCM + Argon2id |
+| Крипто | AES-256-GCM + Argon2id (desktop — native, web/mobile — WASM) |
 | БД | sql.js (SQLite) |
 | Тесты | Vitest (300 tests) |
 | API | REST / HTTPS (port 19824) |

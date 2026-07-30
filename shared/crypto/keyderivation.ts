@@ -1,4 +1,7 @@
+import { argon2id } from 'hash-wasm'
 import { CRYPTO } from './constants'
+
+export type KdfType = 'argon2id' | 'pbkdf2'
 
 // Convert hex string to Uint8Array
 function hexToBytes(hex: string): Uint8Array {
@@ -21,8 +24,45 @@ export function generateSalt(): Uint8Array {
   return crypto.getRandomValues(new Uint8Array(CRYPTO.SALT_SIZE))
 }
 
-// PBKDF2 Key Derivation using Web Crypto API
-export async function deriveKey(
+// Argon2id Key Derivation (OWASP recommended) via WASM — works in browser/Capacitor WebView
+export async function deriveKeyArgon2id(
+  password: string,
+  salt: Uint8Array,
+): Promise<Uint8Array> {
+  return argon2id({
+    password,
+    salt,
+    iterations: CRYPTO.ARGON2.TIME_COST,
+    parallelism: CRYPTO.ARGON2.PARALLELISM,
+    memorySize: CRYPTO.ARGON2.MEMORY_COST,
+    hashLength: CRYPTO.PBKDF2.KEY_LENGTH, // 64 bytes: split into encryption + HMAC key
+    outputType: 'binary',
+  })
+}
+
+// Single 32-byte Argon2id key, no enc/HMAC split — mirrors
+// electron/main/crypto/keyderivation.ts's deriveKey exactly (same
+// time/memory/parallelism/hashLength), so the same password+salt produce the
+// same key on both platforms. Used for the panic-backup envelope, which needs
+// a plain AES-256 key rather than the vault's split encryption+HMAC key.
+export async function deriveKeyArgon2id32(
+  password: string,
+  salt: Uint8Array,
+): Promise<Uint8Array> {
+  return argon2id({
+    password,
+    salt,
+    iterations: CRYPTO.ARGON2.TIME_COST,
+    parallelism: CRYPTO.ARGON2.PARALLELISM,
+    memorySize: CRYPTO.ARGON2.MEMORY_COST,
+    hashLength: CRYPTO.ARGON2.KEY_LENGTH, // 32 bytes
+    outputType: 'binary',
+  })
+}
+
+// Legacy PBKDF2 Key Derivation using Web Crypto API — kept only to unlock
+// pre-existing vaults; new/migrated vaults use deriveKeyArgon2id above.
+export async function deriveKeyPbkdf2(
   password: string,
   salt: Uint8Array,
 ): Promise<Uint8Array> {
@@ -49,6 +89,17 @@ export async function deriveKey(
   )
 
   return new Uint8Array(derivedBits)
+}
+
+// Derive a key using the KDF stored for a given vault (defaults to Argon2id for new vaults)
+export async function deriveKey(
+  password: string,
+  salt: Uint8Array,
+  kdfType: KdfType = 'argon2id',
+): Promise<Uint8Array> {
+  return kdfType === 'pbkdf2'
+    ? deriveKeyPbkdf2(password, salt)
+    : deriveKeyArgon2id(password, salt)
 }
 
 // Split derived key into encryption + HMAC keys

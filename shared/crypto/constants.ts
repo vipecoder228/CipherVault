@@ -1,7 +1,16 @@
 // NOTE: electron/main/crypto/constants.ts has the Node.js equivalents
 // (DIGEST: 'sha256', ENCRYPTION_ALGO: 'aes-256-gcm')
-// Both files must keep the same numeric values for PBKDF2, SALT_SIZE, IV_SIZE, AUTH_TAG_SIZE, etc.
+// Both files must keep the same numeric values for ARGON2, PBKDF2, SALT_SIZE, IV_SIZE, AUTH_TAG_SIZE, etc.
 export const CRYPTO = {
+  // Argon2id parameters (OWASP recommended) — mirrors electron/main/crypto/constants.ts
+  ARGON2: {
+    TIME_COST: 3,        // iterations
+    MEMORY_COST: 65536,  // 64 MB
+    PARALLELISM: 4,      // threads
+    KEY_LENGTH: 32,      // bytes
+    SALT_LENGTH: 16,     // bytes
+  },
+  // Legacy PBKDF2 (kept for migrating pre-existing web/mobile vaults)
   PBKDF2: {
     ITERATIONS: 600_000,
     KEY_LENGTH: 64,
@@ -23,6 +32,15 @@ export const RATE_LIMIT = {
   DELAY_2_MS: 30_000,
   DELAY_3_MS: 300_000,
   WINDOW_MS: 300_000, // 5 min window for counting attempts
+} as const
+
+export const SYNC = {
+  // Fixed "salt" substitute for deriving the sync server's authSecret from the
+  // user's sync password. Deterministic (not random) so every device derives
+  // the same authSecret from the same password without needing to fetch a
+  // salt from the server first. MUST NOT change across releases — changing it
+  // would silently invalidate every existing account's login.
+  AUTH_LABEL: 'ciphervault-sync-auth-v1',
 } as const
 
 export const DEFAULTS = {
