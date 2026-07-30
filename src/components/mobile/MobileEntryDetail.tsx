@@ -6,7 +6,9 @@ import { useToastStore } from '../ui/Toast'
 import { useI18n } from '../../i18n'
 import { invoke, copyWithTtl } from '../../lib/ipc'
 import { EditEntryModal } from '../entries/EditEntryModal'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+
+const REVEAL_PASSWORD_TTL_MS = 15_000
 
 export function MobileEntryDetail() {
   const { selectedEntry, selectEntry, toggleFavorite, deleteEntry } = useEntriesStore()
@@ -19,10 +21,43 @@ export function MobileEntryDetail() {
   const [viewPasswordError, setViewPasswordError] = useState(false)
   const [verifying, setVerifying] = useState(false)
   const [biometricAvailable, setBiometricAvailable] = useState(false)
+  const revealTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     getBiometric().isAvailable().then(setBiometricAvailable)
   }, [])
+
+  useEffect(() => {
+    return () => {
+      if (revealTimeoutRef.current) clearTimeout(revealTimeoutRef.current)
+    }
+  }, [])
+
+  // Hide the revealed password when switching to a different entry
+  useEffect(() => {
+    setShowPassword(false)
+    if (revealTimeoutRef.current) {
+      clearTimeout(revealTimeoutRef.current)
+      revealTimeoutRef.current = null
+    }
+  }, [selectedEntry?.id])
+
+  const toggleShowPassword = () => {
+    if (revealTimeoutRef.current) {
+      clearTimeout(revealTimeoutRef.current)
+      revealTimeoutRef.current = null
+    }
+    setShowPassword((prev) => {
+      const next = !prev
+      if (next) {
+        revealTimeoutRef.current = setTimeout(() => {
+          setShowPassword(false)
+          revealTimeoutRef.current = null
+        }, REVEAL_PASSWORD_TTL_MS)
+      }
+      return next
+    })
+  }
 
   if (!selectedEntry) return null
 
@@ -223,7 +258,7 @@ export function MobileEntryDetail() {
                 </span>
                 <div className="flex items-center gap-1">
                   <button
-                    onClick={() => setShowPassword(!showPassword)}
+                    onClick={toggleShowPassword}
                     className="p-1 text-vault-text-secondary hover:text-vault-accent text-xs"
                   >
                     {showPassword ? 'Скрыть' : 'Показать'}

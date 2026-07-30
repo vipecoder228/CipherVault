@@ -470,6 +470,8 @@ const handlers: Record<string, (...args: any[]) => any> = {
   'syncServer:pull': (_: unknown, syncPassword: string) => syncServerService.pullVault(syncPassword),
   'syncServer:status': () => syncServerService.getSyncServerStatus(),
   'syncServer:delete-account': () => syncServerService.deleteAccount(),
+  'syncServer:list-sessions': () => syncServerService.listSessions(),
+  'syncServer:revoke-session': (_: unknown, deviceId: string) => syncServerService.revokeSession(deviceId),
 
   // Global Shortcut
   'shortcut:get': async () => {

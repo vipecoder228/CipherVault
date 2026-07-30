@@ -508,6 +508,13 @@ export default {
   sync_server_delete_account: 'Delete Account and Server Data',
   sync_server_confirm_delete_account: 'This will permanently delete your account and vault backup from the server. This cannot be undone. Continue?',
   sync_server_delete_account_success: 'Account and server data deleted',
+  sync_server_sessions_title: 'Active Sessions',
+  sync_server_no_sessions: 'No active sessions',
+  sync_server_current_device: '(this device)',
+  sync_server_revoke_session: 'End session',
+  sync_server_confirm_revoke_session: 'End this session? The device will need to log in again to sync.',
+  sync_server_revoke_session_success: 'Session ended',
+  sync_server_other_sessions_notice: 'You have {count} other active session(s) on this account',
 
   // Header
   search_placeholder: 'Search entries... (Ctrl+K)',

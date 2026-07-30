@@ -323,6 +323,55 @@ describe('syncServerClient', () => {
     }, 15000)
   })
 
+  describe('listSessions / revokeSession', () => {
+    it('listSessions fails when not configured', async () => {
+      const client = await freshClient()
+      const result = await client.listSessions()
+      expect(result).toEqual({ success: false, error: 'Сервер синхронизации не настроен' })
+    })
+
+    it('listSessions fails when not logged in', async () => {
+      const client = await freshClient()
+      await client.configureServer('http://localhost:8787')
+      const result = await client.listSessions()
+      expect(result).toEqual({ success: false, error: 'Вы не авторизованы на сервере синхронизации' })
+    })
+
+    it('listSessions returns the session list on success', async () => {
+      const client = await freshClient()
+      await client.configureServer('http://localhost:8787')
+      mockFetchOnce(200, { token: 'tok-123', expiresAt: Date.now() + 1000 })
+      await client.loginAccount('alice', 'pw', 'my-device')
+
+      mockFetchOnce(200, { sessions: [{ deviceId: 'dev-2', deviceName: 'Phone', createdAt: 1000 }] })
+      const result = await client.listSessions()
+
+      expect(result).toEqual({
+        success: true,
+        sessions: [{ deviceId: 'dev-2', deviceName: 'Phone', createdAt: 1000 }],
+      })
+    })
+
+    it('revokeSession fails when not logged in', async () => {
+      const client = await freshClient()
+      await client.configureServer('http://localhost:8787')
+      const result = await client.revokeSession('dev-2')
+      expect(result).toEqual({ success: false, error: 'Вы не авторизованы на сервере синхронизации' })
+    })
+
+    it('revokeSession succeeds on 204', async () => {
+      const client = await freshClient()
+      await client.configureServer('http://localhost:8787')
+      mockFetchOnce(200, { token: 'tok-123', expiresAt: Date.now() + 1000 })
+      await client.loginAccount('alice', 'pw', 'my-device')
+
+      mockFetchOnce(204, undefined)
+      const result = await client.revokeSession('dev-2')
+
+      expect(result).toEqual({ success: true })
+    })
+  })
+
   describe('loadSyncServerSettings', () => {
     it('restores persisted settings and decrypts the stored session token', async () => {
       const client = await freshClient()

@@ -170,6 +170,12 @@ async function startAutoLockTimer(): Promise<void> {
   }, timeoutMs)
 }
 
+async function resetAutoLockTimer(): Promise<void> {
+  if (derivedKey) {
+    await startAutoLockTimer()
+  }
+}
+
 function lockVault(): void {
   if (derivedKey) {
     // Zero out the key
@@ -1493,6 +1499,7 @@ export const webHandlers: HandlerMap = {
   'vault:create': (_: any, masterPassword: string, displayName: string) => setupVault(masterPassword, undefined, displayName),
   'vault:unlock': (_: any, masterPassword: string, totpCode?: string, vaultId?: number) => unlockVault(masterPassword, totpCode, vaultId),
   'vault:lock': () => { lockVault(); return Promise.resolve() },
+  'vault:reset-timer': () => resetAutoLockTimer(),
   'vault:switch': async (_: any, vaultId: number) => {
     if (isUnlocked()) return { success: false, error: 'Lock the vault before switching' }
     const vault = webQueryOne<any>('SELECT * FROM vault WHERE id = ?', [vaultId])
@@ -1835,6 +1842,8 @@ export const webHandlers: HandlerMap = {
   'syncServer:pull': (_: any, syncPassword: string) => syncServerClient.pullVault(syncPassword),
   'syncServer:status': () => syncServerClient.getSyncServerStatus(),
   'syncServer:delete-account': () => syncServerClient.deleteAccount(),
+  'syncServer:list-sessions': () => syncServerClient.listSessions(),
+  'syncServer:revoke-session': (_: any, deviceId: string) => syncServerClient.revokeSession(deviceId),
   'backup:export': () => Promise.resolve({ success: false, error: 'Not supported on mobile' }),
   'backup:import': () => Promise.resolve({ success: false, error: 'Not supported on mobile' }),
   'backup:import-panic': () => importPanicBackup(),

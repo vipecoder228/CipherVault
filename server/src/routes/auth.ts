@@ -1,7 +1,13 @@
 import { Router } from 'express'
 import { hash as argon2Hash, verify as argon2Verify } from 'argon2'
 import type { SyncDb } from '../db'
-import { createSession, deleteAllSessionsForAccount, deleteSession } from '../services/session'
+import {
+  createSession,
+  deleteAllSessionsForAccount,
+  deleteSession,
+  listSessionsForAccount,
+  deleteSessionsByDeviceId,
+} from '../services/session'
 import { requireAuth } from '../middleware/auth'
 import type { RegisterRequest, LoginRequest } from '../../../shared/syncProtocol'
 
@@ -67,13 +73,35 @@ export function createAuthRouter(db: SyncDb): Router {
       return res.status(401).json({ error: 'Invalid username or password' })
     }
 
+    // Snapshot other active sessions before creating this one, so the newly
+    // logging-in device isn't listed as an "other" session of itself.
+    const otherSessions = listSessionsForAccount(db, account.id)
+      .filter((s) => s.deviceId !== body.deviceId)
+      .map((s) => ({ deviceId: s.deviceId, deviceName: s.deviceName, createdAt: s.createdAt }))
+
     const { token, expiresAt } = createSession(db, account.id, body.deviceId, body.deviceName)
-    res.json({ token, expiresAt })
+    res.json({ token, expiresAt, otherSessions })
   })
 
   router.post('/logout', requireAuth(db), (req, res) => {
     const token = (req as any).sessionToken as string
     deleteSession(db, token)
+    res.status(204).end()
+  })
+
+  router.get('/sessions', requireAuth(db), (req, res) => {
+    const accountId = (req as any).session.accountId as number
+    const sessions = listSessionsForAccount(db, accountId)
+    res.json({ sessions })
+  })
+
+  router.delete('/sessions/:deviceId', requireAuth(db), (req, res) => {
+    const accountId = (req as any).session.accountId as number
+    const deviceId = req.params.deviceId
+    if (!isValidDeviceField(deviceId)) {
+      return res.status(400).json({ error: 'Invalid deviceId' })
+    }
+    deleteSessionsByDeviceId(db, accountId, deviceId)
     res.status(204).end()
   })
 

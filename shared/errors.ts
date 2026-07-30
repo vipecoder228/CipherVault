@@ -61,6 +61,8 @@ export const ERRORS = {
   SYNC_SERVER_CONFLICT: 'Вейлт был обновлён на другом устройстве',
   SYNC_SERVER_NO_REMOTE_VAULT: 'На сервере пока нет вейлта',
   SYNC_SERVER_DELETE_ACCOUNT_FAILED: 'Не удалось удалить аккаунт на сервере',
+  SYNC_SERVER_LIST_SESSIONS_FAILED: 'Не удалось получить список сессий',
+  SYNC_SERVER_REVOKE_SESSION_FAILED: 'Не удалось завершить сессию',
 
   // Shortcut
   SHORTCUT_INVALID_FORMAT: 'Неверный формат горячей клавиши',

@@ -11,6 +11,8 @@ import type {
   VaultBlobResponse,
   PushVaultResponse,
   VaultConflictResponse,
+  ListSessionsResponse,
+  SessionInfo,
 } from '../../../shared/syncProtocol'
 import type { SyncServerStatus, SyncServerPushResult } from '../../../shared/types'
 import { saveSecret, getSecret, clearSecret } from './secretStorage'
@@ -153,7 +155,7 @@ export async function loginAccount(
   usernameInput: string,
   syncPassword: string,
   deviceNameInput: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; otherSessions?: SessionInfo[] }> {
   if (!serverUrl) return { success: false, error: ERRORS.SYNC_SERVER_NOT_CONFIGURED }
 
   if (!deviceId) {
@@ -182,7 +184,7 @@ export async function loginAccount(
   await saveStringSetting('sync_server_device_name', deviceName)
   await saveStringSetting('sync_server_last_seen_version', '0')
 
-  return { success: true }
+  return { success: true, otherSessions: loginBody.otherSessions }
 }
 
 export async function logoutAccount(): Promise<void> {
@@ -310,6 +312,37 @@ export async function pullVault(syncPassword: string): Promise<{ success: boolea
     return { success: true, imported }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : ERRORS.SYNC_SERVER_PULL_FAILED }
+  }
+}
+
+export async function listSessions(): Promise<{ success: boolean; error?: string; sessions?: SessionInfo[] }> {
+  if (!serverUrl) return { success: false, error: ERRORS.SYNC_SERVER_NOT_CONFIGURED }
+  if (!sessionToken) return { success: false, error: ERRORS.SYNC_SERVER_NOT_LOGGED_IN }
+
+  try {
+    const { status, body } = await apiRequest(SYNC_API_ROUTES.sessions, { method: 'GET' })
+    if (status !== 200) {
+      return { success: false, error: body?.error || ERRORS.SYNC_SERVER_LIST_SESSIONS_FAILED }
+    }
+    const listBody = body as ListSessionsResponse
+    return { success: true, sessions: listBody.sessions }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : ERRORS.SYNC_SERVER_LIST_SESSIONS_FAILED }
+  }
+}
+
+export async function revokeSession(deviceId: string): Promise<{ success: boolean; error?: string }> {
+  if (!serverUrl) return { success: false, error: ERRORS.SYNC_SERVER_NOT_CONFIGURED }
+  if (!sessionToken) return { success: false, error: ERRORS.SYNC_SERVER_NOT_LOGGED_IN }
+
+  try {
+    const { status, body } = await apiRequest(`${SYNC_API_ROUTES.sessions}/${encodeURIComponent(deviceId)}`, { method: 'DELETE' })
+    if (status !== 204) {
+      return { success: false, error: body?.error || ERRORS.SYNC_SERVER_REVOKE_SESSION_FAILED }
+    }
+    return { success: true }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : ERRORS.SYNC_SERVER_REVOKE_SESSION_FAILED }
   }
 }
 

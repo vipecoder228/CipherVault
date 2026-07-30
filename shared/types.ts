@@ -1,3 +1,5 @@
+import type { SessionInfo } from './syncProtocol'
+
 // ─── Entry Types ────────────────────────────────────────
 
 export type EntryType = 'login' | 'secure_note' | 'card' | 'identity' | 'passkey'
@@ -323,12 +325,14 @@ export interface IPCChannels {
   // Sync — remote server provider
   'syncServer:configure': (url: string) => Promise<void>
   'syncServer:register': (username: string, syncPassword: string) => Promise<{ success: boolean; error?: string }>
-  'syncServer:login': (username: string, syncPassword: string, deviceName: string) => Promise<{ success: boolean; error?: string }>
+  'syncServer:login': (username: string, syncPassword: string, deviceName: string) => Promise<{ success: boolean; error?: string; otherSessions?: SessionInfo[] }>
   'syncServer:logout': () => Promise<void>
   'syncServer:push': (syncPassword: string, forceVersion?: number) => Promise<SyncServerPushResult>
   'syncServer:pull': (syncPassword: string) => Promise<{ success: boolean; error?: string; imported?: boolean }>
   'syncServer:status': () => Promise<SyncServerStatus>
   'syncServer:delete-account': () => Promise<{ success: boolean; error?: string }>
+  'syncServer:list-sessions': () => Promise<{ success: boolean; error?: string; sessions?: SessionInfo[] }>
+  'syncServer:revoke-session': (deviceId: string) => Promise<{ success: boolean; error?: string }>
 
   // Import/Export
   'import:csv': () => Promise<ImportResult>

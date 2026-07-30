@@ -52,6 +52,29 @@ export function deleteAllSessionsForAccount(db: SyncDb, accountId: number): void
   db.prepare('DELETE FROM sessions WHERE account_id = ?').run(accountId)
 }
 
+export interface SessionSummary {
+  deviceId: string
+  deviceName: string
+  createdAt: number
+}
+
+// One row per active session, not per device — a device with multiple
+// concurrent logins (unusual, but not prevented) shows up more than once.
+export function listSessionsForAccount(db: SyncDb, accountId: number): SessionSummary[] {
+  const now = Date.now()
+  const rows = db.prepare(
+    `SELECT device_id, device_name, created_at FROM sessions WHERE account_id = ? AND expires_at > ? ORDER BY created_at DESC`
+  ).all(accountId, now) as { device_id: string; device_name: string; created_at: number }[]
+
+  return rows.map((row) => ({ deviceId: row.device_id, deviceName: row.device_name, createdAt: row.created_at }))
+}
+
+// Scoped to accountId so a caller can't probe/revoke another account's
+// device_id — deviceId alone isn't guaranteed globally unique.
+export function deleteSessionsByDeviceId(db: SyncDb, accountId: number, deviceId: string): void {
+  db.prepare('DELETE FROM sessions WHERE account_id = ? AND device_id = ?').run(accountId, deviceId)
+}
+
 // Unused directly (session lookup is by unique hash, not by secret compare),
 // exported so route/auth code that DOES compare raw secrets (e.g. future
 // bearer-scheme variants) has a vetted constant-time helper available.

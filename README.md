@@ -18,7 +18,7 @@
   <a href="https://github.com/vipecoder228/CipherVault/blob/main/LICENSE">
     <img src="https://img.shields.io/github/license/vipecoder228/CipherVault?style=flat-square" alt="License">
   </a>
-  <img src="https://img.shields.io/badge/tests-300%20passed-green?style=flat-square" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-422%20passed-green?style=flat-square" alt="Tests">
 </p>
 
 <p align="center">
@@ -51,7 +51,10 @@
 
 ### Защита приложения
 - **Anti-Tamper Detection** — проверка целостности бинарников
-- **Screenshot Protection** — защита от скриншотов (macOS)
+- **Screenshot / Screen-Recording Protection** — окно исключается из захвата экрана (`setContentProtection`, Windows 10 2004+ и macOS): скриншоты, запись экрана и screen sharing показывают чёрный прямоугольник вместо содержимого
+- **Windows Clipboard Hardening** — при копировании пароля буфер обмена помечается флагами `CanIncludeInClipboardHistory=0` / `CanUploadToCloudClipboard=0` через прямой вызов Win32 API, так что пароль не попадает в историю Win+V и не синхронизируется через Cloud Clipboard
+- **Auto-Lock по неактивности** — таймер настраивается пользователем и сбрасывается активностью на всех платформах (Electron main-процесс + web/mobile)
+- **Auto-Hide показанного пароля** — раскрытый в деталях записи пароль автоматически скрывается через 15 секунд
 - **Encrypted Audit Log** — логирование всех действий (зашифровано)
 - **Encrypted Metadata** — title и URL зашифрованы в БД
 
@@ -153,7 +156,22 @@
 | **Push** | Capacitor LocalNotifications |
 | **REST API** | HTTPS, порт 19824 |
 | **Google Drive** | Синхронизация vault |
+| **Self-hosted Sync Server** | Zero-knowledge синхронизация между устройствами через свой сервер |
 | **Browser Extension** | Chrome, автозаполнение |
+
+---
+
+## Self-hosted Sync Server
+
+Опциональная синхронизация вейлта между устройствами через собственный сервер, без доверия к серверу:
+
+- **Zero-knowledge** — сервер получает только `authSecret` (Argon2id-хэш от пароля синхронизации) и зашифрованный blob вейлта; сам пароль синхронизации серверу не известен
+- **Шифрование blob'а** — AES-256-GCM с ключом, производным от пароля синхронизации (Argon2id), тот же CVSB-конверт, что и в панических бэкапах
+- **Управление сессиями** — список активных устройств с возможностью удалённо завершить (revoke) любую сессию; при входе с нового устройства показывается уведомление об остальных активных сессиях
+- **Version conflict detection** — попытка перезаписать вейлт, обновлённый на другом устройстве, возвращает конфликт вместо тихой потери данных
+- **Удаление аккаунта** — полное удаление аккаунта и его данных на сервере одной кнопкой
+
+Деплой сервера — см. `server/DEPLOYMENT.md`.
 
 ---
 
@@ -190,18 +208,11 @@ npm run dist:android
 
 ## Тесты
 
-**300 тестов** across 27 файлов:
-
-| Модуль | Тестов |
-|--------|:------:|
-| Криптография | 88 |
-| Безопасность | 51 |
-| Сервисы | 89 |
-| Frontend | 63 |
-| IPC | 13 |
+**393 теста** в основном приложении + **29 тестов** sync-сервера:
 
 ```bash
-npm test  # 300/300 passed
+npm test          # основное приложение: 393/393 passed
+cd server && npm test  # sync-сервер: 29/29 passed
 ```
 
 ---
@@ -241,7 +252,7 @@ npx tsc --noEmit
 | Интерфейс | React 19 + TypeScript |
 | Крипто | AES-256-GCM + Argon2id (desktop — native, web/mobile — WASM) |
 | БД | sql.js (SQLite) |
-| Тесты | Vitest (300 tests) |
+| Тесты | Vitest (422 tests) |
 | API | REST / HTTPS (port 19824) |
 | Passkeys | WebAuthn API |
 
@@ -250,11 +261,13 @@ npx tsc --noEmit
 ## Архитектура
 
 ```
-CipherVault v14.0.5
+CipherVault v14.0.10
 ├── Desktop (Electron)
 │   ├── Security Module
 │   │   ├── Memory Guard
 │   │   ├── Tamper Detection
+│   │   ├── Screenshot / Screen-Recording Protection
+│   │   ├── Windows Clipboard Hardening
 │   │   ├── Audit Log
 │   │   ├── Key Rotation
 │   │   └── Ephemeral Keys
@@ -268,6 +281,7 @@ CipherVault v14.0.5
 │   ├── Auto-lock
 │   └── Google Drive Sync
 ├── Browser Extension
+├── Self-hosted Sync Server (zero-knowledge, session management)
 └── Cloud Sync (Google Drive)
 ```
 

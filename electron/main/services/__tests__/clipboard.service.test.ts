@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 const mockWriteText = vi.fn()
 const mockReadText = vi.fn()
 const mockClear = vi.fn()
+const mockWriteSecureText = vi.fn()
 
 vi.mock('electron', () => ({
   clipboard: {
@@ -12,12 +13,22 @@ vi.mock('electron', () => ({
   },
 }))
 
+// Default: native Win32 write is unavailable, so the service falls back to
+// the regular Electron clipboard — matches the pre-existing test behavior
+// regardless of which platform the suite runs on.
+vi.mock('../../security/windowsClipboard', () => ({
+  get writeSecureText() { return mockWriteSecureText },
+}))
+
 import { copyToClipboard, clearClipboard } from '../clipboard.service'
 
 beforeEach(() => {
   vi.clearAllMocks()
   vi.useFakeTimers()
   mockReadText.mockReturnValue('default')
+  mockWriteSecureText.mockImplementation(() => {
+    throw new Error('native clipboard write unavailable in test env')
+  })
 })
 
 afterEach(() => {
@@ -28,6 +39,49 @@ describe('Clipboard Service', () => {
   it('should write text to clipboard', async () => {
     await copyToClipboard('password123')
     expect(mockWriteText).toHaveBeenCalledWith('password123')
+  })
+
+  it('should use the native Win32 write on win32 and skip the Electron fallback', async () => {
+    const originalPlatform = process.platform
+    Object.defineProperty(process, 'platform', { value: 'win32' })
+    mockWriteSecureText.mockImplementation(() => true)
+
+    try {
+      await copyToClipboard('password123')
+      expect(mockWriteSecureText).toHaveBeenCalledWith('password123')
+      expect(mockWriteText).not.toHaveBeenCalled()
+    } finally {
+      Object.defineProperty(process, 'platform', { value: originalPlatform })
+    }
+  })
+
+  it('should fall back to the Electron clipboard when the native Win32 write fails', async () => {
+    const originalPlatform = process.platform
+    Object.defineProperty(process, 'platform', { value: 'win32' })
+    mockWriteSecureText.mockImplementation(() => {
+      throw new Error('FFI call failed')
+    })
+
+    try {
+      await copyToClipboard('password123')
+      expect(mockWriteSecureText).toHaveBeenCalledWith('password123')
+      expect(mockWriteText).toHaveBeenCalledWith('password123')
+    } finally {
+      Object.defineProperty(process, 'platform', { value: originalPlatform })
+    }
+  })
+
+  it('should not attempt the native Win32 write on non-Windows platforms', async () => {
+    const originalPlatform = process.platform
+    Object.defineProperty(process, 'platform', { value: 'darwin' })
+
+    try {
+      await copyToClipboard('password123')
+      expect(mockWriteSecureText).not.toHaveBeenCalled()
+      expect(mockWriteText).toHaveBeenCalledWith('password123')
+    } finally {
+      Object.defineProperty(process, 'platform', { value: originalPlatform })
+    }
   })
 
   it('should clear clipboard when value matches after TTL', async () => {

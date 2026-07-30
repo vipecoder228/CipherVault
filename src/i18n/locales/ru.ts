@@ -508,6 +508,13 @@ export default {
   sync_server_delete_account: 'Удалить аккаунт и данные на сервере',
   sync_server_confirm_delete_account: 'Это безвозвратно удалит ваш аккаунт и резервную копию вейлта на сервере. Отменить нельзя. Продолжить?',
   sync_server_delete_account_success: 'Аккаунт и данные на сервере удалены',
+  sync_server_sessions_title: 'Активные сессии',
+  sync_server_no_sessions: 'Нет активных сессий',
+  sync_server_current_device: '(это устройство)',
+  sync_server_revoke_session: 'Завершить сессию',
+  sync_server_confirm_revoke_session: 'Завершить эту сессию? Устройству потребуется войти снова для синхронизации.',
+  sync_server_revoke_session_success: 'Сессия завершена',
+  sync_server_other_sessions_notice: 'У вас есть {count} других активных сессий на этом аккаунте',
 
   // Header
   search_placeholder: 'Поиск записей... (Ctrl+K)',

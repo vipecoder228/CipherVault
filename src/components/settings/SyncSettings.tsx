@@ -8,7 +8,8 @@ import { useI18n } from '../../i18n'
 import { setSyncPasswordEncrypted } from '../../lib/secureStorage'
 import { cn } from '../../lib/utils'
 import type { SyncServerStatus } from '@shared/types'
-import { FolderOpen, RefreshCw, CloudOff, Cloud, Server, Upload, Download, LogOut, Trash2 } from 'lucide-react'
+import type { SessionInfo } from '@shared/syncProtocol'
+import { FolderOpen, RefreshCw, CloudOff, Cloud, Server, Upload, Download, LogOut, Trash2, Smartphone, X } from 'lucide-react'
 
 type Provider = 'local' | 'server'
 
@@ -47,11 +48,51 @@ export function SyncSettings() {
   const [registering, setRegistering] = useState(false)
   const [serverBusy, setServerBusy] = useState(false)
   const [conflict, setConflict] = useState<{ currentVersion: number; updatedAt: number; deviceId: string; deviceName: string } | null>(null)
+  const [sessions, setSessions] = useState<SessionInfo[]>([])
+  const [sessionsLoading, setSessionsLoading] = useState(false)
+  const [revokingDeviceId, setRevokingDeviceId] = useState<string | null>(null)
 
   useEffect(() => {
     loadSettings()
     loadServerStatus()
   }, [])
+
+  useEffect(() => {
+    if (provider === 'server' && serverStatus.loggedIn) {
+      loadSessions()
+    } else {
+      setSessions([])
+    }
+  }, [provider, serverStatus.loggedIn])
+
+  const loadSessions = async () => {
+    setSessionsLoading(true)
+    try {
+      const result = await invoke('syncServer:list-sessions')
+      if (result.success && result.sessions) setSessions(result.sessions)
+    } catch {
+    } finally {
+      setSessionsLoading(false)
+    }
+  }
+
+  const handleRevokeSession = async (deviceId: string) => {
+    if (!confirm(t('sync_server_confirm_revoke_session'))) return
+    setRevokingDeviceId(deviceId)
+    try {
+      const result = await invoke('syncServer:revoke-session', deviceId)
+      if (result.success) {
+        setSessions((prev) => prev.filter((s) => s.deviceId !== deviceId))
+        addToast(t('sync_server_revoke_session_success'), 'success')
+      } else {
+        addToast(result.error || t('sync_server_configure_failed'), 'error')
+      }
+    } catch {
+      addToast(t('sync_server_configure_failed'), 'error')
+    } finally {
+      setRevokingDeviceId(null)
+    }
+  }
 
   const loadSettings = async () => {
     try {
@@ -176,6 +217,9 @@ export function SyncSettings() {
       if (result.success) {
         await setSyncPasswordEncrypted(serverPassword)
         addToast(t('sync_server_login_success'), 'success')
+        if (result.otherSessions && result.otherSessions.length > 0) {
+          addToast(t('sync_server_other_sessions_notice', { count: result.otherSessions.length }), 'warning')
+        }
         await loadServerStatus()
         if (enabled) await invoke('sync:disable').then(() => { setEnabled(false); setFolder(null) }).catch(() => {})
       } else {
@@ -494,6 +538,49 @@ export function SyncSettings() {
                 <Trash2 size={16} className="mr-2" />
                 {t('sync_server_delete_account')}
               </Button>
+
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-vault-text-secondary">{t('sync_server_sessions_title')}</p>
+                {sessionsLoading ? (
+                  <p className="text-xs text-vault-text-secondary">{t('loading')}</p>
+                ) : sessions.length === 0 ? (
+                  <p className="text-xs text-vault-text-secondary">{t('sync_server_no_sessions')}</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {sessions.map((session) => {
+                      const isCurrent = session.deviceId === serverStatus.deviceId
+                      return (
+                        <div
+                          key={session.deviceId}
+                          className="flex items-center gap-2 p-2 rounded-md bg-vault-bg border border-vault-border"
+                        >
+                          <Smartphone size={14} className="text-vault-text-secondary shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-vault-text truncate">
+                              {session.deviceName}
+                              {isCurrent && <span className="text-vault-text-secondary"> {t('sync_server_current_device')}</span>}
+                            </p>
+                            <p className="text-[10px] text-vault-text-secondary">
+                              {new Date(session.createdAt).toLocaleString()}
+                            </p>
+                          </div>
+                          {!isCurrent && (
+                            <button
+                              type="button"
+                              onClick={() => handleRevokeSession(session.deviceId)}
+                              disabled={revokingDeviceId === session.deviceId}
+                              className="p-1 rounded text-vault-text-secondary hover:text-vault-danger transition-colors shrink-0"
+                              aria-label={t('sync_server_revoke_session')}
+                            >
+                              <X size={14} />
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
             </>
           )}
         </>

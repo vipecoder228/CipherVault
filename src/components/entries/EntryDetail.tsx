@@ -12,6 +12,8 @@ import {
   Eye, EyeOff, Lock, Fingerprint, Key
 } from 'lucide-react'
 
+const REVEAL_PASSWORD_TTL_MS = 15_000
+
 export function EntryDetail() {
   const { selectedEntry: entry, selectEntry, deleteEntry, toggleFavorite } = useEntriesStore()
   const { verifySecureNote, isSecureNoteVerified } = useVaultStore()
@@ -25,12 +27,40 @@ export function EntryDetail() {
   const [viewPasswordError, setViewPasswordError] = useState(false)
   const [verifying, setVerifying] = useState(false)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const revealTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current)
+      if (revealTimeoutRef.current) clearTimeout(revealTimeoutRef.current)
     }
   }, [])
+
+  // Hide the revealed password when switching to a different entry
+  useEffect(() => {
+    setShowPassword(false)
+    if (revealTimeoutRef.current) {
+      clearTimeout(revealTimeoutRef.current)
+      revealTimeoutRef.current = null
+    }
+  }, [entry?.id])
+
+  const toggleShowPassword = () => {
+    if (revealTimeoutRef.current) {
+      clearTimeout(revealTimeoutRef.current)
+      revealTimeoutRef.current = null
+    }
+    setShowPassword((prev) => {
+      const next = !prev
+      if (next) {
+        revealTimeoutRef.current = setTimeout(() => {
+          setShowPassword(false)
+          revealTimeoutRef.current = null
+        }, REVEAL_PASSWORD_TTL_MS)
+      }
+      return next
+    })
+  }
 
   if (!entry || typeof entry !== 'object') return null
 
@@ -231,7 +261,7 @@ export function EntryDetail() {
                     {showPassword ? entry.password : '•'.repeat(Math.min(entry.password?.length || 0, 20))}
                   </span>
                   <button
-                    onClick={() => setShowPassword(!showPassword)}
+                    onClick={toggleShowPassword}
                     className="p-1 text-vault-text-secondary hover:text-vault-text transition-colors"
                   >
                     {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}

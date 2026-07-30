@@ -1,21 +1,17 @@
 // ─── Screenshot Protection ──────────────────────────────
-// Prevents screenshots of sensitive screens
+// Prevents screenshots/screen recording of sensitive screens
 
 import { BrowserWindow } from 'electron'
 
 /**
- * Enable content protection on a window (prevents screenshots on macOS)
+ * Enable content protection on a window (excludes it from screen capture).
+ * Supported on macOS and Windows 10 2004+ (via SetWindowDisplayAffinity /
+ * WDA_EXCLUDEFROMCAPTURE); older Windows versions render a black window
+ * instead of fully excluding it.
  */
 export function enableScreenshotProtection(win: BrowserWindow): void {
-  // macOS: setContentProtection prevents the window from being captured
-  if (process.platform === 'darwin') {
+  if (process.platform === 'darwin' || process.platform === 'win32') {
     win.setContentProtection(true)
-  }
-
-  // Windows: Set specific flags
-  if (process.platform === 'win32') {
-    // Disable DirectX acceleration for this window to prevent screen capture
-    win.webContents.setZoomFactor(1)
   }
 }
 
@@ -23,27 +19,7 @@ export function enableScreenshotProtection(win: BrowserWindow): void {
  * Disable content protection (for non-sensitive screens)
  */
 export function disableScreenshotProtection(win: BrowserWindow): void {
-  if (process.platform === 'darwin') {
+  if (process.platform === 'darwin' || process.platform === 'win32') {
     win.setContentProtection(false)
   }
-}
-
-/**
- * Add CSS overlay to prevent screen capture in the renderer
- * This adds a semi-transparent overlay that blocks screen recording
- */
-export function addScreenCapturePrevention(win: BrowserWindow): void {
-  win.webContents.on('before-input-event', (event, input) => {
-    // Block PrintScreen key
-    if (input.key === 'PrintScreen') {
-      event.preventDefault()
-    }
-  })
-
-  // Inject CSS to prevent screen capture
-  win.webContents.insertCSS(`
-    @media print {
-      body { display: none !important; }
-    }
-  `)
 }

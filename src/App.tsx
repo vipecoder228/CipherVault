@@ -97,18 +97,19 @@ export function App() {
     }
   }, [])
 
-  // Auto-lock on inactivity
+  // Auto-lock on inactivity — resets the backend's auto-lock timer (which reads
+  // the user's configured auto_lock_ms setting), throttled to avoid IPC spam.
   useEffect(() => {
     if (locked) return
 
-    let timeout: ReturnType<typeof setTimeout> | null = null
-    const AUTO_LOCK_MS = 5 * 60 * 1000 // 5 minutes
+    const THROTTLE_MS = 5000
+    let lastReset = 0
 
     const resetTimer = () => {
-      if (timeout) clearTimeout(timeout)
-      timeout = setTimeout(() => {
-        lockRef.current()
-      }, AUTO_LOCK_MS)
+      const now = Date.now()
+      if (now - lastReset < THROTTLE_MS) return
+      lastReset = now
+      invoke('vault:reset-timer').catch(() => {})
     }
 
     const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart']
@@ -116,7 +117,6 @@ export function App() {
     resetTimer()
 
     return () => {
-      if (timeout) clearTimeout(timeout)
       events.forEach(event => document.removeEventListener(event, resetTimer))
     }
   }, [locked])

@@ -14,6 +14,7 @@ import { loadSyncSettings, stopSync } from './services/sync.service'
 import { loadSyncServerSettings } from './services/syncServer.service'
 import { toggleWindow } from './utils/window'
 import { initUpdater } from './updater'
+import { enableScreenshotProtection } from './security/screenshotProtection'
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -39,6 +40,8 @@ function createWindow(): void {
     },
     backgroundColor: '#0f0f14',
   })
+
+  enableScreenshotProtection(mainWindow)
 
   // Never show window on ready — stay in tray
   mainWindow.on('ready-to-show', () => {
