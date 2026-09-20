@@ -9,7 +9,7 @@ import { ImportDialog } from '../import-export/ImportDialog'
 import { VaultSwitcher } from '../vault/VaultSwitcher'
 import type { Category } from '@shared/types'
 import {
-  Shield, Star, LayoutGrid, Settings, Lock, Mail,
+  Shield, Star, LayoutGrid, Settings, Lock,
   Plus, ChevronLeft, ChevronRight, Folder, Pencil, Trash2, Download
 } from 'lucide-react'
 import { useI18n } from '../../i18n'
@@ -20,7 +20,7 @@ export function Sidebar() {
   const [showCategoryForm, setShowCategoryForm] = useState(false)
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
   const [showImport, setShowImport] = useState(false)
-  const { activeCategoryId, setActiveCategory, sidebarCollapsed, toggleSidebar, showSettings, setShowSettings, showDisposableEmail, setShowDisposableEmail, showTrash, setShowTrash } = useUIStore()
+  const { activeCategoryId, setActiveCategory, sidebarCollapsed, toggleSidebar, showSettings, setShowSettings, showTrash, setShowTrash } = useUIStore()
   const { setFilters } = useEntriesStore()
   const { lock } = useVaultStore()
 
@@ -93,24 +93,12 @@ export function Sidebar() {
               onClick={() => setFilters({ is_favorite: true })}
             />
             <NavItem
-              icon={<Mail size={18} />}
-              label={t('temp_email')}
-              active={showDisposableEmail}
-              collapsed={sidebarCollapsed}
-              onClick={() => { setShowDisposableEmail(!showDisposableEmail); setShowSettings(false); setShowTrash(false) }}
-            />
-            <NavItem
               icon={<Trash2 size={18} />}
               label={t('trash')}
               active={showTrash}
               collapsed={sidebarCollapsed}
-              onClick={() => { setShowTrash(!showTrash); setShowSettings(false); setShowDisposableEmail(false) }}
+              onClick={() => { setShowTrash(!showTrash); setShowSettings(false) }}
             />
-            {!sidebarCollapsed && showDisposableEmail && (
-              <p className="px-3 text-[10px] text-vault-text-secondary leading-tight">
-                {t('disposable_email_hint')}
-              </p>
-            )}
           </div>
 
           {/* Categories */}

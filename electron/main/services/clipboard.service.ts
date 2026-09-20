@@ -1,7 +1,9 @@
 import { clipboard } from 'electron'
 import { DEFAULTS } from '../crypto/constants'
 import { writeSecureText } from '../security/windowsClipboard'
+import { secureWipe } from '../security/memoryGuard'
 
+let copiedBuffer: Buffer | null = null
 let copiedValue = ''
 let clearTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -18,12 +20,17 @@ function writeToClipboard(text: string): void {
 }
 
 export async function copyToClipboard(text: string, ttl: number = DEFAULTS.CLIPBOARD_TTL_MS): Promise<void> {
-  // Cancel previous timer
   if (clearTimer) {
     clearTimeout(clearTimer)
     clearTimer = null
   }
 
+  if (copiedBuffer) {
+    secureWipe(copiedBuffer)
+    copiedBuffer = null
+  }
+
+  copiedBuffer = Buffer.from(text, 'utf8')
   copiedValue = text
   writeToClipboard(text)
 
@@ -31,6 +38,10 @@ export async function copyToClipboard(text: string, ttl: number = DEFAULTS.CLIPB
     clearTimer = setTimeout(() => {
       if (clipboard.readText() === copiedValue) {
         clipboard.clear()
+      }
+      if (copiedBuffer) {
+        secureWipe(copiedBuffer)
+        copiedBuffer = null
       }
       copiedValue = ''
       clearTimer = null
@@ -45,6 +56,10 @@ export function clearClipboard(): void {
   }
   if (clipboard.readText() === copiedValue) {
     clipboard.clear()
+  }
+  if (copiedBuffer) {
+    secureWipe(copiedBuffer)
+    copiedBuffer = null
   }
   copiedValue = ''
 }

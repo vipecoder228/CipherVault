@@ -5,6 +5,7 @@ import { getDatabase } from '../db/connection'
 import { encryptJSON, decryptJSON } from '../crypto/encryption'
 import { getEncryptionKey } from '../services/vault.service'
 import { createHmac, timingSafeEqual } from 'crypto'
+import { saveSecret, getSecret } from '../services/secretStorage'
 
 export type AuditAction =
   | 'vault_unlocked'
@@ -40,9 +41,18 @@ let hmacKey: Buffer | null = null
 
 async function getHmacKey(): Promise<Buffer> {
   if (hmacKey) return hmacKey
-  // Generate a new HMAC key if not exists
+
+  // Try to load persisted key
+  const persisted = await getSecret('audit_log_hmac_key')
+  if (persisted) {
+    hmacKey = Buffer.from(persisted, 'hex')
+    return hmacKey
+  }
+
+  // Generate a new HMAC key and persist it
   const { randomBytes } = await import('crypto')
   hmacKey = randomBytes(32)
+  await saveSecret('audit_log_hmac_key', hmacKey.toString('hex'))
   return hmacKey
 }
 

@@ -115,15 +115,6 @@ vi.mock('../../services/secretStorage', () => ({
   getSecret: vi.fn(),
 }))
 
-vi.mock('../../services/disposable-email.service', () => ({
-  createDisposableEmailAddress: vi.fn(),
-  listDisposableEmails: vi.fn(),
-  getDisposableEmailMessages: vi.fn(),
-  getDisposableEmailMessage: vi.fn(),
-  deleteDisposableEmailMessage: vi.fn(),
-  deleteDisposableEmailAccount: vi.fn(),
-}))
-
 vi.mock('../../utils/window', () => ({
   getWindow: vi.fn(),
   toggleWindow: vi.fn(),

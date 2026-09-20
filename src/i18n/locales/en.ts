@@ -146,9 +146,7 @@ export default {
   // Sidebar
   all_entries: 'All Entries',
   favorites: 'Favorites',
-  temp_email: 'Temp Email',
   trash: 'Trash',
-  disposable_email_hint: 'Disposable email via mail.tm',
   categories: 'Categories',
   settings: 'Settings',
   lock: 'Lock',
@@ -319,14 +317,6 @@ export default {
   select_file: 'Select File',
   no_file_selected: 'No file selected',
 
-  // Disposable email
-  disposable_email_title: 'Disposable Email',
-  create_email: 'Create Email',
-  email_copied: 'Email address copied',
-  password_copied: 'Password copied',
-  no_emails: 'No disposable emails yet',
-  create_first_email: 'Create your first disposable email address to protect your privacy.',
-
   // Toasts
   toast_password_updated: 'Password updated',
   toast_totp_enabled: 'Two-factor authentication enabled',
@@ -369,30 +359,6 @@ export default {
   loading: 'Loading...',
   deleted_date: 'Deleted: {date}',
 
-  // Disposable email
-  failed_load_emails: 'Failed to load emails',
-  email_created: 'Email created',
-  failed_create_email: 'Failed to create email',
-  failed_load_messages: 'Failed to load messages',
-  failed_load_message: 'Failed to load message',
-  message_deleted: 'Message deleted',
-  failed_delete_message: 'Failed to delete message',
-  confirm_delete_email: 'Delete this email address?',
-  email_deleted: 'Email deleted',
-  failed_delete_email: 'Failed to delete email',
-  failed_copy: 'Failed to copy',
-  refreshed: 'Refreshed',
-  failed_refresh: 'Failed to refresh',
-  from: 'From',
-  no_content: 'No content',
-  copy_address: 'Copy address',
-  refresh: 'Refresh',
-  no_messages_yet: 'No messages yet',
-  send_email_to: 'Send an email to this address to see messages here',
-  no_subject: 'No subject',
-  new: 'New',
-  no_disposable_emails: 'No disposable emails',
-  create_to_get_started: 'Create your first disposable email to get started',
   delete: 'Delete',
 
   // Emergency Access
@@ -527,6 +493,20 @@ export default {
   create_new_vault: 'Create New Vault',
   vault_name: 'Vault Name',
   vault_name_placeholder: 'e.g., Work, Personal',
+
+  // Attachments
+  attachments: 'Attachments',
+  add_attachment: 'Add file',
+  uploading: 'Uploading...',
+  no_attachments: 'No attachments yet',
+  attachment_uploaded: 'Attachment uploaded',
+  attachment_deleted: 'Attachment deleted',
+  confirm_delete_attachment: 'Delete this attachment? This cannot be undone.',
+  failed_to_load_attachments: 'Failed to load attachments',
+  failed_to_upload_attachment: 'Failed to upload attachment',
+  failed_to_download_attachment: 'Failed to download attachment',
+  failed_to_delete_attachment: 'Failed to delete attachment',
+  download: 'Download',
 
   // AppShell
   duress_mode: 'Duress mode — viewing decoy vault. Real data is hidden.',

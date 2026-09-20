@@ -146,9 +146,7 @@ export default {
   // Sidebar
   all_entries: 'Все записи',
   favorites: 'Избранное',
-  temp_email: 'Временная почта',
   trash: 'Корзина',
-  disposable_email_hint: 'Временная почта через mail.tm',
   categories: 'Категории',
   settings: 'Настройки',
   lock: 'Заблокировать',
@@ -319,14 +317,6 @@ export default {
   select_file: 'Выбрать файл',
   no_file_selected: 'Файл не выбран',
 
-  // Disposable email
-  disposable_email_title: 'Временная почта',
-  create_email: 'Создать почту',
-  email_copied: 'Адрес электронной почты скопирован',
-  password_copied: 'Пароль скопирован',
-  no_emails: 'Временных адресов пока нет',
-  create_first_email: 'Создайте временный адрес электронной почты для защиты вашей приватности.',
-
   // Toasts
   toast_password_updated: 'Пароль обновлён',
   toast_totp_enabled: 'Двухфакторная аутентификация включена',
@@ -369,30 +359,6 @@ export default {
   loading: 'Загрузка...',
   deleted_date: 'Удалено: {date}',
 
-  // Disposable email
-  failed_load_emails: 'Не удалось загрузить письма',
-  email_created: 'Почта создана',
-  failed_create_email: 'Не удалось создать почту',
-  failed_load_messages: 'Не удалось загрузить сообщения',
-  failed_load_message: 'Не удалось загрузить сообщение',
-  message_deleted: 'Сообщение удалено',
-  failed_delete_message: 'Не удалось удалить сообщение',
-  confirm_delete_email: 'Удалить этот адрес электронной почты?',
-  email_deleted: 'Почта удалена',
-  failed_delete_email: 'Не удалось удалить почту',
-  failed_copy: 'Не удалось скопировать',
-  refreshed: 'Обновлено',
-  failed_refresh: 'Не удалось обновить',
-  from: 'От',
-  no_content: 'Нет содержимого',
-  copy_address: 'Копировать адрес',
-  refresh: 'Обновить',
-  no_messages_yet: 'Сообщений пока нет',
-  send_email_to: 'Отправьте письмо на этот адрес, чтобы увидеть сообщения',
-  no_subject: 'Без темы',
-  new: 'Новое',
-  no_disposable_emails: 'Временных адресов нет',
-  create_to_get_started: 'Создайте временный адрес для начала работы',
   delete: 'Удалить',
 
   // Emergency Access
@@ -527,6 +493,20 @@ export default {
   create_new_vault: 'Создать новое хранилище',
   vault_name: 'Название хранилища',
   vault_name_placeholder: 'напр. Работа, Личное',
+
+  // Attachments
+  attachments: 'Вложения',
+  add_attachment: 'Добавить файл',
+  uploading: 'Загрузка...',
+  no_attachments: 'Вложений пока нет',
+  attachment_uploaded: 'Вложение загружено',
+  attachment_deleted: 'Вложение удалено',
+  confirm_delete_attachment: 'Удалить это вложение? Это действие необратимо.',
+  failed_to_load_attachments: 'Не удалось загрузить вложения',
+  failed_to_upload_attachment: 'Не удалось загрузить вложение',
+  failed_to_download_attachment: 'Не удалось скачать вложение',
+  failed_to_delete_attachment: 'Не удалось удалить вложение',
+  download: 'Скачать',
 
   // AppShell
   duress_mode: 'Режим принуждения — отображается запасное хранилище. Реальные данные скрыты.',

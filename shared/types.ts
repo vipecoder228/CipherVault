@@ -127,6 +127,18 @@ export interface EncryptedEntry {
   updated_at: string
 }
 
+// ─── Attachments ────────────────────────────────────────
+
+export interface AttachmentMeta {
+  id: number
+  entry_id: number
+  storage_key: string
+  filename: string
+  mime_type: string
+  size: number
+  created_at: string
+}
+
 // ─── Entry Filters ──────────────────────────────────────
 
 export interface EntryFilters {
@@ -273,6 +285,12 @@ export interface IPCChannels {
   'entries:get-decrypted-history': (id: number) => Promise<Array<EntryHistoryItem & { decrypted: Record<string, string> | null }>>
   'entries:get-totp': (id: number) => Promise<string | null>
 
+  // Attachments
+  'attachments:list': (entryId: number) => Promise<AttachmentMeta[]>
+  'attachments:add': (entryId: number, filename: string, mimeType: string, data: Uint8Array) => Promise<AttachmentMeta>
+  'attachments:get': (id: number) => Promise<{ meta: AttachmentMeta; data: Uint8Array } | null>
+  'attachments:delete': (id: number) => Promise<void>
+
   // Password
   'password:generate': (options: PasswordOptions) => Promise<string>
   'password:check-breach': (password: string) => Promise<BreachCheckResult>
@@ -293,14 +311,6 @@ export interface IPCChannels {
   'settings:set': (key: string, value: string) => Promise<void>
   'settings:set-secure': (key: string, value: string) => Promise<void>
   'settings:get-secure': (key: string) => Promise<string | null>
-
-  // Disposable Emails
-  'disposable:create': () => Promise<{ id: number; address: string }>
-  'disposable:list': () => Promise<Array<{ id: number; address: string; createdAt: string }>>
-  'disposable:messages': (emailId: number) => Promise<Array<{ id: string; from: string; subject: string; intro: string; createdAt: string; size: number }>>
-  'disposable:message': (emailId: number, messageId: string) => Promise<{ id: string; from: string; subject: string; text: string; html: string; createdAt: string }>
-  'disposable:delete-message': (emailId: number, messageId: string) => Promise<void>
-  'disposable:delete-account': (emailId: number) => Promise<void>
 
   // Backup
   'backup:export': (backupPassword: string) => Promise<{ success: boolean; path?: string; error?: string }>

@@ -929,6 +929,7 @@ function formatShortcut(shortcut: string): string {
 }
 
 function ShortcutRecorder({ onRecord }: { onRecord: (shortcut: string) => void }) {
+  const { t } = useI18n()
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       e.preventDefault()
@@ -949,8 +950,8 @@ function ShortcutRecorder({ onRecord }: { onRecord: (shortcut: string) => void }
 
   return (
     <div className="mt-2 p-3 rounded-lg bg-vault-accent/10 border border-vault-accent/30 text-center">
-      <p className="text-sm text-vault-accent font-medium">Press your desired key combination...</p>
-      <p className="text-xs text-vault-text-secondary mt-1">Release all keys when done</p>
+      <p className="text-sm text-vault-accent font-medium">{t('settings_press_keys')}</p>
+      <p className="text-xs text-vault-text-secondary mt-1">{t('settings_release_keys')}</p>
     </div>
   )
 }

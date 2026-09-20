@@ -124,7 +124,6 @@ function importDatabase(data: Uint8Array): void {
   db.run('DROP TABLE IF EXISTS vault')
   db.run('DROP TABLE IF EXISTS settings')
   db.run('DROP TABLE IF EXISTS unlock_attempts')
-  db.run('DROP TABLE IF EXISTS disposable_emails')
   db.run('DROP TABLE IF EXISTS _migrations')
   // Re-initialize from the imported data
   // Note: This is a simplified approach - in production, use a more robust merge

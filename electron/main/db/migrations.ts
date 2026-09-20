@@ -97,6 +97,33 @@ const MIGRATIONS = [
 
   // v15: Add password_changed_at for password age tracking
   `ALTER TABLE encrypted_entries ADD COLUMN password_changed_at TEXT;`,
+
+  // v16: File attachments — metadata only, encrypted bytes live in vault-data/attachments/
+  // (sql.js re-exports the whole DB on every save, so large blobs stay off the SQLite file)
+  `CREATE TABLE IF NOT EXISTS attachments (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    entry_id      INTEGER NOT NULL REFERENCES encrypted_entries(id) ON DELETE CASCADE,
+    storage_key   TEXT    NOT NULL UNIQUE,
+    filename      TEXT    NOT NULL,
+    mime_type     TEXT    NOT NULL,
+    size          INTEGER NOT NULL,
+    iv            TEXT    NOT NULL,
+    auth_tag      TEXT    NOT NULL,
+    created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+  );`,
+
+  `CREATE INDEX IF NOT EXISTS idx_attachments_entry ON attachments(entry_id);`,
+
+  // v16: Key versions for key rotation
+  `CREATE TABLE IF NOT EXISTS key_versions (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    vault_id    INTEGER NOT NULL,
+    version     INTEGER NOT NULL,
+    salt        TEXT    NOT NULL,
+    created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (vault_id) REFERENCES vault(id)
+  );`,
+  `CREATE INDEX IF NOT EXISTS idx_key_versions_vault ON key_versions(vault_id);`,
 ]
 
 export function runMigrations(db: Database): void {

@@ -2,7 +2,6 @@ import { useEffect, useState, useCallback } from 'react'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 import { EntryDetail } from '../entries/EntryDetail'
-import { DisposableEmailPanel } from '../disposable-email/DisposableEmailPanel'
 import { TrashPanel } from '../trash/TrashPanel'
 import { useEntriesStore } from '../../store/entriesStore'
 import { useUIStore } from '../../store/uiStore'
@@ -16,7 +15,6 @@ import type { EntryType } from '@shared/types'
 export function AppShell() {
   const selectedEntry = useEntriesStore((s) => s.selectedEntry)
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed)
-  const showDisposableEmail = useUIStore((s) => s.showDisposableEmail)
   const showTrash = useUIStore((s) => s.showTrash)
   const loadEntries = useEntriesStore((s) => s.loadEntries)
 
@@ -44,13 +42,6 @@ export function AppShell() {
           {showTrash && !selectedEntry && (
             <div className="w-[380px] border-l border-vault-border animate-slide-in">
               <TrashPanel />
-            </div>
-          )}
-
-          {/* Disposable Email panel */}
-          {showDisposableEmail && !selectedEntry && (
-            <div className="w-[380px] border-l border-vault-border animate-slide-in">
-              <DisposableEmailPanel />
             </div>
           )}
 

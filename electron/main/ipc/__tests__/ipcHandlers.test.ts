@@ -65,15 +65,6 @@ vi.mock('../services/health.service', () => ({
   analyzePasswordHealth: vi.fn().mockResolvedValue({ total: 0, weak: 0, reused: 0, old: 0, exposed: 0, score: 100, details: [] }),
 }))
 
-vi.mock('../services/disposable-email.service', () => ({
-  createDisposableEmailAddress: vi.fn(),
-  listDisposableEmails: vi.fn().mockResolvedValue([]),
-  getDisposableEmailMessages: vi.fn().mockResolvedValue([]),
-  getDisposableEmailMessage: vi.fn(),
-  deleteDisposableEmailMessage: vi.fn(),
-  deleteDisposableEmailAccount: vi.fn(),
-}))
-
 vi.mock('../services/sync.service', () => ({
   getSyncStatus: vi.fn(),
   selectSyncFolder: vi.fn(),

@@ -20,6 +20,8 @@ import {
 import { RATE_LIMIT } from '../../shared/crypto/constants'
 import { mapColumns, mapEntryType } from '../../shared/importMapper'
 import * as syncServerClient from './syncServerClient'
+import * as webAttachments from './webAttachments'
+import { deleteAttachmentFile } from './webAttachmentStorage'
 import type {
   IPCChannels,
   VaultStatus,
@@ -122,9 +124,19 @@ function recordAttempt(success: boolean): void {
 let pendingTotpSecret: string | null = null
 
 function parseTotpSecret(encrypted: string): { iv: string; ciphertext: string; authTag: string } | null {
+  // Try JSON format first (Electron)
+  try {
+    const parsed = JSON.parse(encrypted)
+    if (parsed.iv && parsed.ciphertext && parsed.authTag) {
+      return { iv: parsed.iv, ciphertext: parsed.ciphertext, authTag: parsed.authTag }
+    }
+  } catch {}
+  // Fallback: colon-separated format (legacy Web)
   const parts = encrypted.split(':')
-  if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) return null
-  return { iv: parts[0], ciphertext: parts[1], authTag: parts[2] }
+  if (parts.length === 3 && parts[0] && parts[1] && parts[2]) {
+    return { iv: parts[0], ciphertext: parts[1], authTag: parts[2] }
+  }
+  return null
 }
 
 async function generateTOTPToken(secret: string): Promise<string> {
@@ -380,12 +392,13 @@ async function migrateVaultToArgon2id(
       if (parsed) {
         const decryptedSecret = await decryptJSON<string>(parsed, oldEncKey)
         const reEncrypted = await encrypt(decryptedSecret, newEncKey)
-        const reEncryptedStr = `${reEncrypted.iv}:${reEncrypted.ciphertext}:${reEncrypted.authTag}`
+        const reEncryptedStr = JSON.stringify({ iv: reEncrypted.iv, ciphertext: reEncrypted.ciphertext, authTag: reEncrypted.authTag })
         webRun(`UPDATE vault SET totp_secret = ?, updated_at = datetime('now') WHERE id = ?`, [reEncryptedStr, vaultId])
       }
     }
 
     await reencryptEntriesAndHistory(oldEncKey, newEncKey, vaultId)
+    await webAttachments.reencryptVaultAttachments(vaultId, oldEncKey, newEncKey)
 
     webRun(
       `UPDATE vault SET master_hash = ?, kdf_salt = ?, kdf_type = 'argon2id', updated_at = datetime('now') WHERE id = ?`,
@@ -662,8 +675,10 @@ async function restoreEntry(id: number): Promise<void> {
 async function permanentDeleteEntry(id: number): Promise<void> {
   const encKey = getEncryptionKey()
   if (!encKey) return
-  webRun('DELETE FROM encrypted_entries WHERE id = ?', [id])
+  const storageKeys = webAttachments.getStorageKeysForEntry(id)
+  webRun('DELETE FROM encrypted_entries WHERE id = ?', [id]) // FK ON DELETE CASCADE removes the attachment rows
   await saveWebDatabase()
+  for (const key of storageKeys) await deleteAttachmentFile(key)
 }
 
 async function getDeletedEntries(): Promise<EncryptedEntry[]> {
@@ -688,8 +703,10 @@ async function cleanupOldDeletedEntries(): Promise<number> {
   )
   const count = countResult[0]?.count ?? 0
   if (count > 0) {
-    webRun(`DELETE FROM encrypted_entries WHERE deleted_at IS NOT NULL AND deleted_at < datetime('now', '-30 days')`)
+    const storageKeys = webAttachments.getStorageKeysForDeletedEntries(30)
+    webRun(`DELETE FROM encrypted_entries WHERE deleted_at IS NOT NULL AND deleted_at < datetime('now', '-30 days')`) // FK cascade removes the attachment rows
     await saveWebDatabase()
+    for (const key of storageKeys) await deleteAttachmentFile(key)
   }
   return count
 }
@@ -751,8 +768,10 @@ async function forceListEntries(): Promise<EncryptedEntry[]> {
 }
 
 async function forcePermanentDeleteEntry(id: number): Promise<void> {
-  webRun('DELETE FROM encrypted_entries WHERE id = ?', [id])
+  const storageKeys = webAttachments.getStorageKeysForEntry(id)
+  webRun('DELETE FROM encrypted_entries WHERE id = ?', [id]) // FK ON DELETE CASCADE removes the attachment rows
   await saveWebDatabase()
+  for (const key of storageKeys) await deleteAttachmentFile(key)
 }
 
 async function getPanicBackupEntries(): Promise<Array<EncryptedEntry & { decrypted?: Record<string, string> }>> {
@@ -1545,12 +1564,13 @@ export const webHandlers: HandlerMap = {
       if (parsed) {
         const decryptedSecret = await decryptJSON<string>(parsed, oldEncKey)
         const reEncrypted = await encrypt(decryptedSecret, newEncKey)
-        const reEncryptedStr = `${reEncrypted.iv}:${reEncrypted.ciphertext}:${reEncrypted.authTag}`
+        const reEncryptedStr = JSON.stringify({ iv: reEncrypted.iv, ciphertext: reEncrypted.ciphertext, authTag: reEncrypted.authTag })
         webRun(`UPDATE vault SET totp_secret = ?, updated_at = datetime('now') WHERE id = ?`, [reEncryptedStr, activeVaultId])
       }
     }
 
     await reencryptEntriesAndHistory(oldEncKey, newEncKey, activeVaultId)
+    await webAttachments.reencryptVaultAttachments(activeVaultId, oldEncKey, newEncKey)
 
     webRun(
       `UPDATE vault SET master_hash = ?, kdf_salt = ?, kdf_type = 'argon2id', updated_at = datetime('now') WHERE id = ?`,
@@ -1581,7 +1601,7 @@ export const webHandlers: HandlerMap = {
     if (!await verifyTOTP(pendingTotpSecret, code)) return false
 
     const encrypted = await encrypt(pendingTotpSecret, encKey)
-    const encryptedStr = `${encrypted.iv}:${encrypted.ciphertext}:${encrypted.authTag}`
+    const encryptedStr = JSON.stringify({ iv: encrypted.iv, ciphertext: encrypted.ciphertext, authTag: encrypted.authTag })
     webRun(`UPDATE vault SET totp_secret = ?, totp_enabled = 1, updated_at = datetime('now') WHERE id = ?`, [encryptedStr, activeVaultId])
     await saveWebDatabase()
     pendingTotpSecret = null
@@ -1707,6 +1727,27 @@ export const webHandlers: HandlerMap = {
   'entries:force-delete': (_: any, id: number) => forcePermanentDeleteEntry(id),
   'entries:panic-backup': () => getPanicBackupEntries(),
   'entries:complete-panic': () => completePanic(),
+
+  // Attachments
+  'attachments:list': (_: any, entryId: number) => {
+    if (typeof entryId !== 'number' || entryId <= 0) throw new Error('Invalid entry ID')
+    return webAttachments.listAttachments(entryId, getEncryptionKey())
+  },
+  'attachments:add': (_: any, entryId: number, filename: string, mimeType: string, data: Uint8Array) => {
+    if (typeof entryId !== 'number' || entryId <= 0) throw new Error('Invalid entry ID')
+    if (typeof filename !== 'string' || filename.length === 0 || filename.length > 255) throw new Error('Invalid filename')
+    if (typeof mimeType !== 'string' || mimeType.length > 255) throw new Error('Invalid MIME type')
+    if (!(data instanceof Uint8Array)) throw new Error('Invalid file data')
+    return webAttachments.addAttachment(entryId, filename, mimeType, data, getEncryptionKey())
+  },
+  'attachments:get': (_: any, id: number) => {
+    if (typeof id !== 'number' || id <= 0) throw new Error('Invalid attachment ID')
+    return webAttachments.getAttachmentData(id, getEncryptionKey())
+  },
+  'attachments:delete': (_: any, id: number) => {
+    if (typeof id !== 'number' || id <= 0) throw new Error('Invalid attachment ID')
+    return webAttachments.deleteAttachmentById(id, getEncryptionKey())
+  },
 
   // Email
   'email:send-backup': (_: any, backupData: string) => sendBackupWeb(backupData),
@@ -1847,12 +1888,6 @@ export const webHandlers: HandlerMap = {
   'backup:export': () => Promise.resolve({ success: false, error: 'Not supported on mobile' }),
   'backup:import': () => Promise.resolve({ success: false, error: 'Not supported on mobile' }),
   'backup:import-panic': () => importPanicBackup(),
-  'disposable:create': () => Promise.resolve({ id: 0, address: '' }),
-  'disposable:list': () => Promise.resolve([]),
-  'disposable:messages': () => Promise.resolve([]),
-  'disposable:message': () => Promise.resolve({ id: '', from: '', subject: '', text: '', html: '', createdAt: '' }),
-  'disposable:delete-message': () => Promise.resolve(),
-  'disposable:delete-account': () => Promise.resolve(),
   'import:csv': () => importCSV(),
   'import:json': () => importJSON(),
   'export:csv': () => Promise.resolve({ success: false }),

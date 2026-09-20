@@ -63,7 +63,12 @@ async function handleRequest(req: any, res: any): Promise<void> {
   // CORS headers — only allow localhost (local API)
   const origin = req.headers['origin'] || ''
   const isLocal = origin.includes('localhost') || origin.includes('127.0.0.1') || !origin
-  res.setHeader('Access-Control-Allow-Origin', isLocal ? 'https://localhost:19824' : 'https://localhost:19824')
+  if (!isLocal) {
+    res.writeHead(403, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ error: 'Forbidden: non-localhost origin' }))
+    return
+  }
+  res.setHeader('Access-Control-Allow-Origin', 'https://localhost:19824')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type')
   res.setHeader('X-Content-Type-Options', 'nosniff')
