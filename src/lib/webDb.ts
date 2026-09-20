@@ -1,5 +1,5 @@
 import initSqlJsWasm, { type Database } from 'sql.js'
-import { Filesystem, Directory } from '@capacitor/filesystem'
+import { isCapacitor, isTauri } from '../../shared/bridge'
 
 const DB_FILE = 'vault.db'
 
@@ -174,26 +174,51 @@ function isValidSqlite(bytes: Uint8Array): boolean {
   return header === SQLITE_MAGIC
 }
 
-// Try Capacitor filesystem first, fall back to localStorage
+// Platform-specific filesystem helpers
+async function fsReadFile(path: string): Promise<string | null> {
+  if (isCapacitor || !isTauri) {
+    try {
+      const { Filesystem, Directory } = await import('@capacitor/filesystem')
+      const result = await Filesystem.readFile({ path, directory: Directory.Data })
+      return (result as any).data as string
+    } catch { return null }
+  }
+  if (isTauri) {
+    try {
+      const { readTextFile, BaseDirectory } = await import('@tauri-apps/plugin-fs')
+      return await readTextFile(path, { baseDir: BaseDirectory.AppData })
+    } catch { return null }
+  }
+  return null
+}
+
+async function fsWriteFile(path: string, data: string, encoding?: string): Promise<void> {
+  if (isCapacitor || !isTauri) {
+    const { Filesystem, Directory } = await import('@capacitor/filesystem')
+    await Filesystem.writeFile({
+      path, data, directory: Directory.Data,
+      encoding: (encoding || 'utf8') as any,
+    })
+    return
+  }
+  if (isTauri) {
+    const { writeTextFile, BaseDirectory } = await import('@tauri-apps/plugin-fs')
+    await writeTextFile(path, data, { baseDir: BaseDirectory.AppData })
+  }
+}
+
+// Try Capacitor/Tauri filesystem first, fall back to localStorage
 // Validates data is a real SQLite database before returning
 async function loadDbFromDisk(): Promise<Uint8Array | null> {
-  // Try Capacitor filesystem first
-  try {
-    const result = await Filesystem.readFile({
-      path: DB_FILE,
-      directory: Directory.Data,
-    })
-    const b64 = (result as any).data as string
-    if (b64 && b64.length > 0) {
-      const bytes = base64ToArray(b64)
-      if (isValidSqlite(bytes)) {
-        console.log('[DB] Loaded valid database from Capacitor filesystem')
-        return bytes
-      }
-      console.warn('[DB] Capacitor filesystem has invalid DB, falling back to localStorage')
+  // Try native filesystem first
+  const b64 = await fsReadFile(DB_FILE)
+  if (b64 && b64.length > 0) {
+    const bytes = base64ToArray(b64)
+    if (isValidSqlite(bytes)) {
+      console.log('[DB] Loaded valid database from native filesystem')
+      return bytes
     }
-  } catch {
-    // File doesn't exist or Capacitor not available
+    console.warn('[DB] Native filesystem has invalid DB, falling back to localStorage')
   }
 
   // Fallback: localStorage
@@ -232,16 +257,11 @@ async function saveDbToDisk(database: Database): Promise<void> {
     // ALWAYS save to localStorage (most reliable in WebView)
     localStorage.setItem('ciphervault_db', base64)
 
-    // Also try Capacitor filesystem (backup)
+    // ALSO try native filesystem (backup)
     try {
-      await Filesystem.writeFile({
-        path: DB_FILE,
-        data: base64,
-        directory: Directory.Data,
-        encoding: 'base64' as any,
-      })
+      await fsWriteFile(DB_FILE, base64, 'base64')
     } catch {
-      // Capacitor not available — localStorage already saved above
+      // Native filesystem not available — localStorage already saved above
     }
   } catch (err) {
     console.error('Failed to save database:', err)

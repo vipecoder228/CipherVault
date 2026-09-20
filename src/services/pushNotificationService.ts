@@ -1,7 +1,7 @@
 // Push Notification Service
 // Sends breach alerts and security notifications to mobile devices
 
-import { isCapacitor } from '../../shared/bridge'
+import { isCapacitor, isTauri, isMobile } from '../../shared/bridge'
 
 export interface NotificationPayload {
   title: string
@@ -88,6 +88,56 @@ const capacitorPushNotification: PushNotificationService = {
   },
 }
 
+// ─── Tauri Implementation ────────────────────────────────
+
+const tauriPushNotification: PushNotificationService = {
+  async isAvailable(): Promise<boolean> {
+    try {
+      const { isPermissionGranted } = await import('@tauri-apps/plugin-notification')
+      return true
+    } catch {
+      return false
+    }
+  },
+
+  async requestPermission(): Promise<boolean> {
+    try {
+      const { requestPermission } = await import('@tauri-apps/plugin-notification')
+      const result = await requestPermission()
+      return result === 'granted'
+    } catch {
+      return false
+    }
+  },
+
+  async hasPermission(): Promise<boolean> {
+    try {
+      const { isPermissionGranted } = await import('@tauri-apps/plugin-notification')
+      return await isPermissionGranted()
+    } catch {
+      return false
+    }
+  },
+
+  async sendLocalNotification(payload: NotificationPayload): Promise<void> {
+    try {
+      const { sendNotification } = await import('@tauri-apps/plugin-notification')
+      await sendNotification({
+        title: payload.title,
+        body: payload.body,
+      })
+    } catch (error) {
+      console.error('Failed to send local notification:', error)
+    }
+  },
+
+  async registerForPush(): Promise<string | null> {
+    // Tauri doesn't have FCM push registration built-in
+    // Local notifications work directly
+    return null
+  },
+}
+
 // ─── Web Fallback ─────────────────────────────────────
 
 const webPushNotification: PushNotificationService = {
@@ -121,6 +171,7 @@ const webPushNotification: PushNotificationService = {
 // ─── Factory ──────────────────────────────────────────
 
 export function getPushNotificationService(): PushNotificationService {
+  if (isTauri) return tauriPushNotification
   if (isCapacitor) return capacitorPushNotification
   return webPushNotification
 }

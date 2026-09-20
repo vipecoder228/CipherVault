@@ -10,7 +10,7 @@ import { MobileAppShell } from './components/mobile/MobileAppShell'
 import { ToastContainer } from './components/ui/Toast'
 import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { invoke } from './lib/ipc'
-import { isCapacitor } from '../shared/bridge'
+import { isCapacitor, isTauri } from '../shared/bridge'
 
 // Detect if we're on a mobile device
 function isMobileDevice(): boolean {
@@ -46,11 +46,15 @@ export function App() {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // Auto-lock on Capacitor when app goes to background
+  // Auto-lock on Capacitor/Tauri when app goes to background
   useEffect(() => {
-    if (!isCapacitor) return
+    if (!isCapacitor && !isTauri) return
 
-    import('./capacitor/bridge').then(({ onAppStateChange }) => {
+    const loadBridge = isTauri
+      ? import('./tauri/bridge')
+      : import('./capacitor/bridge')
+
+    loadBridge.then(({ onAppStateChange }) => {
       onAppStateChange((state) => {
         if (state === 'background' && !locked) {
           lockRef.current()
@@ -121,9 +125,9 @@ export function App() {
     }
   }, [locked])
 
-  // Start breach monitor on Capacitor when unlocked
+  // Start breach monitor on mobile when unlocked
   useEffect(() => {
-    if (!isCapacitor || locked) return
+    if ((!isCapacitor && !isTauri) || locked) return
 
     import('./lib/webBackend').then(({ startBreachMonitorLocal }) => {
       startBreachMonitorLocal()

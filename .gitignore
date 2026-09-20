@@ -6,3 +6,5 @@ dist/
 .mimocode/
 resources/certs/*.pfx
 screenshot.png
+src-tauri/target/
+src-tauri/gen/

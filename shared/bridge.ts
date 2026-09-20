@@ -4,7 +4,9 @@
 // Platform detection
 export const isElectron = typeof window !== 'undefined' && typeof (window as any).electronAPI !== 'undefined'
 export const isCapacitor = typeof window !== 'undefined' && typeof (window as any).Capacitor !== 'undefined'
-export const isWeb = !isElectron && !isCapacitor
+export const isTauri = typeof window !== 'undefined' && typeof (window as any).__TAURI_INTERNALS__ !== 'undefined'
+export const isMobile = isCapacitor || isTauri
+export const isWeb = !isElectron && !isCapacitor && !isTauri
 
 // Clipboard interface
 export interface ClipboardAPI {

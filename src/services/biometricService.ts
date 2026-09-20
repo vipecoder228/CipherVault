@@ -1,7 +1,7 @@
 // Biometric authentication service
 // Provides fingerprint/Face ID authentication for mobile devices
 
-import { isCapacitor, isElectron } from '../../shared/bridge'
+import { isCapacitor, isElectron, isTauri, isMobile } from '../../shared/bridge'
 
 export interface BiometricResult {
   success: boolean
@@ -57,6 +57,47 @@ const capacitorBiometric: BiometricService = {
   },
 }
 
+// Tauri biometric implementation using @tauri-apps/plugin-biometric
+const tauriBiometric: BiometricService = {
+  async isAvailable(): Promise<boolean> {
+    try {
+      const { checkStatus } = await import('@tauri-apps/plugin-biometric')
+      const status = await checkStatus()
+      return status.isAvailable
+    } catch {
+      return false
+    }
+  },
+
+  async authenticate(title: string, subtitle: string, reason: string): Promise<BiometricResult> {
+    try {
+      const { authenticate } = await import('@tauri-apps/plugin-biometric')
+      await authenticate(reason, {
+        title,
+        subtitle,
+        cancelTitle: 'Отмена',
+        allowDeviceCredential: true,
+        confirmationRequired: false,
+      })
+      return { success: true }
+    } catch (error: any) {
+      return { success: false, error: error.message || 'Authentication failed' }
+    }
+  },
+
+  async enable(): Promise<void> {
+    localStorage.setItem('biometric_enabled', 'true')
+  },
+
+  async disable(): Promise<void> {
+    localStorage.removeItem('biometric_enabled')
+  },
+
+  async isEnabled(): Promise<boolean> {
+    return localStorage.getItem('biometric_enabled') === 'true'
+  },
+}
+
 // Electron biometric implementation (not yet available)
 const electronBiometric: BiometricService = {
   async isAvailable(): Promise<boolean> {
@@ -89,6 +130,7 @@ const webBiometric: BiometricService = {
 
 // Get the appropriate biometric service based on platform
 export function getBiometricService(): BiometricService {
+  if (isTauri) return tauriBiometric
   if (isCapacitor) return capacitorBiometric
   if (isElectron) return electronBiometric
   return webBiometric

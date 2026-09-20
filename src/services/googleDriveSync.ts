@@ -1,7 +1,7 @@
 // Google Drive sync service
 // Provides cloud synchronization via Google Drive
 
-import { isCapacitor, isElectron } from '../../shared/bridge'
+import { isCapacitor, isElectron, isTauri } from '../../shared/bridge'
 import { getRawDb, saveWebDatabase } from '../lib/webDb'
 
 export interface SyncConfig {
@@ -370,6 +370,7 @@ const webSync: SyncService = {
 export function getSyncService(): SyncService {
   if (isCapacitor) return capacitorGoogleDrive
   if (isElectron) return electronGoogleDrive
+  // Tauri uses web sync (works in WebView)
   return webSync
 }
 

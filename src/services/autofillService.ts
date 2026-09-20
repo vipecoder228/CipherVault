@@ -2,7 +2,7 @@
 // Provides credential management and quick access for Android
 // Full native autofill requires Android AutofillService (native development)
 
-import { isCapacitor, isElectron } from '../../shared/bridge'
+import { isCapacitor, isElectron, isTauri } from '../../shared/bridge'
 import { invoke, copyWithTtl } from '../lib/ipc'
 
 export interface AutofillEntry {
