@@ -3,7 +3,13 @@ import { useI18n } from '../../i18n'
 import { invoke } from '../../lib/ipc'
 import { AlertTriangle, Trash2, Mail } from 'lucide-react'
 import { useToastStore } from '../ui/Toast'
-import { runPanicWipe, backupReasonKey, type BackupResult } from './panicBackup'
+import { runPanicWipe, backupReasonKey, getBackupErrorDetail, type BackupResult } from './panicBackup'
+
+// backupResult.reason may be a composite string like "backup_failed: <error message>"
+// (see panicBackup.ts) — compare on the base reason before the colon.
+function isReason(reason: string | undefined, base: string): boolean {
+  return !!reason && reason.split(':')[0].trim() === base
+}
 
 interface Props {
   onDone: () => void
@@ -34,13 +40,13 @@ export function PanicChoiceScreen({ onDone }: Props) {
     // the backup didn't happen. For successful backups or non-critical errors
     // (e.g. Telegram config missing, but file saved locally), auto-close after
     // a brief delay so the user sees the success message.
-    const isCriticalFailure = result?.reason === 'no_backup_password' || result?.reason === 'backup_failed'
+    const isCriticalFailure = isReason(result?.reason, 'no_backup_password') || isReason(result?.reason, 'backup_failed')
     if (!isCriticalFailure) {
       setTimeout(onDone, 1500)
     }
   }
 
-  const isCriticalFailure = backupResult?.reason === 'no_backup_password' || backupResult?.reason === 'backup_failed'
+  const isCriticalFailure = isReason(backupResult?.reason, 'no_backup_password') || isReason(backupResult?.reason, 'backup_failed')
 
   return (
     <div className="min-h-screen bg-vault-bg flex items-center justify-center">
@@ -71,13 +77,18 @@ export function PanicChoiceScreen({ onDone }: Props) {
                 </div>
               ) : (
                 <>
-                  {backupResult.reason === 'no_backup_password' || backupResult.reason === 'backup_failed' ? (
+                  {isReason(backupResult.reason, 'no_backup_password') || isReason(backupResult.reason, 'backup_failed') ? (
                     <p className="text-xs font-medium text-red-400">{t('panic_backup_failed')}</p>
                   ) : (
                     <p className="text-xs font-medium text-vault-text-secondary">{t('panic_backup_saved')}</p>
                   )}
                   {backupResult.reason && (
                     <p className="text-[10px] text-vault-warning">{t(backupReasonKey(backupResult.reason))}</p>
+                  )}
+                  {backupResult.reason && getBackupErrorDetail(backupResult.reason) && (
+                    <p className="text-[10px] text-vault-text-secondary break-all font-mono">
+                      {getBackupErrorDetail(backupResult.reason)}
+                    </p>
                   )}
                   {backupResult.filePath && (
                     <p className="text-[10px] text-vault-text-secondary break-all">{backupResult.filePath}</p>

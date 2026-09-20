@@ -55,8 +55,17 @@ export async function runPanicWipe(deps: { invoke: InvokeFn }): Promise<{
         }, null, 2)
 
         const encrypted = await encryptText(backupJson, backupPassword)
-        const sendResult = await inv('email:send-backup', encrypted)
-        backupResult = { emailed: sendResult?.sent || false, filePath: sendResult?.filePath, reason: sendResult?.reason }
+        const sendResult = await inv('email:send-backup', encrypted) as { success?: boolean; error?: string; sent?: boolean; filePath?: string; reason?: string }
+        
+        // If sendBackup() itself failed (threw inside its own try/catch), it returns
+        // { success: false, error: ... } without sent/reason. Surface that as backup_failed,
+        // including the underlying error message so the UI/logs show the real cause.
+        if (sendResult?.success === false) {
+          console.error('sendBackup returned failure:', sendResult.error)
+          backupResult = { emailed: false, reason: `backup_failed: ${sendResult.error || 'unknown error'}`, filePath: undefined }
+        } else {
+          backupResult = { emailed: sendResult?.sent || false, filePath: sendResult?.filePath, reason: sendResult?.reason }
+        }
       } else {
         // Telegram may be configured, but without a backup password there is
         // nothing to encrypt the backup with — surface this instead of
@@ -69,8 +78,10 @@ export async function runPanicWipe(deps: { invoke: InvokeFn }): Promise<{
     // (e.g. vault:status, kdf lookup, encryption, or the IPC call itself).
     // Surface this to the UI instead of leaving backupResult as null, which
     // renders no backup panel at all and looks like nothing happened.
-    console.error('Panic backup failed, deleting data anyway:', err)
-    backupResult = { emailed: false, reason: 'backup_failed' }
+    const errMsg = err instanceof Error ? err.message : String(err)
+    console.error('Panic backup failed, deleting data anyway:', errMsg)
+    // Store the actual error message in reason so it surfaces in UI for debugging
+    backupResult = { emailed: false, reason: `backup_failed: ${errMsg}`, filePath: undefined }
   }
 
   // Delete everything regardless of whether the backup succeeded.
@@ -106,7 +117,16 @@ const BACKUP_REASON_KEYS: Record<string, TranslationKeys> = {
 }
 
 export function backupReasonKey(reason: string): TranslationKeys {
-  return BACKUP_REASON_KEYS[reason] || 'panic_backup_reason_unknown'
+  // Handle composite reasons like "backup_failed: <actual error message>"
+  const baseReason = reason.split(':')[0].trim()
+  return BACKUP_REASON_KEYS[baseReason] || 'panic_backup_reason_unknown'
+}
+
+// Extract the detailed error message from composite reasons like "backup_failed: Cannot write file"
+export function getBackupErrorDetail(reason: string): string | null {
+  const colonIndex = reason.indexOf(':')
+  if (colonIndex === -1) return null
+  return reason.substring(colonIndex + 1).trim()
 }
 
 // AES-GCM encryption using the shared Argon2id KDF helper, so the panic backup

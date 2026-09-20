@@ -101,7 +101,7 @@ describe('runPanicWipe', () => {
 
     const { backupResult, deletedCount } = await runPanicWipe({ invoke })
 
-    expect(backupResult).toEqual({ emailed: false, reason: 'backup_failed' })
+    expect(backupResult).toEqual({ emailed: false, reason: 'backup_failed: vault:status failed', filePath: undefined })
     expect(deletedCount).toBe(SAMPLE_ENTRIES.length)
     expect(calls.filter(c => c.channel === 'entries:force-delete')).toHaveLength(2)
   })
