@@ -67,7 +67,7 @@ const TYPE_LABELS: Record<EntryType, string> = {
 
 function EntryGrid() {
   const { t } = useI18n()
-  const { entries, viewMode, loading, selectEntry, selectedEntry, toggleFavorite, filters, setFilters, searchQuery } = useEntriesStore()
+  const { entries, viewMode, loading, selectEntry, selectedEntry, toggleFavorite, deleteEntry, filters, setFilters, searchQuery } = useEntriesStore()
   const setShowPasswordGenerator = useUIStore((s) => s.setShowPasswordGenerator)
   const alarmMode = useVaultStore((s) => s.alarmMode)
   const addToast = useToastStore((s) => s.addToast)
@@ -145,8 +145,15 @@ function EntryGrid() {
       // Delete - delete entry
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedEntry) {
         e.preventDefault()
-        const event = new CustomEvent('entry-delete', { detail: { id: selectedEntry.id } })
-        window.dispatchEvent(event)
+        if (confirm(t('delete_entry_confirm'))) {
+          deleteEntry(selectedEntry.id)
+            .then(() => {
+              addToast(t('entry_deleted'), 'success')
+            })
+            .catch(() => {
+              addToast(t('failed_to_delete'), 'error')
+            })
+        }
       }
 
       // Ctrl+C - copy password
@@ -175,7 +182,7 @@ function EntryGrid() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [entries, selectedEntry, selectedIds, selectEntry, addToast, t])
+  }, [entries, selectedEntry, selectedIds, selectEntry, deleteEntry, addToast, t, clearSelection])
 
   const handleQuickCopy = async (e: React.MouseEvent, entryId: number) => {
     e.stopPropagation()

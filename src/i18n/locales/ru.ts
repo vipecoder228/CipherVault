@@ -157,6 +157,7 @@ export default {
   failed_to_copy: 'Не удалось скопировать',
   delete_entry_confirm: 'Вы уверены, что хотите удалить эту запись?',
   entry_deleted: 'Запись удалена',
+  failed_to_delete: 'Не удалось удалить запись',
   edit: 'Редактировать',
   history: 'История',
   field_title: 'Название',

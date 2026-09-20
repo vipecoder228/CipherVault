@@ -157,6 +157,7 @@ export default {
   failed_to_copy: 'Failed to copy',
   delete_entry_confirm: 'Are you sure you want to delete this entry?',
   entry_deleted: 'Entry deleted',
+  failed_to_delete: 'Failed to delete entry',
   edit: 'Edit',
   history: 'History',
   field_title: 'Title',

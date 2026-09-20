@@ -162,10 +162,14 @@ export function MobileEntryDetail() {
     }
   }
 
-  const handleDelete = () => {
-    if (confirm('Удалить запись?')) {
-      deleteEntry(selectedEntry.id)
-      selectEntry(null as any)
+  const handleDelete = async () => {
+    if (confirm(t('delete_entry_confirm'))) {
+      try {
+        await deleteEntry(selectedEntry.id)
+        addToast(t('entry_deleted'), 'success')
+      } catch {
+        addToast(t('failed_to_delete'), 'error')
+      }
     }
   }
 

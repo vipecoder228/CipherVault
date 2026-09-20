@@ -153,7 +153,7 @@ export async function updateEntry(id: number, data: UpdateEntryPayload): Promise
 
 export async function deleteEntryById(id: number): Promise<void> {
   const encKey = getEncryptionKey()
-  if (!encKey) return // Alarm mode — no-op
+  if (!encKey) throw new Error('Vault is locked')
   const db = await getDatabase()
   dbDeleteEntry(db, id)
   saveDatabase()

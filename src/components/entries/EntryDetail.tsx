@@ -178,8 +178,12 @@ export function EntryDetail() {
 
   const handleDelete = async () => {
     if (confirm(t('delete_entry_confirm'))) {
-      await deleteEntry(entry.id)
-      addToast(t('entry_deleted'), 'success')
+      try {
+        await deleteEntry(entry.id)
+        addToast(t('entry_deleted'), 'success')
+      } catch {
+        addToast(t('failed_to_delete'), 'error')
+      }
     }
   }
 

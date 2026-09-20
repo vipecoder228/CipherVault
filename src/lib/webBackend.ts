@@ -660,7 +660,7 @@ async function updateEntry(id: number, data: UpdateEntryPayload): Promise<void> 
 
 async function deleteEntryById(id: number): Promise<void> {
   const encKey = getEncryptionKey()
-  if (!encKey) return
+  if (!encKey) throw new Error('Vault is locked')
   webRun(`UPDATE encrypted_entries SET deleted_at = datetime('now') WHERE id = ? AND deleted_at IS NULL`, [id])
   await saveWebDatabase()
 }

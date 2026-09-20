@@ -289,10 +289,10 @@ describe('EntriesService', () => {
       expect(mockSaveDatabase).toHaveBeenCalled()
     })
 
-    it('should no-op when vault is locked', async () => {
+    it('should throw when vault is locked', async () => {
       mockGetEncryptionKey.mockReturnValue(null)
 
-      await deleteEntryById(1)
+      await expect(deleteEntryById(1)).rejects.toThrow('Vault is locked')
 
       expect(entriesQueries.deleteEntry).not.toHaveBeenCalled()
     })
