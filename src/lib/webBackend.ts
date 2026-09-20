@@ -1285,6 +1285,50 @@ async function checkBreachLocal(password: string): Promise<{ breached: boolean; 
   }
 }
 
+// ─── Duplicate Password Check ───────────────────────────
+
+// Hash-then-compare instead of direct string equality: comparing password
+// hashes removes the direct plaintext length/content timing signal that a
+// naive `a === b` comparison would leak to anything able to time this call
+// (e.g. a malicious browser extension racing the IPC channel).
+async function sha256Hex(input: string): Promise<string> {
+  const bytes = new TextEncoder().encode(input)
+  const digest = await crypto.subtle.digest('SHA-256', bytes)
+  return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+async function checkDuplicatePasswordLocal(password: string): Promise<{ duplicated: boolean; count: number; titles: string[] }> {
+  if (typeof password !== 'string' || password.length === 0 || password.length > 10_000) {
+    return { duplicated: false, count: 0, titles: [] }
+  }
+
+  const encKey = getEncryptionKey()
+  if (!encKey) return { duplicated: false, count: 0, titles: [] }
+
+  const entries = webQueryAll<EncryptedEntry>(
+    'SELECT * FROM encrypted_entries WHERE deleted_at IS NULL AND vault_id = ?',
+    [activeVaultId]
+  )
+
+  const targetHash = await sha256Hex(password)
+  const titles: string[] = []
+  for (const entry of entries) {
+    try {
+      const decrypted = await decryptJSON<{ password?: string; title?: string }>(
+        { iv: entry.iv, ciphertext: entry.encrypted_data, authTag: entry.auth_tag },
+        encKey
+      )
+      if (typeof decrypted.password !== 'string') continue
+      const candidateHash = await sha256Hex(decrypted.password)
+      if (candidateHash === targetHash) {
+        titles.push(decrypted.title || decryptMetadata(entry.display_title))
+      }
+    } catch {}
+  }
+
+  return { duplicated: titles.length > 0, count: titles.length, titles }
+}
+
 // ─── Health Analysis ────────────────────────────────────
 
 async function analyzePasswordHealthLocal(): Promise<PasswordHealth> {
@@ -1808,6 +1852,7 @@ export const webHandlers: HandlerMap = {
   // Password
   'password:generate': (_: any, options: PasswordOptions) => Promise.resolve(generatePasswordLocal(options)),
   'password:check-breach': (_: any, password: string) => checkBreachLocal(password),
+  'password:check-duplicate': (_: any, password: string) => checkDuplicatePasswordLocal(password),
   'password:generate-username': () => Promise.resolve(generateUsernameLocal()),
   'password:generate-passphrase': (_: any, wordCount?: number) => Promise.resolve(generatePassphraseLocal(wordCount)),
 

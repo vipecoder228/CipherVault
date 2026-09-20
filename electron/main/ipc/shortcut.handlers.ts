@@ -1,6 +1,6 @@
 import { globalShortcut } from 'electron'
 import { ERRORS } from '../../../shared/errors'
-import { getDatabase } from '../db/connection'
+import { getDatabase, saveDatabase } from '../db/connection'
 import { toggleWindow } from '../utils/window'
 
 let currentShortcut: string = 'CommandOrControl+Shift+Space'
@@ -43,6 +43,7 @@ export async function setGlobalShortcut(shortcut: string): Promise<{ success: bo
     currentShortcut = shortcut
     const db = await getDatabase()
     db.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('global_shortcut', ?)", [shortcut])
+    saveDatabase()
     return { success: true }
   } catch (err: any) {
     return { success: false, error: err.message }

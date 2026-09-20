@@ -316,11 +316,16 @@ export async function handleExportJSON(entryIds?: number[]): Promise<{ success: 
   return { success: true }
 }
 
-export async function handleCheckDuplicatePassword(password: string): Promise<{ isDuplicate: boolean; entries?: Array<{ id: number; title: string }> }> {
+export async function handleCheckDuplicatePassword(password: string): Promise<{ duplicated: boolean; count: number; titles: string[] }> {
+  if (typeof password !== 'string' || password.length === 0 || password.length > 10_000) {
+    return { duplicated: false, count: 0, titles: [] }
+  }
+
   const { getEncryptionKey } = await import('../services/vault.service')
   const { decryptJSON } = await import('../crypto/encryption')
+  const { timingSafeEqual } = await import('crypto')
   const encKey = getEncryptionKey()
-  if (!encKey) return { isDuplicate: false }
+  if (!encKey) return { duplicated: false, count: 0, titles: [] }
 
   const db = await getDatabase()
   const vaultId = getActiveVaultId()
@@ -328,20 +333,28 @@ export async function handleCheckDuplicatePassword(password: string): Promise<{ 
     'SELECT id, display_title, encrypted_data, iv, auth_tag FROM encrypted_entries WHERE vault_id = ? AND deleted_at IS NULL',
     [vaultId]
   )
-  if (result.length === 0) return { isDuplicate: false }
+  if (result.length === 0) return { duplicated: false, count: 0, titles: [] }
 
-  const duplicates: Array<{ id: number; title: string }> = []
+  const passwordBuf = Buffer.from(password, 'utf-8')
+  const titles: string[] = []
   for (const row of result[0].values) {
     try {
       const decrypted = decryptJSON<Record<string, string>>(
         { iv: row[2] as string, ciphertext: row[3] as string, authTag: row[4] as string },
         encKey
       )
-      if (decrypted.password === password) {
-        duplicates.push({ id: row[0] as number, title: row[1] as string })
+      const candidate = decrypted.password
+      if (typeof candidate !== 'string') continue
+      const candidateBuf = Buffer.from(candidate, 'utf-8')
+      // Constant-time comparison to avoid leaking password length/content via
+      // timing (this handler is called on every keystroke with attacker-
+      // controlled input if a malicious extension can reach the IPC channel).
+      const isMatch = candidateBuf.length === passwordBuf.length && timingSafeEqual(candidateBuf, passwordBuf)
+      if (isMatch) {
+        titles.push(row[1] as string)
       }
     } catch {}
   }
 
-  return { isDuplicate: duplicates.length > 0, entries: duplicates }
+  return { duplicated: titles.length > 0, count: titles.length, titles }
 }

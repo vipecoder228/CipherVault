@@ -133,19 +133,21 @@ export function startWebSocketServer(): void {
     wss = new WebSocketServer({ port: PORT, host: '127.0.0.1' })
 
     wss.on('connection', (ws) => {
-      connectionCount++
+      // Enforce the connection limit before counting this connection, so a
+      // rejected connection never inflates connectionCount even briefly.
+      // ws.close() doesn't fire 'close' synchronously, so counting first and
+      // decrementing on close left a window where legitimate connections
+      // could be rejected due to a temporarily-inflated count.
+      if (connectionCount >= MAX_CONNECTIONS) {
+        ws.close(1013, 'Too many connections')
+        return
+      }
 
-      // Always register close handler so connectionCount decrements
+      connectionCount++
       ws.on('close', () => {
         connectionCount = Math.max(0, connectionCount - 1)
         ;(ws as any).authenticated = false
       })
-
-      // Enforce connection limit
-      if (connectionCount > MAX_CONNECTIONS) {
-        ws.close(1013, 'Too many connections')
-        return
-      }
 
       ;(ws as any).authenticated = false
 
