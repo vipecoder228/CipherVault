@@ -1,6 +1,6 @@
 {
   "name": "ciphervault",
-  "version": "14.0.15",
+  "version": "14.0.16",
   "description": "CipherVault — Secure desktop password manager",
   "main": "out/main/index.js",
   "author": "",
