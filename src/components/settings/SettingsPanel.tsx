@@ -570,8 +570,12 @@ function AlarmSetupModal({ onClose, onStatusChange }: { onClose: () => void; onS
         setBotName(result.botName || '')
         // Try auto-detect chat ID
         const detected = await invoke('email:get-chat-id', telegramToken)
-        if (detected) setChatId(detected)
-        addToast(`Bot connected: @${result.botName}`, 'success')
+        if (detected) {
+          setChatId(detected)
+          addToast(`Bot connected: @${result.botName}`, 'success')
+        } else {
+          addToast(`Bot connected: @${result.botName}. Send /start to the bot to auto-detect Chat ID.`, 'info')
+        }
       } else {
         addToast(result?.error || 'Invalid token', 'error')
       }
@@ -687,8 +691,12 @@ function TelegramSetupModal({ onClose }: { onClose: () => void }) {
       if (result?.ok) {
         setBotName(result.botName || '')
         const detected = await invoke('email:get-chat-id', telegramToken)
-        if (detected) setChatId(detected)
-        addToast(`Бот подключён: @${result.botName}`, 'success')
+        if (detected) {
+          setChatId(detected)
+          addToast(`Бот подключён: @${result.botName}`, 'success')
+        } else {
+          addToast(`Бот подключён: @${result.botName}. Отправьте /start боту, чтобы определить Chat ID автоматически.`, 'info')
+        }
       } else {
         addToast(result?.error || 'Неверный токен', 'error')
       }

@@ -29,6 +29,23 @@ async function getTelegramChatId(): Promise<string | null> {
   return getSecret('telegram_chat_id')
 }
 
+async function classifyTelegramFailure(res: Response): Promise<string> {
+  let description = ''
+  try {
+    const data = await res.json()
+    description = typeof data?.description === 'string' ? data.description : ''
+  } catch {
+    // response body wasn't JSON — fall back to status-based classification
+  }
+
+  if (res.status === 401) return 'invalid_token'
+  if (res.status === 404) return 'invalid_token'
+  if (res.status === 429) return 'rate_limited'
+  if (res.status === 400 && /chat not found/i.test(description)) return 'invalid_chat_id'
+  if (res.status === 403) return 'bot_blocked_or_kicked'
+  return 'telegram_rejected'
+}
+
 async function sendViaTelegram(chatId: string, _backupData: string, filePath: string): Promise<{ sent: boolean; reason?: string }> {
   const token = await getTelegramToken()
   if (!token) return { sent: false, reason: 'no_token' }
@@ -36,8 +53,9 @@ async function sendViaTelegram(chatId: string, _backupData: string, filePath: st
   try {
     const timestamp = new Date().toISOString()
 
-    // Send info message
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    // Send info message first — if this fails, the chat_id/token is bad and
+    // there's no point attempting the (more expensive) document upload.
+    const messageRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -46,6 +64,10 @@ async function sendViaTelegram(chatId: string, _backupData: string, filePath: st
       }),
     })
 
+    if (!messageRes.ok) {
+      return { sent: false, reason: await classifyTelegramFailure(messageRes) }
+    }
+
     // Send encrypted file as document
     const fileBuffer = readFileSync(filePath)
     const formData = new FormData()
@@ -53,12 +75,16 @@ async function sendViaTelegram(chatId: string, _backupData: string, filePath: st
     formData.append('document', new Blob([fileBuffer], { type: 'application/octet-stream' }), 'panic-backup.enc')
     formData.append('caption', `Encrypted backup — ${timestamp}`)
 
-    const res = await fetch(`https://api.telegram.org/bot${token}/sendDocument`, {
+    const docRes = await fetch(`https://api.telegram.org/bot${token}/sendDocument`, {
       method: 'POST',
       body: formData,
     })
 
-    return res.ok ? { sent: true } : { sent: false, reason: 'telegram_rejected' }
+    if (!docRes.ok) {
+      return { sent: false, reason: await classifyTelegramFailure(docRes) }
+    }
+
+    return { sent: true }
   } catch {
     return { sent: false, reason: 'network_error' }
   }

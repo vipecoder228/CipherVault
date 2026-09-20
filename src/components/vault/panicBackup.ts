@@ -83,6 +83,10 @@ export async function runPanicWipe(deps: { invoke: InvokeFn }): Promise<{
 
 const BACKUP_REASON_KEYS: Record<string, TranslationKeys> = {
   no_token: 'panic_backup_reason_no_token',
+  invalid_token: 'panic_backup_reason_invalid_token',
+  invalid_chat_id: 'panic_backup_reason_invalid_chat_id',
+  rate_limited: 'panic_backup_reason_rate_limited',
+  bot_blocked_or_kicked: 'panic_backup_reason_bot_blocked',
   telegram_rejected: 'panic_backup_reason_telegram_rejected',
   network_error: 'panic_backup_reason_network_error',
   no_telegram_configured: 'panic_backup_reason_not_configured',
