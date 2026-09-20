@@ -57,10 +57,20 @@ export async function runPanicWipe(deps: { invoke: InvokeFn }): Promise<{
         const encrypted = await encryptText(backupJson, backupPassword)
         const sendResult = await inv('email:send-backup', encrypted)
         backupResult = { emailed: sendResult?.sent || false, filePath: sendResult?.filePath, reason: sendResult?.reason }
+      } else {
+        // Telegram may be configured, but without a backup password there is
+        // nothing to encrypt the backup with — surface this instead of
+        // silently skipping the whole backup step.
+        backupResult = { emailed: false, reason: 'no_backup_password' }
       }
     }
   } catch (err) {
+    // Something threw before we could tell whether the backup succeeded
+    // (e.g. vault:status, kdf lookup, encryption, or the IPC call itself).
+    // Surface this to the UI instead of leaving backupResult as null, which
+    // renders no backup panel at all and looks like nothing happened.
     console.error('Panic backup failed, deleting data anyway:', err)
+    backupResult = { emailed: false, reason: 'backup_failed' }
   }
 
   // Delete everything regardless of whether the backup succeeded.
@@ -91,6 +101,8 @@ const BACKUP_REASON_KEYS: Record<string, TranslationKeys> = {
   network_error: 'panic_backup_reason_network_error',
   no_telegram_configured: 'panic_backup_reason_not_configured',
   web_download_only: 'panic_backup_reason_web_download_only',
+  no_backup_password: 'panic_backup_reason_no_backup_password',
+  backup_failed: 'panic_backup_reason_backup_failed',
 }
 
 export function backupReasonKey(reason: string): TranslationKeys {

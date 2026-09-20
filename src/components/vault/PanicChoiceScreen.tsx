@@ -56,7 +56,11 @@ export function PanicChoiceScreen({ onDone }: Props) {
               </div>
             ) : (
               <>
-                <p className="text-xs font-medium text-vault-text-secondary">{t('panic_backup_saved')}</p>
+                {backupResult.reason === 'no_backup_password' || backupResult.reason === 'backup_failed' ? (
+                  <p className="text-xs font-medium text-red-400">{t('panic_backup_failed')}</p>
+                ) : (
+                  <p className="text-xs font-medium text-vault-text-secondary">{t('panic_backup_saved')}</p>
+                )}
                 {backupResult.reason && (
                   <p className="text-[10px] text-vault-warning">{t(backupReasonKey(backupResult.reason))}</p>
                 )}

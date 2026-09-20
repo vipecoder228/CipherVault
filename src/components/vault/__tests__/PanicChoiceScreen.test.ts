@@ -69,7 +69,7 @@ describe('runPanicWipe', () => {
 
     const { backupResult, deletedCount } = await runPanicWipe({ invoke })
 
-    expect(backupResult).toBeNull()
+    expect(backupResult).toEqual({ emailed: false, reason: 'no_backup_password' })
     expect(deletedCount).toBe(SAMPLE_ENTRIES.length)
     expect(calls.some(c => c.channel === 'email:send-backup')).toBe(false)
     expect(calls.filter(c => c.channel === 'entries:force-delete')).toHaveLength(2)
@@ -101,7 +101,7 @@ describe('runPanicWipe', () => {
 
     const { backupResult, deletedCount } = await runPanicWipe({ invoke })
 
-    expect(backupResult).toBeNull()
+    expect(backupResult).toEqual({ emailed: false, reason: 'backup_failed' })
     expect(deletedCount).toBe(SAMPLE_ENTRIES.length)
     expect(calls.filter(c => c.channel === 'entries:force-delete')).toHaveLength(2)
   })
