@@ -29,8 +29,18 @@ export function PanicChoiceScreen({ onDone }: Props) {
     const { backupResult: result } = await runPanicWipe({ invoke })
     setBackupResult(result)
     addToast(t('panic_wipe_done'), 'success')
-    setTimeout(onDone, 1500)
+    // If backup failed critically (no password or unexpected error), don't
+    // auto-close — user must explicitly acknowledge the error so they see why
+    // the backup didn't happen. For successful backups or non-critical errors
+    // (e.g. Telegram config missing, but file saved locally), auto-close after
+    // a brief delay so the user sees the success message.
+    const isCriticalFailure = result?.reason === 'no_backup_password' || result?.reason === 'backup_failed'
+    if (!isCriticalFailure) {
+      setTimeout(onDone, 1500)
+    }
   }
+
+  const isCriticalFailure = backupResult?.reason === 'no_backup_password' || backupResult?.reason === 'backup_failed'
 
   return (
     <div className="min-h-screen bg-vault-bg flex items-center justify-center">
@@ -40,36 +50,51 @@ export function PanicChoiceScreen({ onDone }: Props) {
         </div>
         <div>
           <h1 className="text-xl font-bold text-vault-text mb-2">{t('panic_choice_title')}</h1>
-          <div className="flex items-center justify-center gap-2 text-sm text-vault-text-secondary">
-            <div className="w-4 h-4 border-2 border-vault-text-secondary border-t-transparent rounded-full animate-spin" />
-            <Trash2 size={16} />
-            {t('panic_wiping_status')}
-          </div>
+          {!backupResult ? (
+            <div className="flex items-center justify-center gap-2 text-sm text-vault-text-secondary">
+              <div className="w-4 h-4 border-2 border-vault-text-secondary border-t-transparent rounded-full animate-spin" />
+              <Trash2 size={16} />
+              {t('panic_wiping_status')}
+            </div>
+          ) : (
+            <p className="text-sm text-vault-text-secondary">{t('panic_wipe_done')}</p>
+          )}
         </div>
 
         {backupResult && (
-          <div className="bg-vault-surface border border-vault-border rounded-xl p-4 space-y-3 text-left">
-            {backupResult.emailed ? (
-              <div className="flex items-center gap-2 text-green-400">
-                <Mail size={16} />
-                <p className="text-xs font-medium">{t('panic_backup_sent')}</p>
-              </div>
-            ) : (
-              <>
-                {backupResult.reason === 'no_backup_password' || backupResult.reason === 'backup_failed' ? (
-                  <p className="text-xs font-medium text-red-400">{t('panic_backup_failed')}</p>
-                ) : (
-                  <p className="text-xs font-medium text-vault-text-secondary">{t('panic_backup_saved')}</p>
-                )}
-                {backupResult.reason && (
-                  <p className="text-[10px] text-vault-warning">{t(backupReasonKey(backupResult.reason))}</p>
-                )}
-                {backupResult.filePath && (
-                  <p className="text-[10px] text-vault-text-secondary break-all">{backupResult.filePath}</p>
-                )}
-              </>
+          <>
+            <div className="bg-vault-surface border border-vault-border rounded-xl p-4 space-y-3 text-left">
+              {backupResult.emailed ? (
+                <div className="flex items-center gap-2 text-green-400">
+                  <Mail size={16} />
+                  <p className="text-xs font-medium">{t('panic_backup_sent')}</p>
+                </div>
+              ) : (
+                <>
+                  {backupResult.reason === 'no_backup_password' || backupResult.reason === 'backup_failed' ? (
+                    <p className="text-xs font-medium text-red-400">{t('panic_backup_failed')}</p>
+                  ) : (
+                    <p className="text-xs font-medium text-vault-text-secondary">{t('panic_backup_saved')}</p>
+                  )}
+                  {backupResult.reason && (
+                    <p className="text-[10px] text-vault-warning">{t(backupReasonKey(backupResult.reason))}</p>
+                  )}
+                  {backupResult.filePath && (
+                    <p className="text-[10px] text-vault-text-secondary break-all">{backupResult.filePath}</p>
+                  )}
+                </>
+              )}
+            </div>
+
+            {isCriticalFailure && (
+              <button
+                onClick={onDone}
+                className="w-full py-3 px-4 rounded-xl bg-vault-surface border border-vault-border text-vault-text text-sm font-medium hover:bg-vault-surface-hover active:scale-98 transition-all"
+              >
+                {t('close')}
+              </button>
             )}
-          </div>
+          </>
         )}
       </div>
     </div>
