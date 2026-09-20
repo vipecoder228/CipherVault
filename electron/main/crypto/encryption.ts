@@ -51,3 +51,39 @@ export function encryptJSON(data: unknown, key: Buffer): EncryptedPayload {
 export function decryptJSON<T = unknown>(payload: EncryptedPayload, key: Buffer): T {
   return JSON.parse(decrypt(payload, key)) as T
 }
+
+export interface EncryptedBufferPayload {
+  iv: string
+  authTag: string
+  ciphertext: Buffer
+}
+
+// Buffer-native variants for arbitrary binary data (e.g. file attachments) —
+// avoids the base64/utf8 round-trip encrypt/decrypt use for string payloads.
+export function encryptBuffer(plaintext: Buffer, key: Buffer): EncryptedBufferPayload {
+  const iv = randomBytes(CRYPTO.IV_SIZE)
+  const cipher = createCipheriv(CRYPTO.ENCRYPTION_ALGO, key, iv, {
+    authTagLength: CRYPTO.AUTH_TAG_SIZE,
+  })
+
+  const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()])
+  const authTag = cipher.getAuthTag()
+
+  return {
+    iv: iv.toString('hex'),
+    ciphertext,
+    authTag: authTag.toString('hex'),
+  }
+}
+
+export function decryptBuffer(payload: EncryptedBufferPayload, key: Buffer): Buffer {
+  const ivBuffer = Buffer.from(payload.iv, 'hex')
+  const authTagBuffer = Buffer.from(payload.authTag, 'hex')
+
+  const decipher = createDecipheriv(CRYPTO.ENCRYPTION_ALGO, key, ivBuffer, {
+    authTagLength: CRYPTO.AUTH_TAG_SIZE,
+  })
+  decipher.setAuthTag(authTagBuffer)
+
+  return Buffer.concat([decipher.update(payload.ciphertext), decipher.final()])
+}

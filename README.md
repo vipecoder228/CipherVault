@@ -157,7 +157,7 @@
 | **REST API** | HTTPS, порт 19824 |
 | **Google Drive** | Синхронизация vault |
 | **Self-hosted Sync Server** | Zero-knowledge синхронизация между устройствами через свой сервер |
-| **Browser Extension** | Chrome, автозаполнение |
+| **Browser Extension** | Chrome, Firefox, автозаполнение |
 
 ---
 
@@ -184,7 +184,8 @@
 | **Linux** | Electron | ✅ Готово |
 | **Android** | Capacitor | ✅ Готово |
 | **iOS** | Capacitor | 🔄 В разработке |
-| **Chrome** | Extension | ✅ Готово |
+| **Chrome / Edge** | Extension (MV3) | ✅ Готово |
+| **Firefox** | Extension (MV3) | ✅ Готово |
 
 ---
 

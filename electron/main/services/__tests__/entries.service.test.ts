@@ -45,6 +45,15 @@ vi.mock('../../crypto/totp', () => ({
   generateTOTPToken: vi.fn(),
 }))
 
+vi.mock('../../db/queries/attachments.queries', () => ({
+  getStorageKeysForEntry: vi.fn(),
+  getStorageKeysForDeletedEntries: vi.fn(),
+}))
+
+vi.mock('../../db/attachmentStorage', () => ({
+  deleteAttachmentFile: vi.fn(),
+}))
+
 // ─── Imports ────────────────────────────────────────────
 import {
   listEntries,
@@ -55,10 +64,15 @@ import {
   restoreEntry,
   searchEntries,
   getPanicBackupEntries,
+  permanentDeleteEntry,
+  cleanupOldDeletedEntries,
+  forcePermanentDeleteEntry,
 } from '../entries.service'
 
 import * as dbConnection from '../../db/connection'
 import * as entriesQueries from '../../db/queries/entries.queries'
+import * as attachmentsQueries from '../../db/queries/attachments.queries'
+import * as attachmentStorage from '../../db/attachmentStorage'
 import * as encryption from '../../crypto/encryption'
 import * as vaultService from '../vault.service'
 
@@ -315,6 +329,80 @@ describe('EntriesService', () => {
       const result = await searchEntries('test')
 
       expect(result).toEqual([])
+    })
+  })
+
+  // ─── permanentDeleteEntry ──────────────────────────────
+  describe('permanentDeleteEntry', () => {
+    it('should no-op when vault is locked', async () => {
+      mockGetEncryptionKey.mockReturnValue(null)
+
+      await permanentDeleteEntry(1)
+
+      expect(entriesQueries.permanentDeleteEntry).not.toHaveBeenCalled()
+      expect(attachmentStorage.deleteAttachmentFile).not.toHaveBeenCalled()
+    })
+
+    it('should delete the DB row before cleaning up attachment files', async () => {
+      mockGetEncryptionKey.mockReturnValue(encKey)
+      vi.mocked(attachmentsQueries.getStorageKeysForEntry).mockReturnValue(['k1', 'k2'])
+
+      await permanentDeleteEntry(1)
+
+      expect(entriesQueries.permanentDeleteEntry).toHaveBeenCalledWith(expect.anything(), 1)
+      expect(mockSaveDatabase).toHaveBeenCalled()
+      expect(attachmentStorage.deleteAttachmentFile).toHaveBeenCalledWith('k1')
+      expect(attachmentStorage.deleteAttachmentFile).toHaveBeenCalledWith('k2')
+    })
+  })
+
+  // ─── cleanupOldDeletedEntries ──────────────────────────
+  describe('cleanupOldDeletedEntries', () => {
+    it('should return 0 when vault is locked', async () => {
+      mockGetEncryptionKey.mockReturnValue(null)
+
+      const result = await cleanupOldDeletedEntries()
+
+      expect(result).toBe(0)
+      expect(attachmentStorage.deleteAttachmentFile).not.toHaveBeenCalled()
+    })
+
+    it('should clean up attachment files for permanently deleted entries', async () => {
+      mockGetEncryptionKey.mockReturnValue(encKey)
+      vi.mocked(attachmentsQueries.getStorageKeysForDeletedEntries).mockReturnValue(['k1'])
+      vi.mocked(entriesQueries.permanentDeleteOldEntries).mockReturnValue(3)
+
+      const result = await cleanupOldDeletedEntries()
+
+      expect(attachmentsQueries.getStorageKeysForDeletedEntries).toHaveBeenCalledWith(expect.anything(), 30)
+      expect(mockSaveDatabase).toHaveBeenCalled()
+      expect(attachmentStorage.deleteAttachmentFile).toHaveBeenCalledWith('k1')
+      expect(result).toBe(3)
+    })
+
+    it('should not save the database when nothing was deleted', async () => {
+      mockGetEncryptionKey.mockReturnValue(encKey)
+      vi.mocked(attachmentsQueries.getStorageKeysForDeletedEntries).mockReturnValue([])
+      vi.mocked(entriesQueries.permanentDeleteOldEntries).mockReturnValue(0)
+
+      const result = await cleanupOldDeletedEntries()
+
+      expect(mockSaveDatabase).not.toHaveBeenCalled()
+      expect(result).toBe(0)
+    })
+  })
+
+  // ─── forcePermanentDeleteEntry ─────────────────────────
+  describe('forcePermanentDeleteEntry', () => {
+    it('should delete the DB row before cleaning up attachment files, regardless of lock state', async () => {
+      mockGetEncryptionKey.mockReturnValue(null)
+      vi.mocked(attachmentsQueries.getStorageKeysForEntry).mockReturnValue(['k1'])
+
+      await forcePermanentDeleteEntry(1)
+
+      expect(entriesQueries.permanentDeleteEntry).toHaveBeenCalledWith(expect.anything(), 1)
+      expect(mockSaveDatabase).toHaveBeenCalled()
+      expect(attachmentStorage.deleteAttachmentFile).toHaveBeenCalledWith('k1')
     })
   })
 

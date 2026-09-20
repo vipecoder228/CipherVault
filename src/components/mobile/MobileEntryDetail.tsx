@@ -6,6 +6,7 @@ import { useToastStore } from '../ui/Toast'
 import { useI18n } from '../../i18n'
 import { invoke, copyWithTtl } from '../../lib/ipc'
 import { EditEntryModal } from '../entries/EditEntryModal'
+import { AttachmentsSection } from '../entries/AttachmentsSection'
 import { useState, useEffect, useCallback, useRef } from 'react'
 
 const REVEAL_PASSWORD_TTL_MS = 15_000
@@ -288,6 +289,11 @@ export function MobileEntryDetail() {
           {selectedEntry.totp_secret && (
             <MobileTOTPField entryId={selectedEntry.id} onCopy={handleCopy} />
           )}
+        </div>
+
+        {/* Attachments */}
+        <div className="p-3 bg-vault-surface rounded-xl border border-vault-border">
+          <AttachmentsSection entryId={selectedEntry.id} />
         </div>
 
         {/* Category */}

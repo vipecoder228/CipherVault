@@ -6,6 +6,7 @@ import { invoke, copyWithTtl } from '../../lib/ipc'
 import { useToastStore } from '../ui/Toast'
 import { HistoryViewer } from './HistoryViewer'
 import { EditEntryModal } from './EditEntryModal'
+import { AttachmentsSection } from './AttachmentsSection'
 import { useI18n } from '../../i18n'
 import {
   X, Copy, ExternalLink, Star, Trash2, Clock, Shield, Pencil,
@@ -429,6 +430,9 @@ export function EntryDetail() {
               </div>
             </div>
           )}
+
+          {/* Attachments */}
+          <AttachmentsSection entryId={entry.id} />
 
           {/* Metadata */}
           <div className="pt-4 border-t border-vault-border space-y-2">

@@ -73,7 +73,13 @@ function connect() {
 
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0] && tabs[0].id) {
-        chrome.tabs.sendMessage(tabs[0].id, msg).catch(() => {});
+        chrome.tabs.sendMessage(tabs[0].id, msg, () => {
+          // Ignore errors (e.g. no content script on this tab) — checking
+          // chrome.runtime.lastError prevents Chrome logging an "Unchecked
+          // runtime.lastError" warning; Firefox doesn't require this but
+          // tolerates the callback form too.
+          void chrome.runtime.lastError;
+        });
       }
     });
   };

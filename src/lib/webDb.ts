@@ -100,6 +100,21 @@ const MIGRATIONS = [
 
   // v14: Add display_url for unencrypted URL display in list
   `ALTER TABLE encrypted_entries ADD COLUMN display_url TEXT NOT NULL DEFAULT '';`,
+
+  // v15/v16: File attachments — metadata only, encrypted bytes live under
+  // Directory.Data/attachments/ (mirrors electron/main/db/migrations.ts v16)
+  `CREATE TABLE IF NOT EXISTS attachments (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    entry_id      INTEGER NOT NULL REFERENCES encrypted_entries(id) ON DELETE CASCADE,
+    storage_key   TEXT    NOT NULL UNIQUE,
+    filename      TEXT    NOT NULL,
+    mime_type     TEXT    NOT NULL,
+    size          INTEGER NOT NULL,
+    iv            TEXT    NOT NULL,
+    auth_tag      TEXT    NOT NULL,
+    created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+  );`,
+  `CREATE INDEX IF NOT EXISTS idx_attachments_entry ON attachments(entry_id);`,
 ]
 
 function runMigrations(database: Database): void {
@@ -207,6 +222,10 @@ async function saveDbToDisk(database: Database): Promise<void> {
   saveLock = true
   try {
     const data = database.export()
+    // sql.js's export() resets PRAGMA foreign_keys to OFF on the live connection
+    // it was called on — restore it immediately so ON DELETE CASCADE (attachments,
+    // entry_history) keeps working for the rest of this session.
+    database.run('PRAGMA foreign_keys = ON')
     const bytes = new Uint8Array(data)
     const base64 = arrayToBase64(bytes)
 

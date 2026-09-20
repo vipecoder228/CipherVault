@@ -13,6 +13,8 @@ import {
   searchEntries as dbSearchEntries,
 } from '../db/queries/entries.queries'
 import { addHistoryEntry, getEntryHistory, getFullEntryHistory } from '../db/queries/history.queries'
+import { getStorageKeysForEntry, getStorageKeysForDeletedEntries } from '../db/queries/attachments.queries'
+import { deleteAttachmentFile } from '../db/attachmentStorage'
 import { encryptJSON, decryptJSON } from '../crypto/encryption'
 import { getEncryptionKey, getActiveVaultId, clearPanicKey } from './vault.service'
 import { generateTOTPToken } from '../crypto/totp'
@@ -169,8 +171,10 @@ export async function permanentDeleteEntry(id: number): Promise<void> {
   const encKey = getEncryptionKey()
   if (!encKey) return
   const db = await getDatabase()
-  dbPermanentDeleteEntry(db, id)
+  const storageKeys = getStorageKeysForEntry(db, id)
+  dbPermanentDeleteEntry(db, id) // FK ON DELETE CASCADE removes the attachment rows
   saveDatabase()
+  for (const key of storageKeys) deleteAttachmentFile(key)
 }
 
 export async function getDeletedEntries(): Promise<EncryptedEntry[]> {
@@ -185,8 +189,10 @@ export async function cleanupOldDeletedEntries(): Promise<number> {
   const encKey = getEncryptionKey()
   if (!encKey) return 0
   const db = await getDatabase()
-  const deleted = dbPermanentDeleteOldEntries(db, 30)
+  const storageKeys = getStorageKeysForDeletedEntries(db, 30)
+  const deleted = dbPermanentDeleteOldEntries(db, 30) // FK cascade removes the attachment rows
   if (deleted > 0) saveDatabase()
+  for (const key of storageKeys) deleteAttachmentFile(key)
   return deleted
 }
 
@@ -242,8 +248,10 @@ export async function forceListEntries(): Promise<EncryptedEntry[]> {
 
 export async function forcePermanentDeleteEntry(id: number): Promise<void> {
   const db = await getDatabase()
-  dbPermanentDeleteEntry(db, id)
+  const storageKeys = getStorageKeysForEntry(db, id)
+  dbPermanentDeleteEntry(db, id) // FK ON DELETE CASCADE removes the attachment rows
   saveDatabase()
+  for (const key of storageKeys) deleteAttachmentFile(key)
 }
 
 export async function getPanicBackupEntries(): Promise<Array<EncryptedEntry & { decrypted?: Record<string, string> }>> {

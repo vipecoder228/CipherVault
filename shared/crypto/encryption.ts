@@ -114,3 +114,52 @@ export function decryptSync(_payload: EncryptedPayload, _key: Buffer): string {
   // This is a placeholder - actual implementation should use the async version
   throw new Error('Use decrypt() for Web Crypto API')
 }
+
+export interface EncryptedBytesPayload {
+  iv: string
+  authTag: string
+  ciphertext: Uint8Array
+}
+
+// Uint8Array-native variants for arbitrary binary data (e.g. file attachments) —
+// avoids the string/TextEncoder round-trip encrypt/decrypt use for text payloads.
+// Mirrors electron/main/crypto/encryption.ts's encryptBuffer/decryptBuffer.
+export async function encryptBytes(plaintext: Uint8Array, key: Uint8Array): Promise<EncryptedBytesPayload> {
+  const iv = randomBytes(CRYPTO.IV_SIZE)
+  const cryptoKey = await importKey(key)
+
+  const encrypted = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv: iv.slice().buffer },
+    cryptoKey,
+    plaintext.slice().buffer
+  )
+
+  const encryptedBytes = new Uint8Array(encrypted)
+  const ciphertext = encryptedBytes.slice(0, encryptedBytes.length - CRYPTO.AUTH_TAG_SIZE)
+  const authTag = encryptedBytes.slice(encryptedBytes.length - CRYPTO.AUTH_TAG_SIZE)
+
+  return {
+    iv: bytesToHex(iv),
+    ciphertext,
+    authTag: bytesToHex(authTag),
+  }
+}
+
+export async function decryptBytes(payload: EncryptedBytesPayload, key: Uint8Array): Promise<Uint8Array> {
+  const iv = hexToBytes(payload.iv)
+  const authTag = hexToBytes(payload.authTag)
+
+  const encryptedData = new Uint8Array(payload.ciphertext.length + authTag.length)
+  encryptedData.set(payload.ciphertext)
+  encryptedData.set(authTag, payload.ciphertext.length)
+
+  const cryptoKey = await importKey(key)
+
+  const decrypted = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: iv.slice().buffer },
+    cryptoKey,
+    encryptedData.slice().buffer
+  )
+
+  return new Uint8Array(decrypted)
+}

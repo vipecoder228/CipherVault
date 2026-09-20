@@ -8,6 +8,7 @@ import { RATE_LIMIT } from '../crypto/constants'
 import { timingSafeEqual } from 'crypto'
 import { clearClipboard } from './clipboard.service'
 import { secureWipe } from '../security/memoryGuard'
+import { reencryptVaultAttachments } from './attachments.service'
 
 // Held in memory ONLY — never written to disk
 let derivedKey: Buffer | null = null
@@ -480,6 +481,9 @@ export async function changeMasterPassword(
         }
       }
     }
+
+    // Re-encrypt attachment files (scoped to this vault — other vaults use different keys)
+    await reencryptVaultAttachments(activeVaultId, oldEncKey, newEncKey)
 
     // Update master hash AFTER all re-encryption is complete
     updateMasterHash(db, newHash, newSalt.toString('hex'), 'argon2id', activeVaultId)
