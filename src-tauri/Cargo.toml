@@ -1,6 +1,6 @@
 [package]
 name = "ciphervault"
-version = "14.0.17"
+version = "14.0.18"
 description = "CipherVault — Secure password manager"
 authors = ["vipecoder228"]
 edition = "2021"
