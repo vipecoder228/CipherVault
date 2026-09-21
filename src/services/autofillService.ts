@@ -110,6 +110,12 @@ function invalidateCache(): void {
   cacheLoaded = false
 }
 
+// Clear credential cache on vault lock
+if (typeof window !== 'undefined') {
+  window.addEventListener('webvault:locked', invalidateCache)
+  window.addEventListener('vault:locked', invalidateCache as any)
+}
+
 // ─── Capacitor Autofill ────────────────────────────────
 
 const capacitorAutofill: AutofillService = {
@@ -148,6 +154,7 @@ const capacitorAutofill: AutofillService = {
           subtitle: cred.username,
           username: cred.username,
         })
+        continue
       }
       // Also match by package name if provided
       if (packageName && cred.packageName && cred.packageName === packageName) {

@@ -41,9 +41,9 @@ function parseTotpSecret(encrypted: string): { iv: string; ciphertext: string; a
 // Constant-time string comparison to prevent timing attacks
 // Note: safeEqual is only used for fixed-length hex hashes
 function safeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false
   const bufA = Buffer.from(a, 'utf8')
   const bufB = Buffer.from(b, 'utf8')
+  if (bufA.length !== bufB.length) return false
   return timingSafeEqual(bufA, bufB)
 }
 
@@ -475,8 +475,8 @@ export async function changeMasterPassword(
               `UPDATE entry_history SET encrypted_snapshot = ?, iv = ?, auth_tag = ? WHERE id = ?`,
               [reEncrypted.ciphertext, reEncrypted.iv, reEncrypted.authTag, historyId]
             )
-          } catch {
-            // History snapshot may be corrupted — skip
+          } catch (err) {
+            throw new Error(`Failed to re-encrypt history entry ${historyId}: ${err}`)
           }
         }
       }

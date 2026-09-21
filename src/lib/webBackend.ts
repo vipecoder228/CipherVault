@@ -45,13 +45,18 @@ import type {
 
 let derivedKey: Uint8Array | null = null
 let autoLockTimer: ReturnType<typeof setTimeout> | null = null
+let panicKeyTimer: ReturnType<typeof setTimeout> | null = null
 let alarmMode = false
 let activeVaultId = 1
 let panicKey: Uint8Array | null = null
+let operationCount = 0
 
 function isUnlocked(): boolean {
   return derivedKey !== null
 }
+
+function acquireOperation(): void { operationCount++ }
+function releaseOperation(): void { operationCount-- }
 
 function getEncryptionKey(): Uint8Array | null {
   if (!derivedKey) return null
@@ -64,6 +69,11 @@ function getPanicEncryptionKey(): Uint8Array | null {
 }
 
 function clearPanicKey(): void {
+  if (panicKeyTimer) {
+    clearTimeout(panicKeyTimer)
+    panicKeyTimer = null
+  }
+  if (panicKey) panicKey.fill(0)
   panicKey = null
 }
 
@@ -73,23 +83,18 @@ async function encryptMetadata(plaintext: string): Promise<string> {
   if (!plaintext) return ''
   const encKey = getEncryptionKey()
   if (!encKey) return plaintext
-  try {
-    const result = await encryptJSON({ value: plaintext }, encKey)
-    return JSON.stringify(result)
-  } catch {
-    return plaintext
-  }
+  const result = await encryptJSON({ value: plaintext }, encKey)
+  return JSON.stringify(result)
 }
 
-function decryptMetadata(encrypted: string): string {
+async function decryptMetadata(encrypted: string): Promise<string> {
   if (!encrypted) return ''
   const encKey = getEncryptionKey()
   if (!encKey) return encrypted
   try {
     const parsed = JSON.parse(encrypted)
     if (parsed && typeof parsed === 'object' && 'iv' in parsed && 'ciphertext' in parsed && 'authTag' in parsed) {
-      // Synchronous decrypt for web — decryptJSON is sync in web backend
-      const data = decryptJSON<{ value: string }>(
+      const data = await decryptJSON<{ value: string }>(
         { iv: parsed.iv, ciphertext: parsed.ciphertext, authTag: parsed.authTag },
         encKey
       )
@@ -189,6 +194,12 @@ async function resetAutoLockTimer(): Promise<void> {
 }
 
 function lockVault(): void {
+  // Defer lock if operation is in progress
+  if (operationCount > 0) {
+    if (autoLockTimer) clearTimeout(autoLockTimer)
+    autoLockTimer = setTimeout(lockVault, 1000)
+    return
+  }
   if (derivedKey) {
     // Zero out the key
     derivedKey.fill(0)
@@ -201,6 +212,7 @@ function lockVault(): void {
     clearTimeout(autoLockTimer)
     autoLockTimer = null
   }
+  clearClipboard()
   // Notify the UI that vault is locked (web equivalent of Electron IPC event)
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('webvault:locked'))
@@ -276,6 +288,8 @@ async function unlockVault(
   totpCode?: string,
   vaultId?: number
 ): Promise<VaultUnlockResult> {
+  acquireOperation()
+  try {
   await getWebDatabase()
 
   if (isUnlocked()) {
@@ -362,7 +376,13 @@ async function unlockVault(
   }
 
   derivedKey = isAlarm ? null : unlockedKey
-  panicKey = isAlarm ? key : null
+  if (isAlarm) {
+    panicKey = key
+    if (panicKeyTimer) clearTimeout(panicKeyTimer)
+    panicKeyTimer = setTimeout(() => { clearPanicKey() }, 300000)
+  } else {
+    panicKey = null
+  }
   alarmMode = isAlarm
   activeVaultId = targetVaultId
   recordAttempt(true)
@@ -370,6 +390,9 @@ async function unlockVault(
   await startAutoLockTimer()
 
   return { success: true, alarmMode: isAlarm }
+  } finally {
+    releaseOperation()
+  }
 }
 
 // Re-derives the vault key with Argon2id (fresh salt) and re-encrypts everything
@@ -446,17 +469,15 @@ async function reencryptEntriesAndHistory(
       [vaultId]
     )
     for (const row of historyRows) {
-      try {
-        const decrypted = await decryptJSON<Record<string, string>>(
-          { iv: row.iv, ciphertext: row.encrypted_snapshot, authTag: row.auth_tag },
-          oldEncKey
-        )
-        const reEncrypted = await encryptJSON(decrypted, newEncKey)
-        webRun(
-          `UPDATE entry_history SET encrypted_snapshot = ?, iv = ?, auth_tag = ? WHERE id = ?`,
-          [reEncrypted.ciphertext, reEncrypted.iv, reEncrypted.authTag, row.id]
-        )
-      } catch {}
+      const decrypted = await decryptJSON<Record<string, string>>(
+        { iv: row.iv, ciphertext: row.encrypted_snapshot, authTag: row.auth_tag },
+        oldEncKey
+      )
+      const reEncrypted = await encryptJSON(decrypted, newEncKey)
+      webRun(
+        `UPDATE entry_history SET encrypted_snapshot = ?, iv = ?, auth_tag = ? WHERE id = ?`,
+        [reEncrypted.ciphertext, reEncrypted.iv, reEncrypted.authTag, row.id]
+      )
     }
 
     webRun('COMMIT')
@@ -494,11 +515,18 @@ async function listEntries(filters?: EntryFilters): Promise<EncryptedEntry[]> {
   const entries = webQueryAll<EncryptedEntry>(query, params)
 
   // Decrypt metadata for display
-  return entries.map(entry => ({
-    ...entry,
-    display_title: decryptMetadata(entry.display_title),
-    display_url: decryptMetadata(entry.display_url),
+  const decrypted = await Promise.all(entries.map(async entry => {
+    try {
+      return {
+        ...entry,
+        display_title: await decryptMetadata(entry.display_title),
+        display_url: await decryptMetadata(entry.display_url),
+      }
+    } catch {
+      return null
+    }
   }))
+  return decrypted.filter((e): e is EncryptedEntry => e !== null)
 }
 
 async function getEntry(id: number): Promise<DecryptedEntry | null> {
@@ -517,8 +545,8 @@ async function getEntry(id: number): Promise<DecryptedEntry | null> {
   )
   decrypted.id = row.id
   decrypted.entry_type = row.entry_type
-  decrypted.display_title = decryptMetadata(row.display_title)
-  decrypted.display_url = decryptMetadata(row.display_url)
+  decrypted.display_title = await decryptMetadata(row.display_title)
+  decrypted.display_url = await decryptMetadata(row.display_url)
   decrypted.category_id = row.category_id
   decrypted.is_favorite = !!row.is_favorite
   decrypted.created_at = row.created_at
@@ -643,7 +671,7 @@ async function updateEntry(id: number, data: UpdateEntryPayload): Promise<void> 
 
   const encrypted = await encryptJSON(updatedData, encKey)
   // Use new title if provided, otherwise decrypt existing
-  const displayTitle = data.title ?? decryptMetadata(existing.display_title)
+  const displayTitle = data.title ?? await decryptMetadata(existing.display_title)
   const displayUrl = data.url ?? updatedData.url
 
   // Encrypt metadata before storing
@@ -688,11 +716,11 @@ async function getDeletedEntries(): Promise<EncryptedEntry[]> {
     'SELECT * FROM encrypted_entries WHERE deleted_at IS NOT NULL AND vault_id = ? ORDER BY deleted_at DESC',
     [activeVaultId]
   )
-  return entries.map(entry => ({
+  return Promise.all(entries.map(async entry => ({
     ...entry,
-    display_title: decryptMetadata(entry.display_title),
-    display_url: decryptMetadata(entry.display_url),
-  }))
+    display_title: await decryptMetadata(entry.display_title),
+    display_url: await decryptMetadata(entry.display_url),
+  })))
 }
 
 async function cleanupOldDeletedEntries(): Promise<number> {
@@ -741,11 +769,16 @@ async function searchEntries(query: string, filters?: EntryFilters): Promise<Enc
   if (!query) return allEntries
 
   const lowerQuery = query.toLowerCase()
-  return allEntries.filter(entry => {
-    const title = decryptMetadata(entry.display_title).toLowerCase()
-    const url = decryptMetadata(entry.display_url).toLowerCase()
-    return title.includes(lowerQuery) || url.includes(lowerQuery) || entry.entry_type.toLowerCase().includes(lowerQuery)
-  })
+  const results = await Promise.all(allEntries.map(async entry => {
+    try {
+      const title = (await decryptMetadata(entry.display_title)).toLowerCase()
+      const url = (await decryptMetadata(entry.display_url)).toLowerCase()
+      return title.includes(lowerQuery) || url.includes(lowerQuery) || entry.entry_type.toLowerCase().includes(lowerQuery) ? entry : null
+    } catch {
+      return null
+    }
+  }))
+  return results.filter((e): e is EncryptedEntry => e !== null)
 }
 
 async function toggleFavoriteEntry(id: number): Promise<void> {
@@ -787,6 +820,7 @@ async function getPanicBackupEntries(): Promise<Array<EncryptedEntry & { decrypt
 
 function completePanic(): void {
   clearPanicKey()
+  alarmMode = false
 }
 
 // Save backup as downloadable file (web version). Web/mobile has no Telegram
@@ -1321,7 +1355,7 @@ async function checkDuplicatePasswordLocal(password: string): Promise<{ duplicat
       if (typeof decrypted.password !== 'string') continue
       const candidateHash = await sha256Hex(decrypted.password)
       if (candidateHash === targetHash) {
-        titles.push(decrypted.title || decryptMetadata(entry.display_title))
+        titles.push(decrypted.title || await decryptMetadata(entry.display_title))
       }
     } catch {}
   }
@@ -1368,7 +1402,7 @@ async function analyzePasswordHealthLocal(): Promise<PasswordHealth> {
       if (!decrypted.password) continue
 
       const pwd = decrypted.password
-      const title = decrypted.title || decryptMetadata(entry.display_title)
+      const title = decrypted.title || await decryptMetadata(entry.display_title)
       const issues: string[] = []
 
       // Length check
@@ -1471,7 +1505,7 @@ async function analyzePasswordHealthLocal(): Promise<PasswordHealth> {
         } else {
           const entry = entries.find(e => e.id === id)
           if (entry) {
-            details.push({ entryId: id, title: decryptMetadata(entry.display_title), issues: ['reused'] })
+            details.push({ entryId: id, title: await decryptMetadata(entry.display_title), issues: ['reused'] })
           }
         }
       }
@@ -1497,15 +1531,7 @@ async function copyToClipboard(text: string, ttl: number = 30000): Promise<void>
   try {
     await navigator.clipboard.writeText(text)
   } catch {
-    // Fallback for Capacitor
-    const textArea = document.createElement('textarea')
-    textArea.value = text
-    textArea.style.position = 'fixed'
-    textArea.style.left = '-9999px'
-    document.body.appendChild(textArea)
-    textArea.select()
-    document.execCommand('copy')
-    document.body.removeChild(textArea)
+    throw new Error('Clipboard API not available')
   }
 
   if (ttl > 0) {
@@ -1514,6 +1540,15 @@ async function copyToClipboard(text: string, ttl: number = 30000): Promise<void>
       clipboardTimer = null
     }, ttl)
   }
+}
+
+// Clear clipboard on page unload to prevent leaking passwords
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', () => {
+    if (clipboardTimer) {
+      navigator.clipboard?.writeText('').catch(() => {})
+    }
+  })
 }
 
 async function clearClipboard(): Promise<void> {
@@ -1541,12 +1576,12 @@ function hexToArray(hex: string): Uint8Array {
 }
 
 function timingSafeStringEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false
+  const len = Math.max(a.length, b.length)
   let result = 0
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  for (let i = 0; i < len; i++) {
+    result |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0)
   }
-  return result === 0
+  return result === 0 && a.length === b.length
 }
 
 // ─── IPC Handler Map ────────────────────────────────────
@@ -1767,8 +1802,14 @@ export const webHandlers: HandlerMap = {
   'entries:get-totp': (_: any, id: number) => getEntryTOTP(id),
 
   // Alarm mode — bypass key check
-  'entries:force-list': () => forceListEntries(),
-  'entries:force-delete': (_: any, id: number) => forcePermanentDeleteEntry(id),
+  'entries:force-list': () => {
+    if (!alarmMode) throw new Error('Not in alarm mode')
+    return forceListEntries()
+  },
+  'entries:force-delete': (_: any, id: number) => {
+    if (!alarmMode) throw new Error('Not in alarm mode')
+    return forcePermanentDeleteEntry(id)
+  },
   'entries:panic-backup': () => getPanicBackupEntries(),
   'entries:complete-panic': () => completePanic(),
 
@@ -2391,7 +2432,7 @@ export async function checkAllPasswordsForBreachesLocal(): Promise<{ checked: nu
         const pwdHash = await hashPasswordLocal(decrypted.password)
         if (notifiedBreachesLocal.get(entry.id) !== pwdHash) {
           notifiedBreachesLocal.set(entry.id, pwdHash)
-          const title = decryptMetadata(entry.display_title)
+          const title = await decryptMetadata(entry.display_title)
 
           // Send push notification
           try {

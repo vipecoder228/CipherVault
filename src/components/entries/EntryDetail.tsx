@@ -34,6 +34,7 @@ export function EntryDetail() {
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current)
       if (revealTimeoutRef.current) clearTimeout(revealTimeoutRef.current)
+      setViewPassword('')
     }
   }, [])
 

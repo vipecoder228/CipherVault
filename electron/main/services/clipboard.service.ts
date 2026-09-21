@@ -54,9 +54,8 @@ export function clearClipboard(): void {
     clearTimeout(clearTimer)
     clearTimer = null
   }
-  if (clipboard.readText() === copiedValue) {
-    clipboard.clear()
-  }
+  // Always clear OS clipboard on vault lock — don't conditionalize on content match
+  clipboard.clear()
   if (copiedBuffer) {
     secureWipe(copiedBuffer)
     copiedBuffer = null

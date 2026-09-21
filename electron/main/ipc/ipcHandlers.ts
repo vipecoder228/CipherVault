@@ -55,9 +55,10 @@ const handlers: Record<string, (...args: any[]) => any> = {
       return false
     }
   },
-  'vault:get-kdf-salt': async (_: unknown, vaultId: number) => {
+  'vault:get-kdf-salt': async (_: unknown, vaultId?: number) => {
     const db = await getDatabase()
-    const result = db.exec('SELECT kdf_salt FROM vault WHERE id = ?', [vaultId])
+    const targetId = vaultId ?? 1
+    const result = db.exec('SELECT kdf_salt FROM vault WHERE id = ?', [targetId])
     if (result.length === 0 || result[0].values.length === 0) return null
     return result[0].values[0][0] as string
   },
@@ -86,7 +87,12 @@ const handlers: Record<string, (...args: any[]) => any> = {
   'entries:update': (_: unknown, id: number, data: any) => {
     if (typeof id !== 'number' || id <= 0 || id > 2147483647) throw new Error('Invalid entry ID')
     if (!data || typeof data !== 'object') throw new Error('Invalid update data')
-    return entriesService.updateEntry(id, data)
+    const allowedKeys = ['title', 'username', 'password', 'url', 'notes', 'category_id', 'is_favorite', 'totp_secret', 'card_number', 'card_holder', 'card_expiry', 'card_cvv', 'identity_first_name', 'identity_last_name', 'identity_phone', 'identity_email', 'identity_address', 'identity_ssn', 'identity_passport', 'identity_birthdate', 'custom_fields', 'passkey_id', 'passkey_public_key', 'passkey_rp_name', 'passkey_rp_id', 'passkey_counter']
+    const sanitized: Record<string, any> = {}
+    for (const key of Object.keys(data)) {
+      if (allowedKeys.includes(key)) sanitized[key] = data[key]
+    }
+    return entriesService.updateEntry(id, sanitized)
   },
   'entries:delete': (_: unknown, id: number) => {
     if (typeof id !== 'number' || id <= 0 || id > 2147483647) throw new Error('Invalid entry ID')
@@ -169,11 +175,28 @@ const handlers: Record<string, (...args: any[]) => any> = {
   },
 
   // Email / Telegram
-  'email:send-backup': (_: unknown, backupData: string) => sendBackup(backupData),
-  'email:test-telegram': (_: unknown, token: string) => testTelegramConnection(token),
-  'email:get-chat-id': (_: unknown, token: string) => getTelegramChatIdFromToken(token),
-  'email:save-telegram': (_: unknown, token: string, chatId: string) => saveTelegramConfig(token, chatId),
-  'email:send-breach-notification': (_: unknown, entryTitle: string, breachCount: number) => sendBreachNotification(entryTitle, breachCount),
+  'email:send-backup': (_: unknown, backupData: string) => {
+    if (typeof backupData !== 'string' || backupData.length === 0) throw new Error('Invalid backup data')
+    return sendBackup(backupData)
+  },
+  'email:test-telegram': (_: unknown, token: string) => {
+    if (typeof token !== 'string' || token.length === 0) throw new Error('Invalid Telegram token')
+    return testTelegramConnection(token)
+  },
+  'email:get-chat-id': (_: unknown, token: string) => {
+    if (typeof token !== 'string' || token.length === 0) throw new Error('Invalid Telegram token')
+    return getTelegramChatIdFromToken(token)
+  },
+  'email:save-telegram': (_: unknown, token: string, chatId: string) => {
+    if (typeof token !== 'string' || token.length === 0) throw new Error('Invalid Telegram token')
+    if (typeof chatId !== 'string' || chatId.length === 0) throw new Error('Invalid chat ID')
+    return saveTelegramConfig(token, chatId)
+  },
+  'email:send-breach-notification': (_: unknown, entryTitle: string, breachCount: number) => {
+    if (typeof entryTitle !== 'string') throw new Error('Invalid entry title')
+    if (typeof breachCount !== 'number' || breachCount < 0) throw new Error('Invalid breach count')
+    return sendBreachNotification(entryTitle, breachCount)
+  },
 
   // Password
   'password:generate': (_: unknown, options: any) => {
@@ -184,6 +207,10 @@ const handlers: Record<string, (...args: any[]) => any> = {
       }
       for (const key of ['uppercase', 'lowercase', 'numbers', 'symbols']) {
         if (key in options) options[key] = !!options[key]
+      }
+      // Ensure at least one charset is enabled
+      if (!options.uppercase && !options.lowercase && !options.numbers && !options.symbols) {
+        options.lowercase = true
       }
     }
     return generatePassword(options)
@@ -207,8 +234,13 @@ const handlers: Record<string, (...args: any[]) => any> = {
   'categories:update': async (_: unknown, id: number, data: any) => {
     if (typeof id !== 'number' || id <= 0 || id > 2147483647) throw new Error('Invalid category ID')
     if (!data || typeof data !== 'object') throw new Error('Invalid category data')
+    const allowedKeys = ['name', 'icon', 'color', 'sort_order']
+    const sanitized: Record<string, any> = {}
+    for (const key of Object.keys(data)) {
+      if (allowedKeys.includes(key)) sanitized[key] = data[key]
+    }
     const db = await getDatabase()
-    return updateCategory(db, id, data)
+    return updateCategory(db, id, sanitized)
   },
   'categories:delete': async (_: unknown, id: number) => {
     if (typeof id !== 'number' || id <= 0 || id > 2147483647) throw new Error('Invalid category ID')
@@ -295,6 +327,8 @@ const handlers: Record<string, (...args: any[]) => any> = {
 
   // Passkey management
   'passkey:save': async (_: unknown, credential: any) => {
+    if (!credential || typeof credential !== 'object') throw new Error('Invalid credential')
+    if (typeof credential.id !== 'string' || !credential.id) throw new Error('Missing credential id')
     const { savePasskey, listPasskeys } = await import('../services/passkeyStorage')
     const existing = await listPasskeys()
     if (existing.some(c => c.id === credential.id)) return { success: true }

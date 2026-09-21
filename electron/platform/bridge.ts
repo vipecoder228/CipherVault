@@ -4,6 +4,12 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlink
 import { join } from 'path'
 import { app } from 'electron'
 
+// This bridge is only safe to use in non-Electron contexts (web/Capacitor/Tauri).
+// In Electron builds, the preload IPC channel handles all privileged operations.
+// Guard: if running inside Electron's main process, export a stub to prevent
+// accidental use that would expose arbitrary filesystem/SQL access.
+const isElectronMainProcess = typeof process !== 'undefined' && process.versions?.electron != null
+
 // Electron Clipboard implementation
 const electronClipboard = {
   async writeText(text: string): Promise<void> {
@@ -128,12 +134,9 @@ const electronDatabase = {
 }
 
 // Create Electron platform bridge
-export const electronBridge: PlatformBridge = {
-  clipboard: electronClipboard,
-  biometric: electronBiometric,
-  filesystem: electronFileSystem,
-  dialog: electronDialog,
-  database: electronDatabase,
-}
+// Guard: only expose full bridge outside of Electron main process context
+export const electronBridge: PlatformBridge = isElectronMainProcess
+  ? { clipboard: electronClipboard, biometric: electronBiometric, filesystem: { readFile: async () => '', writeFile: async () => {}, exists: async () => false, mkdir: async () => {}, readDir: async () => [], deleteFile: async () => {}, rename: async () => {} }, dialog: electronDialog, database: { init: async () => {}, run: async () => {}, query: async () => [], close: async () => {}, getDatabasePath: () => '' } }
+  : { clipboard: electronClipboard, biometric: electronBiometric, filesystem: electronFileSystem, dialog: electronDialog, database: electronDatabase }
 
 export default electronBridge

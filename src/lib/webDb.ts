@@ -73,6 +73,7 @@ const MIGRATIONS = [
   `CREATE INDEX IF NOT EXISTS idx_history_entry ON entry_history(entry_id, changed_at DESC);`,
   `CREATE TABLE IF NOT EXISTS unlock_attempts (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    vault_id     INTEGER NOT NULL DEFAULT 1,
     success      INTEGER NOT NULL DEFAULT 0,
     attempted_at TEXT    NOT NULL DEFAULT (datetime('now'))
   );`,
@@ -136,10 +137,9 @@ function runMigrations(database: Database): void {
       try {
         database.run(sql)
         database.run('INSERT INTO _migrations (version) VALUES (?)', [index])
-      } catch {
-        try {
-          database.run('INSERT INTO _migrations (version) VALUES (?)', [index])
-        } catch {}
+      } catch (err) {
+        console.error(`Migration ${index} failed:`, err)
+        // Don't mark as applied — let it retry on next startup
       }
     }
   })
@@ -176,34 +176,34 @@ function isValidSqlite(bytes: Uint8Array): boolean {
 
 // Platform-specific filesystem helpers
 async function fsReadFile(path: string): Promise<string | null> {
-  if (isCapacitor || !isTauri) {
-    try {
-      const { Filesystem, Directory } = await import('@capacitor/filesystem')
-      const result = await Filesystem.readFile({ path, directory: Directory.Data })
-      return (result as any).data as string
-    } catch { return null }
-  }
   if (isTauri) {
     try {
       const { readTextFile, BaseDirectory } = await import('@tauri-apps/plugin-fs')
       return await readTextFile(path, { baseDir: BaseDirectory.AppData })
     } catch { return null }
   }
+  if (isCapacitor) {
+    try {
+      const { Filesystem, Directory } = await import('@capacitor/filesystem')
+      const result = await Filesystem.readFile({ path, directory: Directory.Data })
+      return (result as any).data as string
+    } catch { return null }
+  }
   return null
 }
 
 async function fsWriteFile(path: string, data: string, encoding?: string): Promise<void> {
-  if (isCapacitor || !isTauri) {
+  if (isTauri) {
+    const { writeTextFile, BaseDirectory } = await import('@tauri-apps/plugin-fs')
+    await writeTextFile(path, data, { baseDir: BaseDirectory.AppData })
+    return
+  }
+  if (isCapacitor) {
     const { Filesystem, Directory } = await import('@capacitor/filesystem')
     await Filesystem.writeFile({
       path, data, directory: Directory.Data,
       encoding: (encoding || 'utf8') as any,
     })
-    return
-  }
-  if (isTauri) {
-    const { writeTextFile, BaseDirectory } = await import('@tauri-apps/plugin-fs')
-    await writeTextFile(path, data, { baseDir: BaseDirectory.AppData })
   }
 }
 
@@ -245,6 +245,7 @@ async function saveDbToDisk(database: Database): Promise<void> {
     return
   }
   saveLock = true
+  saveTimer = null
   try {
     const data = database.export()
     // sql.js's export() resets PRAGMA foreign_keys to OFF on the live connection
@@ -266,7 +267,10 @@ async function saveDbToDisk(database: Database): Promise<void> {
   } catch (err) {
     console.error('Failed to save database:', err)
   } finally {
+    // Ensure FK enforcement is always restored even if save fails
+    try { database.run('PRAGMA foreign_keys = ON') } catch {}
     saveLock = false
+    saveTimer = null
   }
 }
 

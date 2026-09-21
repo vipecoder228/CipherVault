@@ -1,5 +1,10 @@
 // Secure storage helpers for encrypting sensitive data in localStorage
 // Used on web/mobile platforms where OS keychain is unavailable
+//
+// WARNING: On mobile (Capacitor/Android), localStorage is backed by a SQLite
+// file accessible to rooted devices or via ADB backup. The device key stored
+// here is therefore not fully secure on mobile. For production mobile use,
+// consider migrating to native Keychain (iOS) / Android Keystore.
 
 // ─── Device-specific key ──────────────────────────────
 // Used to encrypt secrets when master password is not available

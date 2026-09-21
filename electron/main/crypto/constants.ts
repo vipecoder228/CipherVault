@@ -4,11 +4,10 @@
 export const CRYPTO = {
   // Argon2id parameters (OWASP recommended)
   ARGON2: {
-    TIME_COST: 3,        // iterations
+    TIME_COST: 4,        // iterations
     MEMORY_COST: 65536,  // 64 MB
     PARALLELISM: 4,      // threads
     KEY_LENGTH: 32,      // bytes
-    SALT_LENGTH: 16,     // bytes
   },
   // Legacy PBKDF2 (kept for migration)
   PBKDF2: {

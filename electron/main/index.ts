@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, Tray, Menu, nativeImage, globalShortcut, session, powerMonitor } from 'electron'
+import { app, BrowserWindow, shell, Tray, Menu, nativeImage, globalShortcut, session, powerMonitor, dialog } from 'electron'
 import { join } from 'path'
 import { readFileSync } from 'fs'
 import AutoLaunch from 'auto-launch'
@@ -15,6 +15,14 @@ import { loadSyncServerSettings } from './services/syncServer.service'
 import { toggleWindow } from './utils/window'
 import { initUpdater } from './updater'
 import { enableScreenshotProtection } from './security/screenshotProtection'
+
+// Prevent crashes from unhandled promise rejections in IPC handlers
+process.on('unhandledRejection', (reason) => {
+  console.error('[CipherVault] Unhandled promise rejection:', reason)
+})
+process.on('uncaughtException', (err) => {
+  console.error('[CipherVault] Uncaught exception:', err)
+})
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -58,6 +66,10 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
+  mainWindow.webContents.on('will-navigate', (e) => {
+    e.preventDefault()
+  })
+
   // Hide to tray on blur
   mainWindow.on('blur', () => {
     if (mainWindow?.isVisible()) {
@@ -88,7 +100,7 @@ function createWindow(): void {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
-        'Content-Security-Policy': ["default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://api.pwnedpasswords.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'"]
+        'Content-Security-Policy': ["default-src 'self'; script-src 'self' 'wasm-unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://api.pwnedpasswords.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'"]
       }
     })
   })
@@ -171,6 +183,10 @@ app.whenReady().then(async () => {
   const integrityCheck = verifyIntegrity()
   if (!integrityCheck.ok) {
     console.warn('[CipherVault] Integrity check failed:', integrityCheck.tamperedFiles)
+    dialog.showErrorBox(
+      'Integrity Check Failed',
+      `The following files appear to have been modified:\n${integrityCheck.tamperedFiles.join('\n')}\n\nThe application may have been tampered with.`
+    )
   }
 
   // Initialize audit log system

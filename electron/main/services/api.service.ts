@@ -1,5 +1,6 @@
 import { createServer, Server } from 'https'
 import { timingSafeEqual } from 'crypto'
+import { app } from 'electron'
 import { getDatabase } from '../db/connection'
 import { getLocalhostCert } from './tlsCert'
 import { getEntries, getEntryById } from '../db/queries/entries.queries'
@@ -62,13 +63,15 @@ function parseBody(req: any): Promise<any> {
 async function handleRequest(req: any, res: any): Promise<void> {
   // CORS headers — only allow localhost (local API)
   const origin = req.headers['origin'] || ''
-  const isLocal = origin.includes('localhost') || origin.includes('127.0.0.1') || !origin
+  // Allow requests with no Origin (non-browser clients like curl/Node.js)
+  // or requests from localhost (browser same-origin/extension)
+  const isLocal = !origin || origin.includes('localhost') || origin.includes('127.0.0.1')
   if (!isLocal) {
     res.writeHead(403, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({ error: 'Forbidden: non-localhost origin' }))
     return
   }
-  res.setHeader('Access-Control-Allow-Origin', 'https://localhost:19824')
+  res.setHeader('Access-Control-Allow-Origin', origin || 'https://localhost:19824')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type')
   res.setHeader('X-Content-Type-Options', 'nosniff')
@@ -98,7 +101,7 @@ async function handleRequest(req: any, res: any): Promise<void> {
   try {
     if (req.url === '/status') {
       res.writeHead(200, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ status: 'ok', version: '13.0.0' }))
+      res.end(JSON.stringify({ status: 'ok', version: app.getVersion() }))
       return
     }
 

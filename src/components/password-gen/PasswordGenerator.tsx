@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { invoke, copyWithTtl } from '../../lib/ipc'
 import { useToastStore } from '../ui/Toast'
 import { useI18n } from '../../i18n'
@@ -51,6 +51,8 @@ export function PasswordGenerator({ onUsePassword }: { onUsePassword?: (pwd: str
   const [showSavePreset, setShowSavePreset] = useState(false)
   const addToast = useToastStore((s) => s.addToast)
 
+  const optionsKey = JSON.stringify(options)
+
   const generate = async () => {
     let pwd: string
     if (mode === 'passphrase') {
@@ -65,7 +67,7 @@ export function PasswordGenerator({ onUsePassword }: { onUsePassword?: (pwd: str
 
   useEffect(() => {
     generate()
-  }, [mode, options, passphraseWords])
+  }, [mode, optionsKey, passphraseWords])
 
   const strength = calculateStrength(password)
 

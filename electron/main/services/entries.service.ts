@@ -148,6 +148,12 @@ export async function updateEntry(id: number, data: UpdateEntryPayload): Promise
   const displayTitle = data.title ?? existing.display_title
   const displayUrl = data.url ?? updatedData.url
   dbUpdateEntry(db, id, encrypted.ciphertext, encrypted.iv, encrypted.authTag, displayTitle, displayUrl)
+
+  // Update password_changed_at only when the password actually changed
+  if (data.password && data.password !== existingData.password) {
+    db.run("UPDATE encrypted_entries SET password_changed_at = datetime('now') WHERE id = ?", [id])
+  }
+
   saveDatabase()
 }
 

@@ -2,6 +2,9 @@ import { create } from 'zustand'
 import { invoke } from '../lib/ipc'
 import { useEntriesStore } from './entriesStore'
 
+// Module-level storage for pending TOTP password (not exposed via React state)
+let _pendingPassword: string | null = null
+
 interface VaultInfo {
   id: number
   displayName: string
@@ -13,7 +16,6 @@ interface VaultState {
   loading: boolean
   error: string | null
   requiresTotp: boolean
-  pendingPassword: string | null
   alarmMode: boolean
   activeVaultId: number
   vaults: VaultInfo[]
@@ -36,7 +38,6 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   loading: false,
   error: null,
   requiresTotp: false,
-  pendingPassword: null,
   alarmMode: false,
   activeVaultId: 1,
   vaults: [],
@@ -88,31 +89,32 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     try {
       const result = await invoke('vault:unlock', masterPassword, totpCode, vaultId)
       if (result.success) {
+        _pendingPassword = null
         set({
           locked: false,
           loading: false,
           requiresTotp: false,
-          pendingPassword: null,
           alarmMode: result.alarmMode || false
         })
         return true
       } else if (result.requiresTotp) {
+        _pendingPassword = masterPassword
         set({
           requiresTotp: true,
-          pendingPassword: masterPassword,
           loading: false,
           error: null
         })
         return false
       } else {
+        _pendingPassword = null
         set((state) => ({
           error: result.error || 'Unlock failed',
           loading: false,
-          pendingPassword: state.requiresTotp ? state.pendingPassword : null,
         }))
         return false
       }
     } catch (err: any) {
+      _pendingPassword = null
       console.error('Vault unlock error:', err)
       set({ error: err?.message || 'An unexpected error occurred', loading: false })
       return false
@@ -120,9 +122,13 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   },
 
   lock: async () => {
-    await invoke('vault:lock')
-    set({ locked: true, requiresTotp: false, pendingPassword: null, alarmMode: false })
-    // Clear entries so they don't leak into alarm mode
+    try {
+      await invoke('vault:lock')
+    } catch {
+      // Still clean up state even if IPC fails
+    }
+    _pendingPassword = null
+    set({ locked: true, requiresTotp: false, alarmMode: false, verifiedSecureNotes: new Set() })
     useEntriesStore.setState({ entries: [], selectedEntry: null })
   },
 
@@ -147,7 +153,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   },
 
   clearError: () => set({ error: null }),
-  resetTotpState: () => set({ requiresTotp: false, pendingPassword: null }),
+  resetTotpState: () => { _pendingPassword = null; set({ requiresTotp: false }) },
 
   verifySecureNote: async (noteId: number, password: string) => {
     // No biometric bypass — always verify password via IPC
@@ -176,11 +182,12 @@ export const useVaultStore = create<VaultState>((set, get) => ({
 // Listen for vault:locked event from main process
 if (typeof window !== 'undefined' && window.electronAPI?.on) {
   window.electronAPI.on('vault:locked', () => {
+    _pendingPassword = null
     useVaultStore.setState({
       locked: true,
       requiresTotp: false,
-      pendingPassword: null,
       alarmMode: false,
+      verifiedSecureNotes: new Set(),
     })
     useEntriesStore.setState({ entries: [], selectedEntry: null })
   })
@@ -189,11 +196,12 @@ if (typeof window !== 'undefined' && window.electronAPI?.on) {
 // Listen for web vault lock event (auto-lock in Capacitor/web)
 if (typeof window !== 'undefined' && !window.electronAPI) {
   window.addEventListener('webvault:locked', () => {
+    _pendingPassword = null
     useVaultStore.setState({
       locked: true,
       requiresTotp: false,
-      pendingPassword: null,
       alarmMode: false,
+      verifiedSecureNotes: new Set(),
     })
     useEntriesStore.setState({ entries: [], selectedEntry: null })
   })

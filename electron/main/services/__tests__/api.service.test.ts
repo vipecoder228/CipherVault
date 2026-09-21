@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 
+// Mock Electron app
+vi.mock('electron', () => ({
+  app: { getVersion: () => '14.0.20' },
+}))
+
 // Mock TLS cert generation for tests
 vi.mock('../tlsCert', () => ({
   getLocalhostCert: vi.fn().mockResolvedValue({
